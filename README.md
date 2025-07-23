@@ -32,7 +32,7 @@ git clone https://github.com/revvin76/addarr.git
 cd addarr
 ```
 
-### 2. Populate your .env file with your API tokens from themovi
+### 2. Populate your .env file with your API tokens
 ```bash
 RADARR_URL=http://localhost:7878
 RADARR_API_KEY=****
