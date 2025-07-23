@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>API Debug Tool</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1000px; margin: auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, textarea { 
+            width: 100%; 
+            padding: 8px; 
+            box-sizing: border-box; 
+            margin-bottom: 10px; 
+        }
+        textarea { 
+            height: 150px; 
+            font-family: monospace; 
+            white-space: pre;
+        }
+        button { 
+            background: #4CAF50; 
+            color: white; 
+            padding: 10px 15px; 
+            border: none; 
+            cursor: pointer; 
+        }
+        .response { 
+            margin-top: 20px; 
+            border: 1px solid #ddd; 
+            padding: 15px; 
+            background: #f9f9f9; 
+        }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Radarr/Sonarr API Debugger</h1>
+        
+        <form method="POST">
+            <div class="form-group">
+                <label for="method">HTTP Method</label>
+                <select id="method" name="method">
+                    <option value="GET" {% if method == 'GET' %}selected{% endif %}>GET</option>
+                    <option value="POST" {% if method == 'POST' %}selected{% endif %}>POST</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="url">API URL</label>
+                <input type="text" id="url" name="url" 
+                       placeholder="e.g., http://localhost:7878/api/v3/movie" 
+                       value="{{ url }}" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="api_key">API Key</label>
+                <input type="text" id="api_key" name="api_key" 
+                       placeholder="Your Radarr/Sonarr API key" 
+                       value="{{ api_key }}" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="body">Request Body (JSON)</label>
+                <textarea id="body" name="body" 
+                          placeholder='{"tmdbId": 12345, "rootFolderPath": "G:\\Movies"}'>{{ body }}</textarea>
+            </div>
+            
+            <button type="submit">Submit Request</button>
+        </form>
+        
+        {% if error %}
+            <div class="response error">
+                <h3>Error</h3>
+                <pre>{{ error }}</pre>
+            </div>
+        {% endif %}
+        
+        {% if response %}
+            <div class="response">
+                <h3>Response (Status: {{ status_code }})</h3>
+                <pre>{{ response | tojson(indent=2) }}</pre>
+                
+                <h4>Response Headers</h4>
+                <pre>{{ headers | tojson(indent=2) }}</pre>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

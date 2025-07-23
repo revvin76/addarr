@@ -339,32 +339,59 @@ def get_media_details():
         return jsonify(get_sonarr_details(media_id))
 
 def check_for_updates():
+    """Check for updates and apply them if available"""
     try:
-        repo = git.Repo(os.path.dirname(os.path.abspath(__file__)))
-        
-        # Force reset to origin/main
+        repo = Repo(os.path.dirname(os.path.abspath(__file__)))
         origin = repo.remotes.origin
+        
+        # Fetch latest changes
         origin.fetch()
         
-        # Hard reset to match remote exactly
-        repo.git.reset('--hard', f'origin/{CONFIG["app"]["branch"]}')
+        # Get current and remote commits
+        local_commit = repo.head.commit
+        remote_commit = repo.commit(f'origin/{CONFIG["app"]["branch"]}')
         
-        logging.info("Successfully updated to latest version")
-        return True
-        
+        if local_commit.hexsha != remote_commit.hexsha:
+            logging.info("Update available - pulling changes...")
+            
+            # Stash local changes if any
+            if repo.is_dirty():
+                repo.git.stash()
+            
+            # Pull changes
+            repo.git.reset('--hard', f'origin/{CONFIG["app"]["branch"]}')
+            logging.info("Update applied successfully")
+            
+            # Signal that restart is needed
+            return True
+        else:
+            logging.debug("No updates available")
+            return False
+            
     except Exception as e:
-        logging.error(f"Update failed: {str(e)}")
+        logging.error(f"Update check failed: {str(e)}")
         return False
 
 def update_checker():
-    """Simplified update checker that forces sync"""
+    """Background thread to check for updates periodically"""
     while True:
         try:
-            check_for_updates()
-            time.sleep(CONFIG['app']['update_interval'])  # Check every hour
+            update_available = check_for_updates()
+            if update_available:
+                # Here you could implement a restart mechanism
+                restart_app()
+                
+            time.sleep(CONFIG['app']['update_interval'])
+            
         except Exception as e:
             logging.error(f"Update checker error: {str(e)}")
-            time.sleep(300)  # Wait 5 minutes after errors
+            time.sleep(300)  # Wait 5 minutes after error
+
+def restart_app():
+    """Trigger application restart"""
+    logging.info("Restarting application...")
+    python = sys.executable
+    os.execl(python, python, *sys.argv)
 
 def get_radarr_details(tmdb_id):
     """Simplified Radarr details without crew information"""
@@ -506,6 +533,46 @@ if os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true':
 if os.getenv('FLASK_DEBUG') == '1':
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
+@app.route('/debug', methods=['GET', 'POST'])
+@log_request_response
+def debug_tool():
+    if request.method == 'POST':
+        # Get user input from form
+        method = request.form.get('method', 'GET')
+        url = request.form.get('url', '').strip()
+        headers = {
+            'X-Api-Key': request.form.get('api_key', ''),
+            'Content-Type': 'application/json'
+        }
+        body = request.form.get('body', '{}')
+        
+        # Send request
+        try:
+            if method.upper() == 'GET':
+                response = requests.get(url, headers=headers)
+            else:
+                response = requests.post(url, headers=headers, json=json.loads(body))
+            
+            return render_template('debug.html',
+                response=response.text,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                method=method,
+                url=url,
+                api_key=headers['X-Api-Key'],
+                body=body
+            )
+        except Exception as e:
+            return render_template('debug.html',
+                error=str(e),
+                method=method,
+                url=url,
+                api_key=headers['X-Api-Key'],
+                body=body
+            )
+    
+    return render_template('debug.html')
+
 def get_ip_address():
     """Get the local IP address for network access"""
     import socket
@@ -547,7 +614,7 @@ if __name__ == '__main__':
             name="ForceUpdater"
         )
         update_thread.start()
-            
+
     print_welcome()
     app.run(host='0.0.0.0', port=5000)
 
