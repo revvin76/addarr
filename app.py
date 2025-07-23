@@ -340,43 +340,31 @@ def get_media_details():
 
 def check_for_updates():
     try:
-        # Initialize repo (fixed)
-        repo = Repo(os.path.dirname(os.path.abspath(__file__)))
+        repo = git.Repo(os.path.dirname(os.path.abspath(__file__)))
         
-        if not repo.bare:
-            current_commit = repo.head.commit.hexsha
-            origin = repo.remotes.origin
-            
-            # Fetch updates safely
-            try:
-                origin.fetch()
-                branch_name = CONFIG["app"]["branch"]
-                
-                # Get remote commit safely
-                remote_ref = f'origin/{branch_name}'
-                if remote_ref in repo.refs:
-                    remote_commit = repo.refs[remote_ref].commit.hexsha
-                    
-                    if current_commit != remote_commit:
-                        logging.info("Update available. Pulling changes...")
-                        origin.pull()
-                        logging.info("Update complete. Restart required.")
-                        return True
-            except Exception as fetch_error:
-                logging.warning(f"Fetch failed: {str(fetch_error)}")
-                
-        return False
+        # Force reset to origin/main
+        origin = repo.remotes.origin
+        origin.fetch()
+        
+        # Hard reset to match remote exactly
+        repo.git.reset('--hard', f'origin/{CONFIG["app"]["branch"]}')
+        
+        logging.info("Successfully updated to latest version")
+        return True
         
     except Exception as e:
-        logging.error(f"Update check failed: {str(e)}", exc_info=True)
+        logging.error(f"Update failed: {str(e)}")
         return False
-    
-def update_checker():
-    while True:
-        print(f"Checking for updates at {datetime.now()}")
-        check_for_updates()
-        time.sleep(CONFIG['app']['update_interval'])
 
+def update_checker():
+    """Simplified update checker that forces sync"""
+    while True:
+        try:
+            check_for_updates()
+            time.sleep(CONFIG['app']['update_interval'])  # Check every hour
+        except Exception as e:
+            logging.error(f"Update checker error: {str(e)}")
+            time.sleep(300)  # Wait 5 minutes after errors
 
 def get_radarr_details(tmdb_id):
     """Simplified Radarr details without crew information"""
@@ -552,6 +540,14 @@ if __name__ == '__main__':
     from colorama import init
     init()  # Initialize colorama
     
+    if os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true':
+        update_thread = threading.Thread(
+            target=update_checker,
+            daemon=True,
+            name="ForceUpdater"
+        )
+        update_thread.start()
+            
     print_welcome()
     app.run(host='0.0.0.0', port=5000)
 

@@ -80,3 +80,10 @@ yarn-error.log*
 
 # Virtual environments
 *.venv/
+
+*.log
+*.pyc
+*.db
+instance/
+.env
+*.local
