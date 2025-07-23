@@ -1,9 +1,16 @@
 import os
+from functools import wraps
 from flask import Flask, render_template, request, jsonify,send_from_directory
 import requests
 from dotenv import load_dotenv
 import json
-
+import subprocess
+import threading
+from datetime import datetime
+from git import Repo
+import logging
+from logging.handlers import RotatingFileHandler
+import time
 
 load_dotenv()
 
@@ -26,20 +33,124 @@ CONFIG = {
     }
 }
 
+CONFIG.update({
+    'app': {
+        'update_interval': 3600,  # Check for updates every hour (in seconds)
+        'github_repo': 'revvin76/addarr',  # Update with your GitHub repo
+        'branch': 'main'  # Your main branch name
+    }
+})
+
+def setup_logging():
+    log_format = '%(asctime)s - %(levelname)s - %(message)s'
+    log_file = 'managarr.log'
+    
+    # Set up rotating logs (10MB max, 5 backups)
+    handler = RotatingFileHandler(
+        log_file, maxBytes=10*1024*1024, backupCount=5
+    )
+    handler.setFormatter(logging.Formatter(log_format))
+    
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    
+    # Also log to console in debug mode
+    if os.getenv('FLASK_DEBUG') == '1':
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter(log_format))
+        logger.addHandler(console_handler)
+
+setup_logging()
+
+def log_request_response(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Log request
+        request_data = {
+            'method': request.method,
+            'path': request.path,
+            'args': dict(request.args),
+            'remote_addr': request.remote_addr
+        }
+        
+        # Only include form/json if not sensitive
+        if not any(s in request.path.lower() for s in ['login', 'auth']):
+            if request.form:
+                request_data['form'] = dict(request.form)
+            if request.is_json:
+                try:
+                    request_data['json'] = request.json
+                except:
+                    request_data['json'] = "Invalid JSON"
+        
+        logging.info(f"Request: {json.dumps(request_data, indent=2)}")
+        
+        start_time = time.time()
+        
+        try:
+            response = f(*args, **kwargs)
+            
+            # Handle both Response objects and direct string returns
+            if isinstance(response, str):
+                # For template responses, create a mock response for logging
+                response_data = {
+                    'status_code': 200,
+                    'type': 'template',
+                    'processing_time': f"{time.time() - start_time:.3f}s"
+                }
+            else:
+                # For proper Response objects
+                response_data = {
+                    'status_code': response.status_code,
+                    'type': 'response',
+                    'processing_time': f"{time.time() - start_time:.3f}s"
+                }
+                
+            logging.info(f"Response: {json.dumps(response_data, indent=2)}")
+            return response
+            
+        except Exception as e:
+            logging.error(f"Error in {f.__name__}: {str(e)}", exc_info=True)
+            raise
+    
+    return decorated_function
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
+                              'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logging.error(f"Unhandled exception: {str(e)}", exc_info=True)
+    return jsonify({'error': 'An unexpected error occurred'}), 500
+
 required_env = ['RADARR_URL', 'RADARR_API_KEY', 'SONARR_URL', 'SONARR_API_KEY']
 missing = [key for key in required_env if not os.getenv(key)]
 if missing:
     raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
 
 @app.route('/')
+@log_request_response
 def index():
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except TemplateNotFound:
+        logging.error("Template 'index.html' not found")
+        return "Page not found", 404
 
 @app.route('/offline.html')
+@log_request_response
 def offline():
-    return render_template('offline.html')
+    try:
+        return render_template('offline.html')
+    except TemplateNotFound:
+        logging.error("Template 'offline.html' not found")
+        return "Page not found", 404
 
 @app.route('/get_tmdb_details')
+@log_request_response
 def get_tmdb_details():
     media_type = request.args.get('type')  # 'tv' or 'movie'
     tmdb_id = request.args.get('id')      # TMDB ID
@@ -94,6 +205,7 @@ def get_tmdb_details():
         return jsonify({'error': str(e)}), 500
     
 @app.route('/search', methods=['POST'])
+@log_request_response
 def search():
     query = request.form['query']
     media_type = request.form['media_type']
@@ -140,6 +252,7 @@ def search_sonarr(query):
     return response.json()
 
 @app.route('/add', methods=['POST'])
+@log_request_response
 def add_to_arr():
     data = request.json
     media_type = data['media_type']
@@ -211,6 +324,7 @@ def add_to_sonarr(tvdb_id):
 
 # Add these new functions to your Flask app
 @app.route('/get_media_details')
+@log_request_response
 def get_media_details():
     media_type = request.args.get('type')
     media_id = request.args.get('id')
@@ -221,6 +335,46 @@ def get_media_details():
         return jsonify(get_radarr_details(media_id))
     else:
         return jsonify(get_sonarr_details(media_id))
+
+def check_for_updates():
+    try:
+        # Initialize repo (fixed)
+        repo = Repo(os.path.dirname(os.path.abspath(__file__)))
+        
+        if not repo.bare:
+            current_commit = repo.head.commit.hexsha
+            origin = repo.remotes.origin
+            
+            # Fetch updates safely
+            try:
+                origin.fetch()
+                branch_name = CONFIG["app"]["branch"]
+                
+                # Get remote commit safely
+                remote_ref = f'origin/{branch_name}'
+                if remote_ref in repo.refs:
+                    remote_commit = repo.refs[remote_ref].commit.hexsha
+                    
+                    if current_commit != remote_commit:
+                        logging.info("Update available. Pulling changes...")
+                        origin.pull()
+                        logging.info("Update complete. Restart required.")
+                        return True
+            except Exception as fetch_error:
+                logging.warning(f"Fetch failed: {str(fetch_error)}")
+                
+        return False
+        
+    except Exception as e:
+        logging.error(f"Update check failed: {str(e)}", exc_info=True)
+        return False
+    
+def update_checker():
+    while True:
+        print(f"Checking for updates at {datetime.now()}")
+        check_for_updates()
+        time.sleep(CONFIG['app']['update_interval'])
+
 
 def get_radarr_details(tmdb_id):
     """Simplified Radarr details without crew information"""
@@ -320,6 +474,7 @@ def get_sonarr_details(tvdb_id):
 
 # Add this new endpoint
 @app.route('/check_library_status')
+@log_request_response
 def check_library_status():
     media_type = request.args.get('type')
     media_id = request.args.get('id')
@@ -342,8 +497,24 @@ def check_library_status():
     return jsonify({'in_library': in_library})
 
 @app.route('/images/<path:filename>')
+@log_request_response
 def serve_image(filename):
     return send_from_directory('static/images', filename)
+
+if os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true':
+    try:
+        update_thread = threading.Thread(
+            target=update_checker,
+            daemon=True,
+            name="AutoUpdater"
+        )
+        update_thread.start()
+        logging.info("Auto-update thread started")
+    except Exception as e:
+        logging.error(f"Failed to start update thread: {str(e)}")
+
+if os.getenv('FLASK_DEBUG') == '1':
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
