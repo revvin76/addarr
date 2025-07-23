@@ -1,0 +1,349 @@
+import os
+from flask import Flask, render_template, request, jsonify,send_from_directory
+import requests
+from dotenv import load_dotenv
+import json
+
+
+load_dotenv()
+
+app = Flask(__name__)
+
+# Configuration
+CONFIG = {
+    'radarr': {
+        'url': os.getenv('RADARR_URL'),
+        'api_key': os.getenv('RADARR_API_KEY'),
+        'root_folder': os.getenv('RADARR_ROOT_FOLDER'),
+        'quality_profile_id': 2  # Update with your profile ID
+    },
+    'sonarr': {
+        'url': os.getenv('SONARR_URL'),
+        'api_key': os.getenv('SONARR_API_KEY'),
+        'root_folder': os.getenv('SONARR_ROOT_FOLDER'),
+        'quality_profile_id': 3,  
+        'language_profile_id': 1   
+    }
+}
+
+required_env = ['RADARR_URL', 'RADARR_API_KEY', 'SONARR_URL', 'SONARR_API_KEY']
+missing = [key for key in required_env if not os.getenv(key)]
+if missing:
+    raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/offline.html')
+def offline():
+    return render_template('offline.html')
+
+@app.route('/get_tmdb_details')
+def get_tmdb_details():
+    media_type = request.args.get('type')  # 'tv' or 'movie'
+    tmdb_id = request.args.get('id')      # TMDB ID
+
+    print(f"Fetching TMDB details for type: {media_type}, ID: {tmdb_id}")
+    
+    if not media_type or not tmdb_id:
+        return jsonify({'error': 'Missing type or ID'}), 400
+    
+    try:
+        # Base details
+        base_url = f"https://api.themoviedb.org/3/{media_type}/{tmdb_id}"
+        params = {
+            'api_key': os.getenv('TMDB_KEY'),
+            'language': 'en-GB',
+            'append_to_response': 'videos,images'  # Get additional data
+        }
+        
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Process the data into a consistent format
+        result = {
+            'title': data.get('name') or data.get('title'),
+            'overview': data.get('overview'),
+            'poster_path': data.get('poster_path'),
+            'backdrop_path': data.get('backdrop_path'),
+            'vote_average': data.get('vote_average'),
+            'genres': [g['name'] for g in data.get('genres', [])],
+            'first_air_date': data.get('first_air_date'),
+            'last_air_date': data.get('last_air_date'),
+            'status': data.get('status'),  # 'Returning Series' or 'Ended'
+            'videos': data.get('videos', {}).get('results', []),
+            'images': data.get('images', {}).get('posters', [])
+        }
+        
+        # Find the best trailer (official YouTube trailer)
+        result['trailer'] = next(
+            (v for v in result['videos']
+             if v.get('site') == 'YouTube' 
+             and v.get('type') == 'Trailer'
+             and v.get('official') is True),
+            None
+        )
+        
+        return jsonify(result)
+        
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'TMDB API error: {str(e)}'}), 502
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/search', methods=['POST'])
+def search():
+    query = request.form['query']
+    media_type = request.form['media_type']
+    print(f"Searching {media_type} for: {query}")
+    
+    try:
+        if media_type == 'movie':
+            results = search_radarr(query)
+            # Ensure results is always a list
+            results = results if isinstance(results, list) else []
+            print(f"Found {len(results)} movies")
+        else:
+            results = search_sonarr(query)
+            # Sonarr returns a list directly
+            print(f"Found {len(results)} TV shows")
+            
+        return render_template(
+            'results.html',
+            results=results,
+            media_type=media_type,
+            query=query
+        )
+        
+    except Exception as e:
+        print(f"Search error: {str(e)}")
+        return render_template('error.html', error=str(e))
+
+def search_radarr(query):
+    url = f"{CONFIG['radarr']['url']}/api/v3/movie/lookup"
+    params = {
+        'term': query,
+        'apikey': CONFIG['radarr']['api_key']
+    }
+    response = requests.get(url, params=params)
+    return response.json()
+
+def search_sonarr(query):
+    url = f"{CONFIG['sonarr']['url']}/api/v3/series/lookup"
+    params = {
+        'term': query,
+        'apikey': CONFIG['sonarr']['api_key']
+    }
+    response = requests.get(url, params=params)
+    return response.json()
+
+@app.route('/add', methods=['POST'])
+def add_to_arr():
+    data = request.json
+    media_type = data['media_type']
+    media_id = data['media_id']
+    
+    if media_type == 'movie':
+        success = add_to_radarr(media_id)
+    else:
+        success = add_to_sonarr(media_id)
+    
+    return jsonify({'success': success})
+
+def add_to_radarr(tmdb_id):
+    url = f"{CONFIG['radarr']['url']}/api/v3/movie"
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        'tmdbId': tmdb_id,
+        'monitored': True,
+        'rootFolderPath': CONFIG['radarr']['root_folder'],
+        'qualityProfileId': CONFIG['radarr']['quality_profile_id'],
+        'addOptions': {'searchForMovie': True}
+    }
+    response = requests.post(
+        url, 
+        json=payload, 
+        headers=headers,
+        params={'apikey': CONFIG['radarr']['api_key']}
+    )
+    return response.status_code in [200, 201]
+
+def add_to_sonarr(tvdb_id):
+    # First lookup series details
+    lookup_url = f"{CONFIG['sonarr']['url']}/api/v3/series/lookup"
+    params = {
+        'term': f'tvdb:{tvdb_id}',
+        'apikey': CONFIG['sonarr']['api_key']
+    }
+    
+    lookup_res = requests.get(lookup_url, params=params)
+    if lookup_res.status_code != 200:
+        print(f"Lookup failed: {lookup_res.text}")
+        return False
+    
+    series_data = lookup_res.json()[0]  # Get first result
+    
+    payload = {
+        'tvdbId': tvdb_id,
+        'title': series_data['title'],
+        'monitored': True,
+        'rootFolderPath': CONFIG['sonarr']['root_folder'],
+        'qualityProfileId': CONFIG['sonarr']['quality_profile_id'],
+        'languageProfileId': CONFIG['sonarr']['language_profile_id'],
+        'addOptions': {
+            'searchForMissingEpisodes': True,
+            'monitor': 'all'
+        },
+        'seasonFolder': True,
+        'seriesType': 'standard'
+    }
+    
+    response = requests.post(
+        f"{CONFIG['sonarr']['url']}/api/v3/series",
+        json=payload,
+        params={'apikey': CONFIG['sonarr']['api_key']}
+    )
+    
+    print(f"Sonarr response: {response.status_code} - {response.text}")
+    return response.status_code in [200, 201]
+
+# Add these new functions to your Flask app
+@app.route('/get_media_details')
+def get_media_details():
+    media_type = request.args.get('type')
+    media_id = request.args.get('id')
+
+    print(f"Fetching details for {media_type} with ID: {media_id}")
+    
+    if media_type == 'movie':
+        return jsonify(get_radarr_details(media_id))
+    else:
+        return jsonify(get_sonarr_details(media_id))
+
+def get_radarr_details(tmdb_id):
+    """Simplified Radarr details without crew information"""
+    # Check if movie exists in Radarr
+    existing_url = f"{CONFIG['radarr']['url']}/api/v3/movie"
+    existing = requests.get(existing_url, params={'apikey': CONFIG['radarr']['api_key']}).json()
+    
+    for movie in existing:
+        if str(movie.get('tmdbId')) == str(tmdb_id):
+            # Existing movie - get full details
+            movie_url = f"{CONFIG['radarr']['url']}/api/v3/movie/{movie['id']}"
+            full_details = requests.get(movie_url, params={'apikey': CONFIG['radarr']['api_key']}).json()
+            
+            # Ensure images are properly structured
+            if 'images' not in full_details:
+                full_details['images'] = []
+            if full_details.get('remotePoster'):
+                full_details['images'].append({
+                    'coverType': 'poster',
+                    'url': full_details['remotePoster'],
+                    'remoteUrl': full_details['remotePoster']
+                })
+            
+            return {
+                'status': 'existing',
+                'data': full_details,
+                'on_disk': full_details.get('hasFile', False),
+                'monitored': full_details.get('monitored', False)
+            }
+    
+    # Not added - get fresh details
+    lookup_url = f"{CONFIG['radarr']['url']}/api/v3/movie/lookup/tmdb"
+    lookup = requests.get(lookup_url, params={
+        'tmdbId': tmdb_id,
+        'apikey': CONFIG['radarr']['api_key']
+    }).json()
+    
+    # Ensure lookup results have proper image structure
+    if isinstance(lookup, list):
+        lookup = lookup[0] if lookup else {}
+    
+    if 'images' not in lookup:
+        lookup['images'] = []
+    if lookup.get('remotePoster'):
+        lookup['images'].append({
+            'coverType': 'poster',
+            'url': lookup['remotePoster'],
+            'remoteUrl': lookup['remotePoster']
+        })
+    
+    return {
+        'status': 'not_added',
+        'data': lookup,
+        'on_disk': False,
+        'monitored': False
+    }
+
+def get_sonarr_details(tvdb_id):
+    """Check if series exists in Sonarr and get details"""
+    # Check if already added
+    existing_url = f"{CONFIG['sonarr']['url']}/api/v3/series"
+    existing = requests.get(existing_url, params={'apikey': CONFIG['sonarr']['api_key']}).json()
+    
+    for series in existing:
+        if str(series.get('tvdbId')) == str(tvdb_id):
+            # Get detailed status
+            status_url = f"{CONFIG['sonarr']['url']}/api/v3/series/{series['id']}"
+            details = requests.get(status_url, params={'apikey': CONFIG['sonarr']['api_key']}).json()
+            
+            return {
+                'status': 'existing',
+                'data': details,
+                'on_disk': details.get('statistics', {}).get('percentOfEpisodes') > 0,
+                'monitored': details.get('monitored', False),
+                'download_status': f"{details.get('statistics', {}).get('percentOfEpisodes', 0)}% complete",
+                'season_count': details.get('statistics', {}).get('seasonCount'),
+                'episode_count': details.get('statistics', {}).get('episodeCount')
+            }
+    
+    # Not added - get fresh details
+    lookup_url = f"{CONFIG['sonarr']['url']}/api/v3/series/lookup"
+    lookup = requests.get(lookup_url, params={
+        'term': f'tvdb:{tvdb_id}',
+        'apikey': CONFIG['sonarr']['api_key']
+    }).json()
+    
+    if lookup:
+        return {
+            'status': 'not_added',
+            'data': lookup[0],
+            'on_disk': False,
+            'monitored': False,
+            'status': lookup[0].get('status', 'unknown')
+        }
+    
+    return {'error': 'Series not found'}
+
+# Add this new endpoint
+@app.route('/check_library_status')
+def check_library_status():
+    media_type = request.args.get('type')
+    media_id = request.args.get('id')
+    
+    if media_type == 'movie':
+        # Check Radarr
+        existing = requests.get(
+            f"{CONFIG['radarr']['url']}/api/v3/movie",
+            params={'apikey': CONFIG['radarr']['api_key']}
+        ).json()
+        in_library = any(str(m.get('tmdbId')) == str(media_id) for m in existing)
+    else:
+        # Check Sonarr
+        existing = requests.get(
+            f"{CONFIG['sonarr']['url']}/api/v3/series",
+            params={'apikey': CONFIG['sonarr']['api_key']}
+        ).json()
+        in_library = any(str(s.get('tvdbId')) == str(media_id) for s in existing)
+    
+    return jsonify({'in_library': in_library})
+
+@app.route('/images/<path:filename>')
+def serve_image(filename):
+    return send_from_directory('static/images', filename)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
