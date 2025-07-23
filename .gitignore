@@ -41,6 +41,9 @@ venv.bak/
 *.sql
 *.db
 addarr.log
+*.local
+*.log
+instance/
 
 # IDE & Editor
 .vscode/

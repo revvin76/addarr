@@ -11,6 +11,8 @@ from git import Repo
 import logging
 from logging.handlers import RotatingFileHandler
 import time
+from ascii_magic import AsciiArt
+
 
 load_dotenv()
 
@@ -516,5 +518,40 @@ if os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true':
 if os.getenv('FLASK_DEBUG') == '1':
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
+def get_ip_address():
+    """Get the local IP address for network access"""
+    import socket
+    try:
+        # Create a temporary socket to get the IP
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            # Doesn't actually connect, just determines the best route
+            s.connect(('10.255.255.255', 1))
+            ip_address = s.getsockname()[0]
+    except Exception:
+        ip_address = '127.0.0.1'  # Fallback to localhost
+    return ip_address
+
+def print_welcome():    
+    from colorama import Fore, Style
+    
+    # App info text
+    app_info = f"""
+    {Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}
+    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.0')}
+    {Fore.WHITE}• Local: {Fore.CYAN}http://127.0.0.1:5000{Style.RESET_ALL}
+    {Fore.WHITE}• Network: {Fore.CYAN}http://{get_ip_address()}:5000{Style.RESET_ALL}
+    """
+    my_art = AsciiArt.from_image('static/images/logo.png')
+    my_art.to_terminal()
+
+    print(app_info)
+    print(f"{Fore.GREEN}✅ Ready to add media!{Style.RESET_ALL}\n")
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    from colorama import init
+    init()  # Initialize colorama
+    
+    print_welcome()
+    app.run(host='0.0.0.0', port=5000)
+
