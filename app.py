@@ -43,7 +43,7 @@ CONFIG.update({
 
 def setup_logging():
     log_format = '%(asctime)s - %(levelname)s - %(message)s'
-    log_file = 'managarr.log'
+    log_file = 'addarr.log'
     
     # Set up rotating logs (10MB max, 5 backups)
     handler = RotatingFileHandler(

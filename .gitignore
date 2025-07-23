@@ -40,7 +40,7 @@ venv.bak/
 *.sqlite
 *.sql
 *.db
-managarr.log
+addarr.log
 
 # IDE & Editor
 .vscode/
