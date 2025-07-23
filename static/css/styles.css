@@ -448,3 +448,120 @@ iframe {
     height: 100%;
     object-fit: scale-down;
 }
+
+/* ===== API Debugger Specific Styles ===== */
+.api-debug-container {
+    display: flex;
+    min-height: calc(100vh - 80px);
+    overflow: hidden;
+}
+
+.api-sidebar {
+    width: 300px;
+    min-width: 300px;
+    background-color: var(--card-bg);
+    border-right: 1px solid var(--card-border);
+    overflow-y: auto;
+    height: calc(100vh - 80px);
+    position: sticky;
+    top: 80px;
+    padding: 1rem;
+}
+
+.api-main-content {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+    height: calc(100vh - 80px);
+}
+
+.api-form-container {
+    background-color: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.api-response-container {
+    background-color: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.api-endpoint {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background-color: #3a3a3a;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 3px solid var(--accent-green);
+}
+
+.api-endpoint:hover {
+    background-color: #444;
+    transform: translateX(2px);
+}
+
+.api-endpoint small {
+    color: #a0a0a0;
+    font-size: 0.8em;
+}
+
+.api-url-input-group .input-group-text {
+    background-color: #3a3a3a;
+    color: var(--text-light);
+    border-color: #444;
+}
+
+.api-stable-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .api-debug-container {
+        flex-direction: column;
+    }
+    
+    .api-sidebar {
+        width: 100%;
+        height: auto;
+        position: static;
+        border-right: none;
+        border-bottom: 1px solid var(--card-border);
+    }
+    
+    .api-main-content {
+        height: auto;
+    }
+}
+/* JSON Syntax Highlighting */
+pre {
+    position: relative;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+pre .string { color: var(--accent-green); }
+pre .number { color: #d19a66; }
+pre .boolean { color: #56b6c2; }
+pre .null { color: #d19a66; }
+pre .key { color: #e06c75; }
+
+/* Copy button styling */
+pre button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+pre:hover button {
+    opacity: 1;
+}

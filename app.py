@@ -536,42 +536,71 @@ if os.getenv('FLASK_DEBUG') == '1':
 @app.route('/debug', methods=['GET', 'POST'])
 @log_request_response
 def debug_tool():
+    # Get service from query param or default to radarr
+    service = request.args.get('service', 'radarr')
+    
     if request.method == 'POST':
-        # Get user input from form
         method = request.form.get('method', 'GET')
         url = request.form.get('url', '').strip()
-        headers = {
-            'X-Api-Key': request.form.get('api_key', ''),
-            'Content-Type': 'application/json'
-        }
+        api_key = request.form.get('api_key', '')
         body = request.form.get('body', '{}')
         
-        # Send request
+        # Construct full URL
+        base_url = CONFIG['radarr']['url'] if service == 'radarr' else CONFIG['sonarr']['url']
+        full_url = f"{base_url}/api/v3{url if url.startswith('/') else '/' + url}"
+        
+        headers = {
+            'X-Api-Key': api_key,
+            'Content-Type': 'application/json'
+        }
+        
         try:
             if method.upper() == 'GET':
-                response = requests.get(url, headers=headers)
+                response = requests.get(full_url, headers=headers)
             else:
-                response = requests.post(url, headers=headers, json=json.loads(body))
+                response = requests.post(full_url, headers=headers, json=json.loads(body))
+            
+            # Parse and format the JSON response
+            try:
+                formatted_response = json.dumps(json.loads(response.text), indent=2)
+            except json.JSONDecodeError:
+                formatted_response = response.text  # Fallback for non-JSON responses
             
             return render_template('debug.html',
-                response=response.text,
+                response=formatted_response,  # Now properly formatted
                 status_code=response.status_code,
                 headers=dict(response.headers),
                 method=method,
                 url=url,
-                api_key=headers['X-Api-Key'],
-                body=body
+                api_key=api_key,
+                body=body,
+                service=service,
+                radarr_url=CONFIG['radarr']['url'],
+                sonarr_url=CONFIG['sonarr']['url'],
+                radarr_api_key=CONFIG['radarr']['api_key'],
+                sonarr_api_key=CONFIG['sonarr']['api_key']
             )
         except Exception as e:
             return render_template('debug.html',
                 error=str(e),
                 method=method,
                 url=url,
-                api_key=headers['X-Api-Key'],
-                body=body
+                api_key=api_key,
+                body=body,
+                service=service,
+                radarr_url=CONFIG['radarr']['url'],
+                sonarr_url=CONFIG['sonarr']['url'],
+                radarr_api_key=CONFIG['radarr']['api_key'],
+                sonarr_api_key=CONFIG['sonarr']['api_key']
             )
     
-    return render_template('debug.html')
+    return render_template('debug.html',
+        service=service,
+        radarr_url=CONFIG['radarr']['url'],
+        sonarr_url=CONFIG['sonarr']['url'],
+        radarr_api_key=CONFIG['radarr']['api_key'],
+        sonarr_api_key=CONFIG['sonarr']['api_key']
+    )
 
 def get_ip_address():
     """Get the local IP address for network access"""
