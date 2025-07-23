@@ -3,7 +3,11 @@
 A lightweight Flask web interface to search and add movies/TV shows to Radarr/Sonarr.  
 Perfect for self-hosted media servers!  
 
-![Demo Screenshot](/static/images/screenshot.png) *(optional: add a screenshot later)*  
+![Demo Screenshot 1](/static/images/screenshot1.png)
+![Demo Screenshot 2](/static/images/screenshot2.png)
+![Demo Screenshot 3](/static/images/screenshot3.png)
+![Demo Screenshot 4](/static/images/screenshot4.png)
+![Demo Screenshot 5](/static/images/screenshot5.png)
 
 ---
 
