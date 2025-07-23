@@ -14,7 +14,6 @@ Perfect for self-hosted media servers!
 ## Features ✨
 - 🔍 **Search** movies (Radarr) and TV shows (Sonarr)  
 - ➕ **One-click add** to your library  
-- 📱 **Mobile-friendly** PWA (works offline)  
 - 🎥 **Trailer previews** (YouTube integration)  
 - 📊 **Detailed info** (ratings, genres, status)  
 - 🔄 **Auto-update** from GitHub  
