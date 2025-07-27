@@ -494,10 +494,13 @@
             logPanel.classList.remove('open');
             logOverlay.classList.remove('open');
         });
-        logOverlay.addEventListener('click', function() {
-            logPanel.classList.remove('open');
-            logOverlay.classList.remove('open');
-        });        
+        
+        if  (logOverlay) {
+            logOverlay.addEventListener('click', function() {
+                logPanel.classList.remove('open');
+                logOverlay.classList.remove('open');
+            });        
+        }
 
         function fetchLogContent() {
             logContent.textContent = 'Loading...';

@@ -753,3 +753,117 @@ input:checked + .toggle-slider:before {
 #update-now .spinner-border {
     vertical-align: -0.125em;
 }
+
+/* ====================== */
+/* Desktop Enhancements */
+/* ====================== */
+
+@media (min-width: 992px) {
+  /* Layout Improvements */
+  .container {
+    max-width: 1400px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+
+  /* Grid System Enhancement */
+  .row {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  /* Card Enhancements */
+  .search-result-card {
+    min-height: 500px;
+  }
+
+  .search-result-thumbnail-container {
+    padding-bottom: 150%; /* Maintain aspect ratio */
+  }
+
+  .card-custom:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+  }
+
+  /* Typography Scaling */
+  h1, .h1 { font-size: 3rem; }
+  h2, .h2 { font-size: 2.5rem; }
+  h3, .h3 { font-size: 2rem; }
+
+  /* Navigation Enhancements */
+  .navbar-custom {
+    padding: 1rem 2rem;
+  }
+
+  /* Modal Sizing */
+  .modal-lg {
+    max-width: 900px;
+  }
+
+  /* Sidebar/Content Layout */
+  .api-debug-container {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+  }
+
+  .api-sidebar {
+    height: calc(100vh - 80px);
+    position: sticky;
+    top: 80px;
+  }
+
+  /* Image Gallery */
+  .image-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    white-space: normal;
+  }
+
+  .image-gallery .col-4 {
+    width: auto;
+  }
+
+  /* Form Elements */
+  .form-control, .form-select {
+    padding: 0.75rem 1rem;
+  }
+
+  /* Config Panel */
+  .config-panel {
+    width: 450px;
+  }
+
+  /* Search Results Container */
+  .search-container {
+    padding: 3rem;
+  }
+}
+
+/* Extra Large Screens */
+@media (min-width: 1400px) {
+  .row {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  }
+
+  .search-result-card {
+    min-height: 550px;
+  }
+
+  .modal-xl {
+    max-width: 1200px;
+  }
+}
+
+/* Hover States (Desktop Only) */
+@media (hover: hover) {
+  .card-custom:hover .card-title {
+    color: var(--accent-green);
+    transition: color 0.2s;
+  }
+
+  .nav-link:hover {
+    color: var(--accent-green) !important;
+  }
+}
