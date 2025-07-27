@@ -207,7 +207,18 @@ def index():
             current_version='unknown',
             latest_version='unknown'
         )
-    
+
+@app.route('/logs')
+@log_request_response
+def get_logs():
+    try:
+        log_path = 'addarr.log'
+        with open(log_path, 'r') as f:
+            lines = f.readlines()[-500:]  # return last 500 lines max
+        return jsonify({'success': True, 'log': ''.join(lines)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/offline.html')
 @log_request_response
 def offline():

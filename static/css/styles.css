@@ -112,8 +112,8 @@ h6, .h6 { font-size: 1rem; color: #a0a0a0; font-weight: 500; }
 }
 
 .btn-outline-radarr {
-    border-color: var(--accent-green);
-    color: var(--accent-green);
+    /* border-color: var(--accent-green); */
+    color: var(--text-light);
 }
 
 .btn-outline-radarr:hover {

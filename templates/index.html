@@ -31,10 +31,13 @@
             
             <div class="d-flex gap-2">
                 <button id="debugToggle" class="btn btn-outline-radarr">
-                    <i class="bi bi-bug-fill"></i> Debug
+                    <i class="fas fa-bug"></i>
+                </button>
+                <button id="logToggle" class="btn btn-outline-radarr">
+                    <i class="fas fa-list-check"></i>
                 </button>
                 <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="collapse" data-bs-target="#configPanel">
-                    <i class="bi bi-gear-fill"></i> Settings
+                    <i class="fas fa-cog"></i>
                 </button>
             </div>
         </div>
@@ -176,9 +179,24 @@
     </form>
 </div>
 
-<div id="debugPanel" class="side-panel">
-    <div class="panel-content">
-        <h4>Debug</h4>
+<div id="logPanel" class="config-panel">
+
+        <div class="config-header">
+            <h3>Log file</h3>
+            <button class="btn btn-sm btn-outline-radarr" id="closeLog">&times;</button>
+        </div>
+        <pre id="logContent" class="api-response-container">Loading...</pre>
+</div>
+
+<div id="debugPanel" class="config-panel">
+
+        <div class="config-header">
+            <h3>Debug APIs</h3>
+            <button class="btn btn-sm btn-outline-radarr" id="closeDebug">&times;</button>
+        </div>
+
+        <div class="panel-content">
+    
         <div class="api-debug-container">
             <!-- Sidebar -->
             <div class="api-sidebar">
@@ -394,13 +412,11 @@
             configPanel.classList.add('open');
             configOverlay.classList.add('open');
             loadConfigurationData();
-        });
-        
+        });       
         closeConfig.addEventListener('click', function() {
             configPanel.classList.remove('open');
             configOverlay.classList.remove('open');
         });
-        
         configOverlay.addEventListener('click', function() {
             configPanel.classList.remove('open');
             configOverlay.classList.remove('open');
@@ -410,7 +426,12 @@
         const debugPanel = document.getElementById('debugPanel');
         const debugOverlay = document.getElementById('debugOverlay');
         const closedebug = document.getElementById('closedebug');
-        
+
+        closeDebug.addEventListener('click', function() {
+            debugPanel.classList.remove('open');
+            debugOverlay.classList.remove('open');
+        });
+
         if (debugToggle){
             debugToggle.addEventListener('click', function() {
                 debugPanel.classList.add('open');
@@ -431,7 +452,68 @@
                 debugOverlay.classList.remove('open');
             });
         }
+
+        const logToggle = document.getElementById('logToggle');
+        const logPanel = document.getElementById('logPanel');
+        const logOverlay = document.getElementById('logOverlay');
+        const closeLog = document.getElementById('closeLog');
+
+        function fetchLogContent() {
+            const logContent = document.getElementById('logContent');
+            if (!logContent) return;
+            
+            logContent.textContent = 'Loading...';
+            
+            fetch('/logs')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        logContent.textContent = data.log;
+                    } else {
+                        logContent.textContent = 'Error: ' + data.error;
+                    }
+                })
+                .catch(err => {
+                    logContent.textContent = 'Failed to load log file: ' + err.message;
+                });
+        }
+
+        // Call this when opening the log panel
+        document.getElementById('logToggle').addEventListener('click', function() {
+            document.getElementById('logPanel').classList.add('open');
+            document.getElementById('logOverlay').classList.add('open');
+            fetchLogContent();  // Load logs when panel opens
+        });
         
+        closeLog.addEventListener('click', function() {
+            logPanel.classList.remove('open');
+            logOverlay.classList.remove('open');
+        });
+        logOverlay.addEventListener('click', function() {
+            logPanel.classList.remove('open');
+            logOverlay.classList.remove('open');
+        });        
+
+        function fetchLogContent() {
+            logContent.textContent = 'Loading...';
+            fetch('/logs')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        logContent.textContent = data.log;
+                    } else {
+                        logContent.textContent = 'Error: ' + data.error;
+                    }
+                })
+                .catch(err => {
+                    logContent.textContent = 'Failed to load log file: ' + err;
+                });
+        }
         // Load debuguration data
         function loadConfigurationData() {
             // Load Radarr data
