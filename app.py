@@ -24,14 +24,14 @@ CONFIG = {
         'url': os.getenv('RADARR_URL'),
         'api_key': os.getenv('RADARR_API_KEY'),
         'root_folder': os.getenv('RADARR_ROOT_FOLDER'),
-        'quality_profile_id': 2  # Update with your profile ID
+        'quality_profile_id':  os.getenv('RADARR_QUALITY_PROFILE')
     },
     'sonarr': {
         'url': os.getenv('SONARR_URL'),
         'api_key': os.getenv('SONARR_API_KEY'),
         'root_folder': os.getenv('SONARR_ROOT_FOLDER'),
-        'quality_profile_id': 3,  
-        'language_profile_id': 1   
+        'quality_profile_id': os.getenv('SONARR_QUALITY_PROFILE'),  
+        'language_profile_id': os.getenv('SONARR_LANGUAGE_PROFILE')   
     }
 }
 
@@ -123,6 +123,48 @@ def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@app.route('/save_config', methods=['POST'])
+def save_config():
+    try:
+        config = request.json
+        
+        # Read existing .env file
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        env_lines = []
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                env_lines = f.readlines()
+        
+        # Update or add each config value
+        updated_lines = []
+        config_keys_written = set()
+        
+        # Process existing lines
+        for line in env_lines:
+            if '=' in line:
+                key = line.split('=')[0].strip()
+                if key in config:
+                    updated_lines.append(f"{key}={config[key]}\n")
+                    config_keys_written.add(key)
+                else:
+                    updated_lines.append(line)
+            else:
+                updated_lines.append(line)
+        
+        # Add any new keys
+        for key, value in config.items():
+            if key not in config_keys_written:
+                updated_lines.append(f"{key}={value}\n")
+        
+        # Write back to .env
+        with open(env_path, 'w') as f:
+            f.writelines(updated_lines)
+        
+        return jsonify({'success': True})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
 @app.errorhandler(Exception)
 def handle_exception(e):
     logging.error(f"Unhandled exception: {str(e)}", exc_info=True)
@@ -137,11 +179,35 @@ if missing:
 @log_request_response
 def index():
     try:
-        return render_template('index.html')
-    except TemplateNotFound:
-        logging.error("Template 'index.html' not found")
-        return "Page not found", 404
+        repo = Repo(os.path.dirname(os.path.abspath(__file__)))
+        local_commit = repo.head.commit.hexsha[:7]
+        remote_commit = repo.remotes.origin.fetch()[0].commit.hexsha[:7]
 
+        current_version = local_commit
+        latest_version = remote_commit
+        return render_template(
+            'index.html',
+            current_version=current_version,
+            latest_version=latest_version,
+            radarr_quality_profile=CONFIG['radarr']['quality_profile_id'],
+            radarr_root_folder=CONFIG['radarr']['root_folder'],
+            radarr_url=CONFIG['radarr']['url'],
+            radarr_api_key=CONFIG['radarr']['api_key'],
+            sonarr_quality_profile=CONFIG['sonarr']['quality_profile_id'],
+            sonarr_root_folder=CONFIG['sonarr']['root_folder'],
+            sonarr_language_profile=CONFIG['sonarr']['language_profile_id'],
+            sonarr_url=CONFIG['sonarr']['url'],
+            sonarr_api_key=CONFIG['sonarr']['api_key']
+        )
+    except Exception as e:
+        logging.error(f"Version check failed: {str(e)}", exc_info=True)
+        return render_template(
+            'index.html',
+            error="Update check failed",
+            current_version='unknown',
+            latest_version='unknown'
+        )
+    
 @app.route('/offline.html')
 @log_request_response
 def offline():
@@ -150,6 +216,10 @@ def offline():
     except TemplateNotFound:
         logging.error("Template 'offline.html' not found")
         return "Page not found", 404
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('error.html'), 404
 
 @app.route('/get_tmdb_details')
 @log_request_response
@@ -533,75 +603,45 @@ if os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true':
 if os.getenv('FLASK_DEBUG') == '1':
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
-@app.route('/debug', methods=['GET', 'POST'])
-@log_request_response
-def debug_tool():
-    # Get service from query param or default to radarr
-    service = request.args.get('service', 'radarr')
-    
-    if request.method == 'POST':
-        method = request.form.get('method', 'GET')
-        url = request.form.get('url', '').strip()
-        api_key = request.form.get('api_key', '')
-        body = request.form.get('body', '{}')
-        
-        # Construct full URL
-        base_url = CONFIG['radarr']['url'] if service == 'radarr' else CONFIG['sonarr']['url']
-        full_url = f"{base_url}/api/v3{url if url.startswith('/') else '/' + url}"
-        
-        headers = {
-            'X-Api-Key': api_key,
-            'Content-Type': 'application/json'
-        }
-        
-        try:
-            if method.upper() == 'GET':
-                response = requests.get(full_url, headers=headers)
-            else:
-                response = requests.post(full_url, headers=headers, json=json.loads(body))
-            
-            # Parse and format the JSON response
-            try:
-                formatted_response = json.dumps(json.loads(response.text), indent=2)
-            except json.JSONDecodeError:
-                formatted_response = response.text  # Fallback for non-JSON responses
-            
-            return render_template('debug.html',
-                response=formatted_response,  # Now properly formatted
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                method=method,
-                url=url,
-                api_key=api_key,
-                body=body,
-                service=service,
-                radarr_url=CONFIG['radarr']['url'],
-                sonarr_url=CONFIG['sonarr']['url'],
-                radarr_api_key=CONFIG['radarr']['api_key'],
-                sonarr_api_key=CONFIG['sonarr']['api_key']
-            )
-        except Exception as e:
-            return render_template('debug.html',
-                error=str(e),
-                method=method,
-                url=url,
-                api_key=api_key,
-                body=body,
-                service=service,
-                radarr_url=CONFIG['radarr']['url'],
-                sonarr_url=CONFIG['sonarr']['url'],
-                radarr_api_key=CONFIG['radarr']['api_key'],
-                sonarr_api_key=CONFIG['sonarr']['api_key']
-            )
-    
-    return render_template('debug.html',
-        service=service,
-        radarr_url=CONFIG['radarr']['url'],
-        sonarr_url=CONFIG['sonarr']['url'],
-        radarr_api_key=CONFIG['radarr']['api_key'],
-        sonarr_api_key=CONFIG['sonarr']['api_key']
-    )
+@app.route('/api/version')
+def get_current_version():
+    try:
+        repo = git.Repo(search_parent_directories=True)
+        return jsonify({
+            'hash': repo.head.commit.hexsha[:7],
+            'date': repo.head.commit.committed_datetime.isoformat()
+        })
+    except Exception as e:
+        return jsonify({'hash': 'unknown', 'error': str(e)})
 
+@app.route('/api/version/latest')
+def get_latest_version():
+    try:
+        response = requests.get('https://api.github.com/repos/yourusername/yourrepo/releases/latest')
+        return jsonify(response.json())
+    except Exception as e:
+        return jsonify({'tag_name': 'unknown', 'error': str(e)})
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def handle_settings():
+    if request.method == 'GET':
+        return jsonify({'auto_update': os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true'})
+    else:
+        auto_update = request.json.get('auto_update', True)
+        # Update your configuration here (write to .env or config file)
+        return jsonify({'success': True})
+
+@app.route('/api/update', methods=['POST'])
+def trigger_update():
+    try:
+        repo = git.Repo(search_parent_directories=True)
+        origin = repo.remotes.origin
+        origin.fetch()
+        repo.git.reset('--hard', f'origin/{CONFIG["app"]["branch"]}')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
 def get_ip_address():
     """Get the local IP address for network access"""
     import socket
@@ -621,7 +661,7 @@ def print_welcome():
     # App info text
     app_info = f"""
     {Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}
-    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.0')}
+    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.1')}
     {Fore.WHITE}• Local: {Fore.CYAN}http://127.0.0.1:5000{Style.RESET_ALL}
     {Fore.WHITE}• Network: {Fore.CYAN}http://{get_ip_address()}:5000{Style.RESET_ALL}
     """

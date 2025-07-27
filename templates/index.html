@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="/static/images/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
     <link rel="shortcut icon" href="/static/images/favicon.ico" />
-    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">    
     <!-- Manifest -->
     <link rel="manifest" href="/static/manifest.json">
 
@@ -20,17 +20,27 @@
 
     <!-- Theme color -->
     <meta name="theme-color" content="#1a1a1a" />
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </head>
 <body>
     <!-- Logo and Header -->
     <div class="container-fluid bg-dark py-2">
         <div class="container d-flex align-items-center">
-            <a href="/" class="d-flex align-items-center text-decoration-none">
+            <a href="/" class="d-flex align-items-center text-decoration-none me-auto">
                 <img src="/static/images/logo.png" alt="Addarr Logo" height="40" class="me-2">
             </a>
+            
+            <div class="d-flex gap-2">
+                <button id="debugToggle" class="btn btn-outline-radarr">
+                    <i class="bi bi-bug-fill"></i> Debug
+                </button>
+                <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="collapse" data-bs-target="#configPanel">
+                    <i class="bi bi-gear-fill"></i> Settings
+                </button>
+            </div>
         </div>
     </div>
+
+
 
     <!-- Main Content - Centered Form -->
     <div class="container d-flex flex-column justify-content-center" style="min-height: calc(100vh - 120px);">
@@ -65,22 +75,669 @@
             </div>
         </div>
     </div>
-    <div class="col-12">
-        <a href="{{ url_for('debug_tool') }}" class="btn btn-primary btn-lg w-100">API Debug Tool</a>
-    </div>    
-    <script>
-// Register service worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/static/sw.js')
-      .then(registration => {
-        console.log('ServiceWorker registration successful');
-      })
-      .catch(err => {
-        console.log('ServiceWorker registration failed: ', err);
-      });
-  });
+    
+
+
+<div class="config-overlay" id="configOverlay"></div>
+<div class="config-overlay" id="debugOverlay"></div>
+
+<div class="config-panel" id="configPanel">
+
+    <div class="config-header">
+        <h3>Configuration</h3>
+        <button class="btn btn-sm btn-outline-radarr" id="closeConfig">&times;</button>
+    </div>
+    
+    <form class="config-form" id="configForm">
+        <div class="config-section">
+            <h4>Radarr Settings</h4>
+            <div class="form-group">
+                <label for="radarrUrl">Radarr URL</label>
+                <input type="text" class="form-control" id="radarrUrl" name="RADARR_URL" value="{{ radarr_url }}">
+            </div>
+            <div class="form-group">
+                <label for="radarrApiKey">API Key</label>
+                <input type="text" class="form-control" id="radarrApiKey" name="RADARR_API_KEY" value="{{ radarr_api_key }}">
+            </div>
+            <div class="form-group">
+                <label for="radarrRootFolder">Root Folder</label>
+                <select class="form-control" id="radarrRootFolder" name="RADARR_ROOT_FOLDER">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="radarrQualityProfile">Quality Profile</label>
+                <select class="form-control" id="radarrQualityProfile" name="RADARR_QUALITY_PROFILE">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            <button type="button" class="btn btn-outline-radarr test-connection" id="testRadarr">Test Connection</button>
+        </div>
+        
+        <div class="config-section">
+            <h4>Sonarr Settings</h4>
+            <div class="form-group">
+                <label for="sonarrUrl">Sonarr URL</label>
+                <input type="text" class="form-control" id="sonarrUrl" name="SONARR_URL" value="{{ sonarr_url }}">
+            </div>
+            <div class="form-group">
+                <label for="sonarrApiKey">API Key</label>
+                <input type="text" class="form-control" id="sonarrApiKey" name="SONARR_API_KEY" value="{{ sonarr_api_key }}">
+            </div>
+            <div class="form-group">
+                <label for="sonarrRootFolder">Root Folder</label>
+                <select class="form-control" id="sonarrRootFolder" name="SONARR_ROOT_FOLDER">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="sonarrQualityProfile">Quality Profile</label>
+                <select class="form-control" id="sonarrQualityProfile" name="SONARR_QUALITY_PROFILE">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="sonarrLanguageProfile">Language Profile</label>
+                <select class="form-control" id="sonarrLanguageProfile" name="SONARR_LANGUAGE_PROFILE">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            <button type="button" class="btn btn-outline-radarr test-connection" id="testSonarr">Test Connection</button>
+        </div>
+
+        <div class="config-section">
+            <h4>Version Control</h4>
+            
+            <div class="version-info">
+                <div class="version-row">
+                    <p>Current: <code>{{ current_version }}</code></p>
+                </div>
+                <div class="version-row">
+                    <p>Latest: <code>{{ latest_version }}</code></p>
+                </div>
+            </div>
+            
+            <div class="form-group form-switch">
+                <label class="form-check-label" for="auto-update-toggle">
+                    Enable Auto-Updates
+                </label>
+                <div class="toggle-switch">
+                    <input type="checkbox" class="form-check-input" id="auto-update-toggle">
+                    <span class="toggle-slider"></span>
+                </div>
+            </div>
+            
+            <button type="button" id="update-now" class="btn btn-outline-radarr">
+                <i class="bi bi-cloud-arrow-down-fill"></i> Update Now
+            </button>
+        </div>        
+        
+        <button type="submit" class="btn btn-radarr save-config">Save Configuration</button>
+    </form>
+</div>
+
+<div id="debugPanel" class="side-panel">
+    <div class="panel-content">
+        <h4>Debug</h4>
+        <div class="api-debug-container">
+            <!-- Sidebar -->
+            <div class="api-sidebar">
+               
+                <ul class="nav nav-pills mb-3" id="endpointTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="moviesTab" data-bs-toggle="pill" data-bs-target="#movies" type="button" role="tab">Movies</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tvTab" data-bs-toggle="pill" data-bs-target="#series" type="button" role="tab">TV</button>
+                </li>
+                </ul>
+                
+                <div class="tab-content mt-3">
+                    <div class="tab-pane fade show active" id="movies">
+                        <div class="api-endpoint" data-method="GET" data-path="/movie">
+                            <strong>GET /movie</strong>
+                            <small>Get all movies</small>
+                        </div>
+                        <div class="api-endpoint" data-method="GET" data-path="/movie/{id}">
+                            <strong>GET /movie/{id}</strong>
+                            <small>Get specific movie</small>
+                        </div>
+                        <div class="api-endpoint" data-method="POST" data-path="/movie">
+                            <strong>POST /movie</strong>
+                            <small>Add new movie</small>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane fade" id="series">
+                        <div class="api-endpoint" data-method="GET" data-path="/series">
+                            <strong>GET /series</strong>
+                            <small>Get all series</small>
+                        </div>
+                        <div class="api-endpoint" data-method="GET" data-path="/series/{id}">
+                            <strong>GET /series/{id}</strong>
+                            <small>Get specific series</small>
+                        </div>
+                        <div class="api-endpoint" data-method="POST" data-path="/series">
+                            <strong>POST /series</strong>
+                            <small>Add new series</small>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane fade" id="system">
+                        <div class="api-endpoint" data-method="GET" data-path="/health">
+                            <strong>GET /health</strong>
+                            <small>System health check</small>
+                        </div>
+                        <div class="api-endpoint" data-method="GET" data-path="/system/status">
+                            <strong>GET /system/status</strong>
+                            <small>System status</small>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="profiles" role="tabpanel">
+                        <!-- Radarr -->
+                        <div class="api-endpoint" data-method="GET" data-path="/qualityprofile">
+                            <strong>GET /qualityprofile</strong>
+                            <small>Radarr quality profiles</small>
+                        </div>
+                        
+                        <!-- Sonarr -->
+                        <div class="api-endpoint" data-method="GET" data-path="/languageprofile">
+                            <strong>GET /languageprofile</strong>
+                            <small>Sonarr language profiles</small>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="system" role="tabpanel">
+                        <div class="api-endpoint" data-method="GET" data-path="/rootfolder">
+                            <strong>GET /rootfolder</strong>
+                            <small>List root folders</small>
+                        </div>
+                        <div class="api-endpoint" data-method="GET" data-path="/system/status">
+                            <strong>GET /system/status</strong>
+                            <small>System status</small>
+                        </div>
+                        <div class="api-endpoint" data-method="GET" data-path="/queue">
+                            <strong>GET /queue</strong>
+                            <small>Current download queue</small>
+                        </div>
+                    </div>                
+                </div>
+            </div>
+            
+            <!-- Main Content Area -->
+            <div class="api-main-content">
+                <div class="api-stable-layout">
+                    <div class="api-form-container">
+                        <h3>API Request</h3>
+                        <form method="POST" id="apiForm">
+                            <div class="row mb-3">
+                                <div class="col-md-2">
+                                    <label for="method" class="form-label">Method</label>
+                                    <select id="method" name="method" class="form-select">
+                                        <option value="GET">GET</option>
+                                        <option value="POST">POST</option>
+                                        <option value="PUT">PUT</option>
+                                        <option value="DELETE">DELETE</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-10">
+                                    <label for="url" class="form-label">API URL</label>
+                                    <div class="input-group api-url-input-group">
+                                        <span class="input-group-text" id="baseUrl">{{ radarr_url if service == 'radarr' else sonarr_url }}/api/v3</span>
+                                        <input type="text" id="url" name="url" class="form-control" required>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="api_key" class="form-label">API Key</label>
+                                <input type="text" id="api_key" name="api_key" class="form-control" 
+                                    value="{{ radarr_api_key if service == 'radarr' else sonarr_api_key }}" required>
+                            </div>
+                            
+                            <ul class="nav nav-pills mb-2" id="payloadTabs" role="tablist">
+                            <li class="nav-item">
+                                <button class="nav-link active" id="body-tab" data-bs-toggle="pill" data-bs-target="#body-panel" type="button" role="tab">Body</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" id="headers-tab" data-bs-toggle="pill" data-bs-target="#headers-panel" type="button" role="tab">Headers</button>
+                            </li>
+                            </ul>
+
+                            <div class="tab-content">
+                            <div class="tab-pane fade show active" id="body-panel" role="tabpanel">
+                                <textarea id="body" name="body" class="form-control" rows="6" placeholder="{ }"></textarea>
+                            </div>
+                            <div class="tab-pane fade" id="headers-panel" role="tabpanel">
+                                <textarea id="headers" name="headers" class="form-control" rows="6" placeholder='{ "Header-Name": "value" }'></textarea>
+                            </div>
+                            </div>
+
+                            
+                            <button type="submit" class="btn btn-radarr">Submit Request</button>
+                        </form>
+                    </div>
+                    
+                    {% if error %}
+                        <div class="api-response-container">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h3>Error</h3>
+                            </div>
+                            <div class="alert alert-danger">
+                                <pre>{{ error }}</pre>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if response %}
+                        <div class="api-response-container">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h3>Response</h3>
+                                <span class="badge bg-{% if status_code == 200 %}success{% else %}danger{% endif %}">
+                                    Status: {{ status_code }}
+                                </span>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <h5>Headers</h5>
+                                <pre>{{ headers | tojson(indent=2) | safe }}</pre>
+                            </div>
+                            
+                            <div>
+                                <h5>Body</h5>
+                                {% if response is string %}
+                                    {% if response.startswith('{') or response.startswith('[') %}
+                                        <pre>{{ response | safe }}</pre>
+                                    {% else %}
+                                        <pre>{{ response }}</pre>
+                                    {% endif %}
+                                {% else %}
+                                    <pre>{{ response | tojson(indent=2) | safe }}</pre>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <button id="closeDebugPanel" class="btn btn-secondary">Close</button>
+    </div>
+</div>
+
+<script>
+    // Register service worker
+    document.addEventListener('DOMContentLoaded', () => {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js')
+            .then(registration => {
+                console.log('ServiceWorker registration successful');
+            })
+            .catch(err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+        }
+    });
+
+
+    // Add this to your existing script section
+    document.addEventListener('DOMContentLoaded', function() {
+        // Config panel toggle
+        const configToggle = document.getElementById('configToggle');
+        const configPanel = document.getElementById('configPanel');
+        const configOverlay = document.getElementById('configOverlay');
+        const closeConfig = document.getElementById('closeConfig');
+        
+        configToggle.addEventListener('click', function() {
+            configPanel.classList.add('open');
+            configOverlay.classList.add('open');
+            loadConfigurationData();
+        });
+        
+        closeConfig.addEventListener('click', function() {
+            configPanel.classList.remove('open');
+            configOverlay.classList.remove('open');
+        });
+        
+        configOverlay.addEventListener('click', function() {
+            configPanel.classList.remove('open');
+            configOverlay.classList.remove('open');
+        });
+        
+        const debugToggle = document.getElementById('debugToggle');
+        const debugPanel = document.getElementById('debugPanel');
+        const debugOverlay = document.getElementById('debugOverlay');
+        const closedebug = document.getElementById('closedebug');
+        
+        if (debugToggle){
+            debugToggle.addEventListener('click', function() {
+                debugPanel.classList.add('open');
+                debugOverlay.classList.add('open');
+                loadDebugData();
+            });
+        }   
+        
+        if( closedebug){
+            closedebug.addEventListener('click', function() {
+                debugPanel.classList.remove('open');
+                debugOverlay.classList.remove('open');
+            });
+        }
+        if (debugOverlay) {
+            debugOverlay.addEventListener('click', function() {
+                debugPanel.classList.remove('open');
+                debugOverlay.classList.remove('open');
+            });
+        }
+        
+        // Load debuguration data
+        function loadConfigurationData() {
+            // Load Radarr data
+            fetchRadarrData();
+            // Load Sonarr data
+            fetchSonarrData();
+        }
+        
+        // Fetch Radarr configuration data
+        function fetchRadarrData() {
+            const radarrUrl = document.getElementById('radarrUrl').value;
+            const apiKey = document.getElementById('radarrApiKey').value;
+            
+            if (!radarrUrl || !apiKey) return;
+            
+            // Fetch root folders
+            fetch(`${radarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('radarrRootFolder');
+                    select.innerHTML = '';
+                    data.forEach(folder => {
+                        const option = document.createElement('option');
+                        option.value = folder.path;
+                        option.textContent = folder.path;
+                        if (folder.path === "{{ radarr_root_folder }}") {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading Radarr root folders:', error));
+            
+                <!-- RADARR_PROFILE = {{ radarr_quality_profile }} -->
+            // Fetch quality profiles
+            fetch(`${radarrUrl}/api/v3/qualityprofile?apikey=${apiKey}`)
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('radarrQualityProfile');
+                    select.innerHTML = '';
+                    data.forEach(profile => {
+                        const option = document.createElement('option');
+                        option.value = profile.id;
+                        option.textContent = profile.name;
+                        if (profile.id === {{ radarr_quality_profile }}) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading Radarr quality profiles:', error));
+        }
+    
+    // Fetch Sonarr configuration data
+    function fetchSonarrData() {
+        const sonarrUrl = document.getElementById('sonarrUrl').value;
+        const apiKey = document.getElementById('sonarrApiKey').value;
+        
+        if (!sonarrUrl || !apiKey) return;
+        
+        // Fetch root folders
+        fetch(`${sonarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('sonarrRootFolder');
+                select.innerHTML = '';
+                data.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder.path;
+                    option.textContent = folder.path;
+                    if (folder.path === "{{ sonarr_root_folder }}") {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading Sonarr root folders:', error));
+        
+        // Fetch quality profiles
+        fetch(`${sonarrUrl}/api/v3/qualityprofile?apikey=${apiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('sonarrQualityProfile');
+                select.innerHTML = '';
+                data.forEach(profile => {
+                    const option = document.createElement('option');
+                    option.value = profile.id;
+                    option.textContent = profile.name;
+                    if (profile.id === {{ sonarr_quality_profile }}) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading Sonarr quality profiles:', error));
+        
+        // Fetch language profiles (Sonarr only)
+        fetch(`${sonarrUrl}/api/v3/languageprofile?apikey=${apiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('sonarrLanguageProfile');
+                select.innerHTML = '';
+                data.forEach(profile => {
+                    const option = document.createElement('option');
+                    option.value = profile.id;
+                    option.textContent = profile.name;
+                    if (profile.id === {{ sonarr_language_profile }}) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading Sonarr language profiles:', error));
+    }
+    
+    // Test connection buttons
+    document.getElementById('testRadarr').addEventListener('click', function() {
+        testConnection('radarr');
+    });
+    
+    document.getElementById('testSonarr').addEventListener('click', function() {
+        testConnection('sonarr');
+    });
+    
+    function testConnection(service) {
+        const url = document.getElementById(`${service}Url`).value;
+        const apiKey = document.getElementById(`${service}ApiKey`).value;
+        const button = document.getElementById(`test${service.charAt(0).toUpperCase() + service.slice(1)}`);
+        
+        if (!url || !apiKey) {
+            alert(`Please enter ${service} URL and API Key first`);
+            return;
+        }
+        
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...';
+        
+        fetch(`${url}/api/v3/system/status?apikey=${apiKey}`)
+            .then(response => {
+                if (response.ok) {
+                    button.innerHTML = '<i class="fas fa-check"></i> Connection OK';
+                    button.classList.add('btn-success');
+                } else {
+                    throw new Error('Connection failed');
+                }
+            })
+            .catch(error => {
+                button.innerHTML = '<i class="fas fa-times"></i> Connection Failed';
+                button.classList.add('btn-danger');
+                console.error(`Error testing ${service} connection:`, error);
+            })
+            .finally(() => {
+                setTimeout(() => {
+                    button.innerHTML = 'Test Connection';
+                    button.classList.remove('btn-success', 'btn-danger');
+                    button.disabled = false;
+                }, 3000);
+            });
+    }
+    
+    // Save configuration
+    document.getElementById('configForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const config = {};
+        formData.forEach((value, key) => {
+            config[key] = value;
+        });
+        
+        fetch('/save_config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(config)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Configuration saved successfully!');
+                // Reload the page to apply changes
+                window.location.reload();
+            } else {
+                alert('Error saving configuration: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error saving configuration');
+        });
+    });
+});
+
+// Toggle Debug Panel
+let debugPanel = document.getElementById('debugPanel');
+if (debugPanel) {
+    debugPanel.addEventListener('click', function (e) {
+        if (e.target === debugPanel || e.target.id === 'closeDebugPanel') {
+            debugPanel.classList.add('open');
+        }
+    });
+}   
+let closeDebugPanel = document.getElementById('closeDebugPanel');
+if (closeDebugPanel) {
+    closeDebugPanel.addEventListener('click', function () {
+        debugPanel.classList.remove('open');
+    });
 }
+
+let activeApp = '';  // Will be set by tab click
+
+let moviesTab = document.getElementById('moviesTab');
+if (moviesTab) {
+    document.getElementById('moviesTab').addEventListener('click', function () {
+        activeApp = 'radarr';
+        loadEndpoints('radarr');  // Call your function to show endpoints
+    });
+};
+let tvTab = document.getElementById('tvTab');
+if (tvTab)  {
+    document.getElementById('tvTab').addEventListener('click', function () {
+        activeApp = 'sonarr';
+        loadEndpoints('sonarr');
+    });
+};
+function handleEndpointClick(endpoint) {
+    const baseUrl = activeApp === 'radarr' ? '{{ radarr_url }}' : '{{ sonarr_url }}';
+    const fullUrl = `${baseUrl}/api/v3/${endpoint}`;
+    document.getElementById('requestUrl').value = fullUrl;
+
+    // Hide endpoint buttons
+    document.getElementById('endpointButtons').classList.add('d-none');
+}
+function loadEndpoints(appType) {
+    const container = document.getElementById('endpointButtons');
+    container.classList.remove('d-none');
+    container.innerHTML = '';  // Clear previous
+
+    const endpoints = appType === 'radarr'
+        ? ['movie', 'queue', 'wanted']  // example endpoints
+        : ['series', 'queue', 'calendar'];
+
+    endpoints.forEach(ep => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-outline-primary m-1';
+        btn.textContent = ep;
+        btn.onclick = () => handleEndpointClick(ep);
+        container.appendChild(btn);
+    });
+}
+
+document.querySelectorAll('.api-endpoint').forEach(endpoint => {
+    endpoint.addEventListener('click', function () {
+        const method = this.dataset.method;
+        const path = this.dataset.path;
+
+        const baseUrl = activeApp === 'radarr' ? "{{ radarr_url }}" : "{{ sonarr_url }}";
+        const apiKey = activeApp === 'radarr' ? "{{ radarr_api_key }}" : "{{ sonarr_api_key }}";
+
+        // Set form fields
+        document.getElementById('method').value = method;
+        document.getElementById('url').value = path;
+        document.getElementById('api_key').value = apiKey;
+        document.querySelector('#baseUrl').textContent = `${baseUrl}/api/v3`;
+
+        // Deactivate pills
+        document.querySelectorAll('#endpointTabs .nav-link').forEach(btn => btn.classList.remove('active'));
+
+        // Hide endpoint area
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('show', 'active'));
+    });
+});
+
+document.getElementById('apiForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const method = document.getElementById('method').value;
+    const url = `${document.querySelector('#baseUrl').textContent}${document.getElementById('url').value}`;
+    const apiKey = document.getElementById('api_key').value;
+    const body = document.getElementById('body').value;
+    const headersRaw = document.getElementById('headers')?.value || "{}";
+
+    let headers;
+    try {
+        headers = JSON.parse(headersRaw);
+    } catch (err) {
+        alert("Invalid headers JSON");
+        return;
+    }
+
+    headers['X-Api-Key'] = apiKey;
+
+    fetch(url, {
+        method,
+        headers,
+        body: ['POST', 'PUT', 'DELETE'].includes(method.toUpperCase()) ? body : null
+    })
+    .then(res => res.text())
+    .then(text => {
+        alert(`Response:\n${text}`);
+    })
+    .catch(err => alert(`Request failed:\n${err}`));
+});
 </script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
 </body>
 </html>
