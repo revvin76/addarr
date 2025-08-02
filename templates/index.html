@@ -577,6 +577,14 @@
         
         if (!sonarrUrl || !apiKey) return;
         
+        console.log(`Fetching Sonarr data from ${sonarrUrl} with API key ${apiKey}`);
+        console.log(`Sonarr Root Folder: {{ sonarr_root_folder }}`);
+        console.log(`Sonarr Quality Profile: {{ sonarr_quality_profile }}`);
+        console.log(`Sonarr Language Profile: {{ sonarr_language_profile }}`);
+        console.log(`Sonarr URL: ${sonarrUrl}`);
+        console.log(`Sonarr API Key: ${apiKey}`);
+        console.log(`Sonarr Root Folder: {{ sonarr_root_folder }}`);
+        
         // Fetch root folders
         fetch(`${sonarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)
             .then(response => response.json())
