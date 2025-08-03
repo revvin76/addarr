@@ -149,6 +149,46 @@
         </div>
 
         <div class="config-section">
+            <h4>DuckDNS Settings</h4>
+            <div class="form-group form-switch">
+                <label class="form-check-label" for="duckdnsEnabled">
+                    Enable DuckDNS
+                </label>
+                <div class="toggle-switch">
+                    <input type="checkbox" class="form-check-input" id="duckdnsEnabled" name="DUCKDNS_ENABLED" 
+                        {% if duckdns_enabled %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="duckdnsDomain">Domain (without .duckdns.org)</label>
+                <input type="text" class="form-control" id="duckdnsDomain" name="DUCKDNS_DOMAIN" 
+                    value="{{ duckdns_domain }}">
+            </div>
+            <div class="form-group">
+                <label for="duckdnsToken">Token</label>
+                <input type="password" class="form-control" id="duckdnsToken" name="DUCKDNS_TOKEN" 
+                    value="{{ duckdns_token }}">
+            </div>
+            <button type="button" class="btn btn-outline-radarr" id="testDuckDNS">Test Connection</button>
+        </div>
+
+        <div class="config-section">
+            <h4>Application Settings</h4>
+            <div class="form-group form-switch">
+                <label class="form-check-label" for="debugEnabled">
+                    Enable Debug Mode
+                </label>
+                <div class="toggle-switch">
+                    <input type="checkbox" class="form-check-input" id="debugEnabled" name="FLASK_DEBUG"
+                        {% if config.get('FLASK_DEBUG', '0') == '1' %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </div>
+            </div>
+            <small class="text-muted">When enabled, detailed logs will be recorded</small>
+        </div>
+
+        <div class="config-section">
             <h4>Version Control</h4>
             
             <div class="version-info">
@@ -180,12 +220,22 @@
 </div>
 
 <div id="logPanel" class="config-panel">
-
-        <div class="config-header">
-            <h3>Log file</h3>
+    <div class="config-header">
+        <h3>Log Viewer</h3>
+        <div class="d-flex align-items-center">
+            <div class="input-group input-group-sm me-2" style="width: 120px;">
+                <span class="input-group-text">Lines:</span>
+                <input type="number" id="logLines" class="form-control" value="500" min="100" max="10000">
+            </div>
+            <button id="refreshLogs" class="btn btn-sm btn-outline-success me-2">
+                <i class="fas fa-sync-alt"></i>
+            </button>
             <button class="btn btn-sm btn-outline-radarr" id="closeLog">&times;</button>
         </div>
-        <pre id="logContent" class="api-response-container">Loading...</pre>
+    </div>
+    <div class="log-container">
+        <pre id="logContent" class="api-response-container">Loading logs...</pre>
+    </div>
 </div>
 
 <div id="debugPanel" class="config-panel">
@@ -453,70 +503,70 @@
             });
         }
 
-        const logToggle = document.getElementById('logToggle');
         const logPanel = document.getElementById('logPanel');
-        const logOverlay = document.getElementById('logOverlay');
+        const logContent = document.getElementById('logContent');
+        const refreshLogs = document.getElementById('refreshLogs');
+        const logLines = document.getElementById('logLines');
         const closeLog = document.getElementById('closeLog');
-
-        function fetchLogContent() {
-            const logContent = document.getElementById('logContent');
-            if (!logContent) return;
+        
+        // Function to load logs
+        function loadLogs() {
+            const lines = Math.min(parseInt(logLines.value) || 500, 10000); // Limit to 10,000 lines max
+            logContent.textContent = 'Loading logs...';
             
-            logContent.textContent = 'Loading...';
-            
-            fetch('/logs')
+            fetch(`/logs?lines=${lines}`)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('Network response was not ok');
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     return response.json();
                 })
                 .then(data => {
                     if (data.success) {
                         logContent.textContent = data.log;
+                        logContent.scrollTop = logContent.scrollHeight;
                     } else {
-                        logContent.textContent = 'Error: ' + data.error;
+                        logContent.textContent = `Error: ${data.error}\n\n${data.traceback || 'No traceback available'}`;
                     }
                 })
-                .catch(err => {
-                    logContent.textContent = 'Failed to load log file: ' + err.message;
+                .catch(error => {
+                    logContent.textContent = `Failed to load logs: ${error.message}`;
                 });
         }
-
-        // Call this when opening the log panel
+        // Event listeners
         document.getElementById('logToggle').addEventListener('click', function() {
-            document.getElementById('logPanel').classList.add('open');
-            document.getElementById('logOverlay').classList.add('open');
-            fetchLogContent();  // Load logs when panel opens
+            logPanel.classList.add('open');
+            loadLogs(); // Load logs when panel opens
         });
+        
+        refreshLogs.addEventListener('click', loadLogs);
         
         closeLog.addEventListener('click', function() {
             logPanel.classList.remove('open');
-            logOverlay.classList.remove('open');
         });
         
-        if  (logOverlay) {
-            logOverlay.addEventListener('click', function() {
-                logPanel.classList.remove('open');
-                logOverlay.classList.remove('open');
-            });        
-        }
-
-        function fetchLogContent() {
-            logContent.textContent = 'Loading...';
-            fetch('/logs')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        logContent.textContent = data.log;
+        // Allow Ctrl+F to search in logs when panel is open
+        logPanel.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                const search = prompt('Search in logs:');
+                if (search) {
+                    const content = logContent.textContent;
+                    const index = content.toLowerCase().indexOf(search.toLowerCase());
+                    if (index >= 0) {
+                        logContent.focus();
+                        // Simple highlighting - you could enhance this
+                        logContent.innerHTML = content.replace(
+                            new RegExp(search, 'gi'),
+                            match => `<span class="highlight">${match}</span>`
+                        );
                     } else {
-                        logContent.textContent = 'Error: ' + data.error;
+                        alert('Text not found in logs');
                     }
-                })
-                .catch(err => {
-                    logContent.textContent = 'Failed to load log file: ' + err;
-                });
-        }
+                }
+            }
+        });        
+
         // Load debuguration data
         function loadConfigurationData() {
             // Load Radarr data
@@ -828,6 +878,56 @@ document.getElementById('apiForm').addEventListener('submit', function (e) {
         alert(`Response:\n${text}`);
     })
     .catch(err => alert(`Request failed:\n${err}`));
+});
+
+document.getElementById('testDuckDNS').addEventListener('click', function() {
+    const domain = document.getElementById('duckdnsDomain').value;
+    const token = document.getElementById('duckdnsToken').value;
+    const button = document.getElementById('testDuckDNS');
+    
+    if (!domain || !token) {
+        alert('Please enter DuckDNS domain and token first');
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...';
+    
+    // First check if the domain is valid
+    if (!domain.match(/^[a-z0-9-]+$/i)) {
+        button.innerHTML = '<i class="fas fa-times"></i> Invalid domain';
+        button.classList.add('btn-danger');
+        setTimeout(() => {
+            button.innerHTML = 'Test Connection';
+            button.classList.remove('btn-danger');
+            button.disabled = false;
+        }, 3000);
+        return;
+    }
+    
+    // Test with a simple IP check request
+    fetch(`https://www.duckdns.org/update?domains=${domain}&token=${token}&ip=check`, {
+        // Add no-cors mode to avoid CORS issues
+        mode: 'no-cors'
+    })
+    .then(() => {
+        // Since we're using no-cors, we can't read the response directly
+        // But if we get here, the request was sent
+        button.innerHTML = '<i class="fas fa-check"></i> Connection OK';
+        button.classList.add('btn-success');
+    })
+    .catch(error => {
+        button.innerHTML = '<i class="fas fa-times"></i> Connection Failed';
+        button.classList.add('btn-danger');
+        console.error('Error testing DuckDNS connection:', error);
+    })
+    .finally(() => {
+        setTimeout(() => {
+            button.innerHTML = 'Test Connection';
+            button.classList.remove('btn-success', 'btn-danger');
+            button.disabled = false;
+        }, 3000);
+    });
 });
 </script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>

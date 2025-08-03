@@ -12,7 +12,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 import time
 from ascii_magic import AsciiArt
-
+from collections import deque
+import traceback
 
 load_dotenv()
 
@@ -39,29 +40,57 @@ CONFIG.update({
     'app': {
         'update_interval': 3600,  # Check for updates every hour (in seconds)
         'github_repo': 'revvin76/addarr',  # Update with your GitHub repo
-        'branch': 'main'  # Your main branch name
+        'branch': 'main',  # Your main branch name,
+        'debug': os.getenv('FLASK_DEBUG', '0') == '1'
+    }
+})
+
+CONFIG.update({
+    'duckdns': {
+        'domain': os.getenv('DUCKDNS_DOMAIN', ''),
+        'token': os.getenv('DUCKDNS_TOKEN', ''),
+        'enabled': os.getenv('DUCKDNS_ENABLED', 'false').lower() == 'true'
     }
 })
 
 def setup_logging():
-    log_format = '%(asctime)s - %(levelname)s - %(message)s'
+    log_format = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
     log_file = 'addarr.log'
     
-    # Set up rotating logs (10MB max, 5 backups)
-    handler = RotatingFileHandler(
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG if os.getenv('FLASK_DEBUG') == '1' else logging.INFO)
+    
+    # File handler (rotating)
+    file_handler = RotatingFileHandler(
         log_file, maxBytes=10*1024*1024, backupCount=5
     )
-    handler.setFormatter(logging.Formatter(log_format))
+    file_handler.setFormatter(logging.Formatter(log_format))
+    logger.addHandler(file_handler)
     
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    logger.addHandler(handler)
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter(log_format))
+    logger.addHandler(console_handler)
     
-    # Also log to console in debug mode
-    if os.getenv('FLASK_DEBUG') == '1':
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter(log_format))
-        logger.addHandler(console_handler)
+    # Set specific log levels for noisy libraries
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+
+def debug_log(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        logger = logging.getLogger(func.__module__)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Entering {func.__name__} with args: {args}, kwargs: {kwargs}")
+        try:
+            result = func(*args, **kwargs)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Exiting {func.__name__} with result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error in {func.__name__}: {str(e)}", exc_info=True)
+            raise
+    return wrapper
 
 setup_logging()
 
@@ -124,10 +153,18 @@ def favicon():
                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route('/save_config', methods=['POST'])
+@debug_log
 def save_config():
     try:
         config = request.json
         
+        # Update debug mode if changed
+        if 'FLASK_DEBUG' in config:
+            debug_enabled = config['FLASK_DEBUG'].lower() == 'true'
+            CONFIG['app']['debug'] = debug_enabled
+            logging.getLogger().setLevel(logging.DEBUG if debug_enabled else logging.INFO)
+            logging.info(f"Debug mode {'enabled' if debug_enabled else 'disabled'}")
+
         # Read existing .env file
         env_path = os.path.join(os.path.dirname(__file__), '.env')
         env_lines = []
@@ -159,7 +196,18 @@ def save_config():
         # Write back to .env
         with open(env_path, 'w') as f:
             f.writelines(updated_lines)
-        
+
+        # Update in-memory config if DuckDNS settings changed
+        if 'DUCKDNS_DOMAIN' in config or 'DUCKDNS_TOKEN' in config or 'DUCKDNS_ENABLED' in config:
+            CONFIG['duckdns']['domain'] = config.get('DUCKDNS_DOMAIN', CONFIG['duckdns']['domain'])
+            CONFIG['duckdns']['token'] = config.get('DUCKDNS_TOKEN', CONFIG['duckdns']['token'])
+            CONFIG['duckdns']['enabled'] = config.get('DUCKDNS_ENABLED', str(CONFIG['duckdns']['enabled'])).lower() == 'true'
+            
+            # Trigger immediate update if enabled
+            if CONFIG['duckdns']['enabled']:
+                threading.Thread(target=update_duckdns_if_needed).start()
+                logging.info("Configuration saved successfully")
+
         return jsonify({'success': True})
     
     except Exception as e:
@@ -177,6 +225,7 @@ if missing:
 
 @app.route('/')
 @log_request_response
+@debug_log
 def index():
     try:
         repo = Repo(os.path.dirname(os.path.abspath(__file__)))
@@ -197,7 +246,11 @@ def index():
             sonarr_root_folder=CONFIG['sonarr']['root_folder'],
             sonarr_language_profile=CONFIG['sonarr']['language_profile_id'],
             sonarr_url=CONFIG['sonarr']['url'],
-            sonarr_api_key=CONFIG['sonarr']['api_key']
+            sonarr_api_key=CONFIG['sonarr']['api_key'],
+            # Add DuckDNS config to template variables
+            duckdns_domain=CONFIG['duckdns']['domain'],
+            duckdns_token=CONFIG['duckdns']['token'],
+            duckdns_enabled=CONFIG['duckdns']['enabled']            
         )
     except Exception as e:
         logging.error(f"Version check failed: {str(e)}", exc_info=True)
@@ -210,17 +263,46 @@ def index():
 
 @app.route('/logs')
 @log_request_response
+@debug_log
 def get_logs():
     try:
         log_path = 'addarr.log'
+        lines_to_return = min(int(request.args.get('lines', 1000)), 10000)  # Limit to 10,000 lines max
+        
+        # Check if file exists first
+        if not os.path.exists(log_path):
+            return jsonify({
+                'success': False,
+                'error': f'Log file {log_path} does not exist',
+                'traceback': ''
+            })
+        
+        # Read the log file efficiently
         with open(log_path, 'r') as f:
-            lines = f.readlines()[-500:]  # return last 500 lines max
-        return jsonify({'success': True, 'log': ''.join(lines)})
+            lines = deque(f, maxlen=lines_to_return)
+        
+        return jsonify({
+            'success': True,
+            'log': ''.join(lines),
+            'total_lines': len(lines)
+        })
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': f'Invalid line count parameter: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({
+            'success': False,
+            'error': f'Failed to read log file: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 500
 
 @app.route('/offline.html')
 @log_request_response
+@debug_log
 def offline():
     try:
         return render_template('offline.html')
@@ -234,6 +316,7 @@ def not_found(e):
 
 @app.route('/get_tmdb_details')
 @log_request_response
+@debug_log
 def get_tmdb_details():
     media_type = request.args.get('type')  # 'tv' or 'movie'
     tmdb_id = request.args.get('id')      # TMDB ID
@@ -289,6 +372,7 @@ def get_tmdb_details():
     
 @app.route('/search', methods=['POST'])
 @log_request_response
+@debug_log
 def search():
     query = request.form['query']
     media_type = request.form['media_type']
@@ -336,6 +420,7 @@ def search_sonarr(query):
 
 @app.route('/add', methods=['POST'])
 @log_request_response
+@debug_log
 def add_to_arr():
     data = request.json
     media_type = data['media_type']
@@ -407,6 +492,7 @@ def add_to_sonarr(tvdb_id):
 
 # Add these new functions to your Flask app
 @app.route('/get_media_details')
+@debug_log
 @log_request_response
 def get_media_details():
     media_type = request.args.get('type')
@@ -419,6 +505,7 @@ def get_media_details():
     else:
         return jsonify(get_sonarr_details(media_id))
 
+@debug_log
 def check_for_updates():
     """Check for updates and apply them if available"""
     try:
@@ -453,6 +540,7 @@ def check_for_updates():
         logging.error(f"Update check failed: {str(e)}")
         return False
 
+@debug_log
 def update_checker():
     """Background thread to check for updates periodically"""
     while True:
@@ -468,12 +556,14 @@ def update_checker():
             logging.error(f"Update checker error: {str(e)}")
             time.sleep(300)  # Wait 5 minutes after error
 
+@debug_log
 def restart_app():
     """Trigger application restart"""
     logging.info("Restarting application...")
     python = sys.executable
     os.execl(python, python, *sys.argv)
 
+@debug_log
 def get_radarr_details(tmdb_id):
     """Simplified Radarr details without crew information"""
     # Check if movie exists in Radarr
@@ -530,6 +620,7 @@ def get_radarr_details(tmdb_id):
         'monitored': False
     }
 
+@debug_log
 def get_sonarr_details(tvdb_id):
     """Check if series exists in Sonarr and get details"""
     # Check if already added
@@ -573,6 +664,7 @@ def get_sonarr_details(tvdb_id):
 # Add this new endpoint
 @app.route('/check_library_status')
 @log_request_response
+@debug_log
 def check_library_status():
     media_type = request.args.get('type')
     media_id = request.args.get('id')
@@ -596,6 +688,7 @@ def check_library_status():
 
 @app.route('/images/<path:filename>')
 @log_request_response
+@debug_log
 def serve_image(filename):
     return send_from_directory('static/images', filename)
 
@@ -615,6 +708,7 @@ if os.getenv('FLASK_DEBUG') == '1':
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 @app.route('/api/version')
+@debug_log
 def get_current_version():
     try:
         repo = git.Repo(search_parent_directories=True)
@@ -626,6 +720,7 @@ def get_current_version():
         return jsonify({'hash': 'unknown', 'error': str(e)})
 
 @app.route('/api/version/latest')
+@debug_log
 def get_latest_version():
     try:
         response = requests.get('https://api.github.com/repos/yourusername/yourrepo/releases/latest')
@@ -634,6 +729,7 @@ def get_latest_version():
         return jsonify({'tag_name': 'unknown', 'error': str(e)})
 
 @app.route('/api/settings', methods=['GET', 'POST'])
+@debug_log
 def handle_settings():
     if request.method == 'GET':
         return jsonify({'auto_update': os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true'})
@@ -643,6 +739,7 @@ def handle_settings():
         return jsonify({'success': True})
 
 @app.route('/api/update', methods=['POST'])
+@debug_log
 def trigger_update():
     try:
         repo = git.Repo(search_parent_directories=True)
@@ -653,6 +750,44 @@ def trigger_update():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     
+# Check and update DuckDNS
+def update_duckdns_if_needed():
+    if not CONFIG['duckdns']['enabled'] or not CONFIG['duckdns']['domain'] or not CONFIG['duckdns']['token']:
+        logging.debug("DuckDNS update skipped - not enabled or missing credentials")
+        return False
+    
+    current_ip = get_ip_address()
+    last_ip = None
+    
+    # Check if IP has changed
+    ip_file = os.path.join(os.path.dirname(__file__), 'last_ip.txt')
+    if os.path.exists(ip_file):
+        with open(ip_file, 'r') as f:
+            last_ip = f.read().strip()
+    
+    if current_ip == last_ip:
+        logging.debug("DuckDNS update skipped - IP unchanged")
+        return False
+    
+    # Update DuckDNS
+    try:
+        url = f"https://www.duckdns.org/update?domains={CONFIG['duckdns']['domain']}&token={CONFIG['duckdns']['token']}&ip={current_ip}"
+        response = requests.get(url, timeout=10)
+        if response.text.strip() == "OK":
+            with open(ip_file, 'w') as f:
+                f.write(current_ip)
+            logging.info(f"DuckDNS updated successfully to {current_ip}")
+            return True
+        else:
+            logging.error(f"DuckDNS update failed. Response: {response.text}")
+            return False
+    except requests.exceptions.RequestException as e:
+        logging.error(f"DuckDNS update error: {str(e)}")
+        return False
+    except Exception as e:
+        logging.error(f"Unexpected error during DuckDNS update: {str(e)}")
+        return False
+
 def get_ip_address():
     """Get the local IP address for network access"""
     import socket
@@ -672,7 +807,7 @@ def print_welcome():
     # App info text
     app_info = f"""
     {Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}
-    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.1')}
+    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.2')}
     {Fore.WHITE}• Local: {Fore.CYAN}http://127.0.0.1:5000{Style.RESET_ALL}
     {Fore.WHITE}• Network: {Fore.CYAN}http://{get_ip_address()}:5000{Style.RESET_ALL}
     """
@@ -694,6 +829,18 @@ if __name__ == '__main__':
             name="ForceUpdater"
         )
         update_thread.start()
+
+    if CONFIG['duckdns']['enabled']:
+        try:
+            duckdns_thread = threading.Thread(
+                target=lambda: update_duckdns_if_needed(),
+                daemon=True,
+                name="DuckDNSUpdater"
+            )
+            duckdns_thread.start()
+            logging.info("DuckDNS update thread started")
+        except Exception as e:
+            logging.error(f"Failed to start DuckDNS thread: {str(e)}")
 
     print_welcome()
     app.run(host='0.0.0.0', port=5000)
