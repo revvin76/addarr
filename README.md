@@ -142,13 +142,13 @@ All settings can be configured through the web interface after initial setup:
 
 ## Troubleshooting 🛠️
 ### Issue: Can't connect to Radarr/Sonarr
-✅ Verify URLs and API keys are correct
-✅ Check that the services are running and accessible
+- ✅ Verify URLs and API keys are correct
+- ✅ Check that the services are running and accessible
 
 ### Issue: Auto-updates not working
-✅ Ensure ENABLE_AUTO_UPDATE=true in .env
-✅ Check internet connectivity
+- ✅ Ensure ENABLE_AUTO_UPDATE=true in .env
+- ✅ Check internet connectivity
 
 ### Issue: DuckDNS not updating
-✅ Verify domain and token are correct
-✅ Check that DuckDNS is enabled in settings
+- ✅ Verify domain and token are correct
+- ✅ Check that DuckDNS is enabled in settings
