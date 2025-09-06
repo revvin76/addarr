@@ -749,7 +749,322 @@ def trigger_update():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-    
+
+@app.route('/manage')
+@log_request_response
+@debug_log
+def manage_media():
+    try:
+        # Get all movies from Radarr
+        radarr_url = f"{CONFIG['radarr']['url']}/api/v3/movie"
+        movies = requests.get(radarr_url, params={'apikey': CONFIG['radarr']['api_key']}).json()
+        
+        # Get all series from Sonarr
+        sonarr_url = f"{CONFIG['sonarr']['url']}/api/v3/series"
+        series = requests.get(sonarr_url, params={'apikey': CONFIG['sonarr']['api_key']}).json()
+        
+        # Create a combined list with type indicator
+        combined_media = []
+        
+        # Add movies with type indicator
+        for movie in movies:
+            movie['media_type'] = 'movie'
+            combined_media.append(movie)
+        
+        # Add TV shows with type indicator
+        for show in series:
+            show['media_type'] = 'tv'
+            combined_media.append(show)
+        
+        # Sort by title alphabetically (case-insensitive)
+        combined_media.sort(key=lambda x: x.get('title', '').lower())
+        
+        return render_template(
+            'manage.html',
+            media=combined_media
+        )
+    except Exception as e:
+        logging.error(f"Error fetching media: {str(e)}", exc_info=True)
+        return render_template('error.html', error="Failed to load media library")
+
+@app.route('/get_media_manage')
+@debug_log
+@log_request_response
+def get_media_manage():
+    media_type = request.args.get('type')
+    media_id = request.args.get('id')
+
+    if media_type == 'movie':
+        # Get details from Radarr
+        url = f"{CONFIG['radarr']['url']}/api/v3/movie/{media_id}"
+        movie = requests.get(url, params={'apikey': CONFIG['radarr']['api_key']}).json()
+        return jsonify({
+            "title": movie.get("title"),
+            "poster": movie["images"][0]["remoteUrl"] if movie.get("images") else None
+        })
+
+    elif media_type == 'tv':
+        # Get details from Sonarr
+        url = f"{CONFIG['sonarr']['url']}/api/v3/series/{media_id}"
+        series = requests.get(url, params={'apikey': CONFIG['sonarr']['api_key']}).json()
+
+        # Fetch all episodes
+        episodes_url = f"{CONFIG['sonarr']['url']}/api/v3/episode"
+        episodes = requests.get(episodes_url, params={
+            "seriesId": media_id,
+            "apikey": CONFIG['sonarr']['api_key']
+        }).json()
+
+        # Group into seasons
+        seasons = {}
+        for ep in episodes:
+            sn = ep["seasonNumber"]
+            if sn not in seasons:
+                seasons[sn] = {"number": sn, "episodes": []}
+            status = "downloaded" if ep.get("hasFile") \
+                     else "missing" if ep.get("airDateUtc") < datetime.utcnow().isoformat() \
+                     else "unaired"
+            seasons[sn]["episodes"].append({
+                "number": ep["episodeNumber"],
+                "title": ep["title"],
+                "status": status,
+                "id": ep["id"]
+            })
+
+        return jsonify({
+            "title": series.get("title"),
+            "poster": series["images"][0]["remoteUrl"] if series.get("images") else None,
+            "seasons": list(seasons.values())
+        })
+
+    return jsonify({"error": "Invalid media type"}), 400
+
+
+@app.route('/delete_movie/<int:movie_id>', methods=['POST'])
+@debug_log
+def delete_movie_manage(movie_id):
+    url = f"{CONFIG['radarr']['url']}/api/v3/movie/{movie_id}"
+    r = requests.delete(url, params={'apikey': CONFIG['radarr']['api_key']})
+    return jsonify({"success": r.status_code == 200})
+
+
+@app.route('/delete_movie_file/<int:movie_id>', methods=['POST'])
+@debug_log
+def delete_movie_file(movie_id):
+    # Radarr can delete only file by setting deleteFiles=True/False
+    url = f"{CONFIG['radarr']['url']}/api/v3/movie/{movie_id}"
+    r = requests.delete(url, params={'apikey': CONFIG['radarr']['api_key'], 'deleteFiles': 'true'})
+    return jsonify({"success": r.status_code == 200})
+
+
+@app.route('/search_movie/<int:movie_id>', methods=['POST'])
+@debug_log
+def search_movie_manage(movie_id):
+    url = f"{CONFIG['radarr']['url']}/api/v3/command"
+    payload = {"name": "MoviesSearch", "movieIds": [movie_id]}
+    r = requests.post(url, json=payload, params={'apikey': CONFIG['radarr']['api_key']})
+    return jsonify({"success": r.status_code == 201})
+
+
+@app.route('/delete_show/<int:series_id>', methods=['POST'])
+@debug_log
+def delete_show(series_id):
+    url = f"{CONFIG['sonarr']['url']}/api/v3/series/{series_id}"
+    r = requests.delete(url, params={'apikey': CONFIG['sonarr']['api_key'], 'deleteFiles': 'true'})
+    return jsonify({"success": r.status_code == 200})
+
+
+@app.route('/delete_all_episodes/<int:series_id>', methods=['POST'])
+@debug_log
+def delete_all_episodes(series_id):
+    # Delete all files for a series
+    url = f"{CONFIG['sonarr']['url']}/api/v3/episodefile/bulk"
+    payload = {"seriesId": series_id}
+    r = requests.delete(url, json=payload, params={'apikey': CONFIG['sonarr']['api_key']})
+    return jsonify({"success": r.status_code == 200})
+
+
+@app.route('/delete_episode/<int:episode_id>', methods=['POST'])
+@debug_log
+def delete_episode_manage(episode_id):
+    url = f"{CONFIG['sonarr']['url']}/api/v3/episodefile/{episode_id}"
+    r = requests.delete(url, params={'apikey': CONFIG['sonarr']['api_key']})
+    return jsonify({"success": r.status_code == 200})
+
+
+@app.route('/search_episode/<int:episode_id>', methods=['POST'])
+@debug_log
+def search_episode_manage(episode_id):
+    url = f"{CONFIG['sonarr']['url']}/api/v3/command"
+    payload = {"name": "EpisodeSearch", "episodeIds": [episode_id]}
+    r = requests.post(url, json=payload, params={'apikey': CONFIG['sonarr']['api_key']})
+    return jsonify({"success": r.status_code == 201})
+
+
+@app.route('/search_all_missing/<int:series_id>', methods=['POST'])
+@debug_log
+def search_all_missing(series_id):
+    url = f"{CONFIG['sonarr']['url']}/api/v3/command"
+    payload = {"name": "SeriesSearch", "seriesId": series_id}
+    r = requests.post(url, json=payload, params={'apikey': CONFIG['sonarr']['api_key']})
+    return jsonify({"success": r.status_code == 201})
+
+
+@app.route('/api/movie/<int:movie_id>', methods=['DELETE'])
+@debug_log
+def delete_movie(movie_id):
+    try:
+        url = f"{CONFIG['radarr']['url']}/api/v3/movie/{movie_id}"
+        response = requests.delete(url, params={'apikey': CONFIG['radarr']['api_key']})
+        return jsonify({'success': response.status_code == 200}), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/movie/<int:movie_id>/monitor', methods=['PUT'])
+@debug_log
+def monitor_movie(movie_id):
+    try:
+        # First get current movie details
+        url = f"{CONFIG['radarr']['url']}/api/v3/movie/{movie_id}"
+        movie = requests.get(url, params={'apikey': CONFIG['radarr']['api_key']}).json()
+        
+        # Update monitored status
+        movie['monitored'] = request.json.get('monitored', False)
+        
+        # Send update
+        response = requests.put(url, json=movie, params={'apikey': CONFIG['radarr']['api_key']})
+        return jsonify({'success': response.status_code == 202}), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/movie/<int:movie_id>/search', methods=['POST'])
+@debug_log
+def search_movie(movie_id):
+    try:
+        url = f"{CONFIG['radarr']['url']}/api/v3/command"
+        payload = {
+            'name': 'MoviesSearch',
+            'movieIds': [movie_id]
+        }
+        response = requests.post(url, json=payload, params={'apikey': CONFIG['radarr']['api_key']})
+        return jsonify({'success': response.status_code == 201}), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/series/<int:series_id>', methods=['DELETE'])
+@debug_log
+def delete_series(series_id):
+    try:
+        url = f"{CONFIG['sonarr']['url']}/api/v3/series/{series_id}"
+        response = requests.delete(url, params={'apikey': CONFIG['sonarr']['api_key']})
+        return jsonify({'success': response.status_code == 200}), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/series/<int:series_id>/monitor', methods=['PUT'])
+@debug_log
+def monitor_series(series_id):
+    try:
+        # First get current series details
+        url = f"{CONFIG['sonarr']['url']}/api/v3/series/{series_id}"
+        series = requests.get(url, params={'apikey': CONFIG['sonarr']['api_key']}).json()
+        
+        # Update monitored status
+        series['monitored'] = request.json.get('monitored', False)
+        
+        # Send update
+        response = requests.put(url, json=series, params={'apikey': CONFIG['sonarr']['api_key']})
+        return jsonify({'success': response.status_code == 202}), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/series/<int:series_id>/search', methods=['POST'])
+@debug_log
+def search_series(series_id):
+    try:
+        url = f"{CONFIG['sonarr']['url']}/api/v3/command"
+        payload = {
+            'name': 'SeriesSearch',
+            'seriesId': series_id
+        }
+        response = requests.post(url, json=payload, params={'apikey': CONFIG['sonarr']['api_key']})
+        return jsonify({'success': response.status_code == 201}), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/series/<int:series_id>/seasons')
+@debug_log
+def get_series_seasons(series_id):
+    try:
+        url = f"{CONFIG['sonarr']['url']}/api/v3/episode"
+        params = {
+            'seriesId': series_id,
+            'apikey': CONFIG['sonarr']['api_key']
+        }
+        episodes = requests.get(url, params=params).json()
+        
+        # Group episodes by season
+        seasons = {}
+        for episode in episodes:
+            season_num = episode['seasonNumber']
+            if season_num not in seasons:
+                seasons[season_num] = {
+                    'seasonNumber': season_num,
+                    'episodes': [],
+                    'statistics': {
+                        'episodeCount': 0,
+                        'episodeFileCount': 0,
+                        'percentOfEpisodes': 0
+                    }
+                }
+            seasons[season_num]['episodes'].append(episode)
+            seasons[season_num]['statistics']['episodeCount'] += 1
+            if episode.get('hasFile', False):
+                seasons[season_num]['statistics']['episodeFileCount'] += 1
+        
+        # Calculate percentages
+        for season in seasons.values():
+            if season['statistics']['episodeCount'] > 0:
+                season['statistics']['percentOfEpisodes'] = round(
+                    (season['statistics']['episodeFileCount'] / season['statistics']['episodeCount']) * 100
+                )
+        
+        return jsonify(list(seasons.values()))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/episode/<int:episode_id>/search', methods=['POST'])
+@debug_log
+def search_episode(episode_id):
+    try:
+        url = f"{CONFIG['sonarr']['url']}/api/v3/command"
+        payload = {
+            'name': 'EpisodeSearch',
+            'episodeIds': [episode_id]
+        }
+        response = requests.post(url, json=payload, params={'apikey': CONFIG['sonarr']['api_key']})
+        return jsonify({'success': response.status_code == 201}), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/episode/<int:episode_id>', methods=['DELETE'])
+@debug_log
+def delete_episode(episode_id):
+    try:
+        # First get episode to find file id
+        url = f"{CONFIG['sonarr']['url']}/api/v3/episode/{episode_id}"
+        episode = requests.get(url, params={'apikey': CONFIG['sonarr']['api_key']}).json()
+        
+        if not episode.get('episodeFileId'):
+            return jsonify({'error': 'No file to delete'}), 400
+            
+        # Delete the file
+        file_url = f"{CONFIG['sonarr']['url']}/api/v3/episodefile/{episode['episodeFileId']}"
+        response = requests.delete(file_url, params={'apikey': CONFIG['sonarr']['api_key']})
+        return jsonify({'success': response.status_code == 200}), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+            
 # Check and update DuckDNS
 def update_duckdns_if_needed():
     if not CONFIG['duckdns']['enabled'] or not CONFIG['duckdns']['domain'] or not CONFIG['duckdns']['token']:
@@ -807,7 +1122,7 @@ def print_welcome():
     # App info text
     app_info = f"""
     {Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}
-    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.2')}
+    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.4')}
     {Fore.WHITE}• Local: {Fore.CYAN}http://127.0.0.1:5000{Style.RESET_ALL}
     {Fore.WHITE}• Network: {Fore.CYAN}http://{get_ip_address()}:5000{Style.RESET_ALL}
     """
@@ -843,5 +1158,5 @@ if __name__ == '__main__':
             logging.error(f"Failed to start DuckDNS thread: {str(e)}")
 
     print_welcome()
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', debug=True, port=5000)
 
