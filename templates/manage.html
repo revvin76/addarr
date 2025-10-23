@@ -25,20 +25,21 @@
 
     <div class="container mt-4">
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0 text-xs">Manage media</h2>
-            <a href="/" class="btn btn-secondary text-xs">← Back</a>
-        </div>
-
         <!-- Filter and Search Controls -->
         <div class="row mb-4">
-            <div class="col-md-6">
-                <select id="mediaFilter" class="form-select">
-                    <option value="all">All Media</option>
-                    <option value="movie">Movies Only</option>
-                    <option value="tv">TV Shows Only</option>
-                </select>
+            <div class="col-md-6 mb-2">
+                <div class="input-group">
+                    <span class="btn btn-primary input-group-text">
+                        <i class="fas fa-filter"></i>
+                    </span>
+                    <select id="mediaFilter" class="form-select">
+                        <option value="all">All Media</option>
+                        <option value="movie">Movies Only</option>
+                        <option value="tv">TV Shows Only</option>
+                    </select>
+                </div>
             </div>
+
             <div class="col-md-6">
                 <div class="input-group">
                     <input type="text" id="mediaSearch" class="form-control" placeholder="Search media...">
@@ -133,11 +134,11 @@
                 <div class="modal-body" id="detailsContent">
                 Loading...
                 </div>
-                <div class="modal-footer">
+                <!-- <div class="modal-footer">
                     <button class="btn btn-danger" id="deleteShowBtn">Delete Show</button>
                     <button class="btn btn-warning" id="deleteAllFilesBtn">Delete All Files</button>
                     <button class="btn btn-primary" id="searchAllMissingBtn">Search All Missing</button>
-                </div>
+                </div> -->
             </div>
         </div>
     </div>

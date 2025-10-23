@@ -160,7 +160,7 @@ function showManageDetails(mediaType, externalId, internalId) {
 }
 
 // Function to populate modal with details for manage page
-function populateManageModalDetails(data, mediaType, internalId) {
+function populateManageModalDetails_old(data, mediaType, internalId) {
     const detailsContent = document.getElementById('detailsContent');
     
     // Extract the actual media data
@@ -318,18 +318,819 @@ function populateManageModalDetails(data, mediaType, internalId) {
     attachButtonEventListeners();
 }
 
-// --- Episode actions ---
-function deleteEpisode(id) {
-  if (!confirm('Delete this episode file?')) return;
-  fetch(`/api/episode/${id}`, { method: 'DELETE' })
-    .then(r => r.ok ? location.reload() : alert('Failed'))
-    .catch(() => alert('Failed to delete episode'));
+// Function to populate modal with details for manage page
+function populateManageModalDetails(data, mediaType, internalId) {
+    const detailsContent = document.getElementById('detailsContent');
+    
+    // Extract the actual media data
+    const mediaData = data.data || data;
+    
+    if (mediaType === 'movie') {
+        renderMovieDetails(mediaData, data, mediaType, internalId);
+    } else {
+        renderTVDetails(mediaData, data, mediaType, internalId);
+    }
 }
 
-function searchEpisode(id) {
-  fetch(`/api/episode/${id}/search`, { method: 'POST' })
-    .then(r => r.ok ? alert('Search started') : alert('Failed'))
-    .catch(() => alert('Search failed'));
+function renderMovieDetails(mediaData, fullData, mediaType, internalId) {
+    const detailsContent = document.getElementById('detailsContent');
+    
+    // Get poster image
+    const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
+    const posterUrl = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
+    
+    // Format runtime
+    const runtime = mediaData.runtime ? `${Math.floor(mediaData.runtime / 60)}h ${mediaData.runtime % 60}m` : 'N/A';
+    
+    // Format file size
+    const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
+    
+    // Get quality information
+    const quality = mediaData.movieFile?.quality?.quality?.name || 'Unknown';
+    
+    // Get file information
+    const movieFile = mediaData.movieFile;
+    const relativePath = movieFile?.relativePath || 'No file downloaded';
+    
+    const html = `
+        <!-- Poster and Basic Info Row -->
+        <div class="row mb-3">
+            <!-- Poster Column - Fixed Width -->
+            <div class="col-4 pe-0">
+                <img src="${posterUrl}" 
+                     class="img-fluid rounded w-100" 
+                     alt="${mediaData.title}"
+                     onerror="this.src='/static/images/favicon.png'"
+                     style="max-width: 120px;">
+            </div>
+            
+            <!-- Title and Details Column -->
+            <div class="col-8 ps-2">
+                <h4 class="mb-1">${mediaData.title || 'Unknown Title'}</h4>
+                <div class="d-flex align-items-center flex-wrap mb-2">
+                    ${mediaData.certification ? `<span class="badge bg-dark me-1">${mediaData.certification}</span>` : ''}
+                    <span class="me-1">${mediaData.year || ''}</span>
+                    <span class="">${runtime}</span>
+                </div>
+                
+                <!-- Status Badges -->
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    <span class="badge ${fullData.on_disk ? 'bg-success' : 'bg-warning'}">
+                        ${fullData.on_disk ? 'Downloaded' : 'Missing'}
+                    </span>
+                    <span class="badge ${fullData.monitored ? 'bg-success' : 'bg-secondary'}">
+                        ${fullData.monitored ? 'Monitored' : 'Not Monitored'}
+                    </span>
+                    ${mediaData.status ? `<span class="badge bg-info">${mediaData.status}</span>` : ''}
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="d-grid gap-2 d-flex">
+                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle" 
+                            data-type="${mediaType}" 
+                            data-id="${internalId}"
+                            data-monitored="${fullData.monitored}">
+                        ${fullData.monitored ? 'Unmonitor' : 'Monitor'}
+                    </button>
+                    <button class="btn btn-primary flex-fill search-btn" 
+                            data-type="${mediaType}" 
+                            data-id="${internalId}">
+                        <i class="fas fa-search me-1"></i> Search
+                    </button>
+                    <button class="btn btn-danger flex-fill delete-btn" 
+                            data-type="${mediaType}" 
+                            data-id="${internalId}">
+                        <i class="fas fa-trash me-1"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Movie Details Card -->
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">MOVIE DETAILS</h6>
+            </div>
+            <div class="card-body p-2">
+                <!-- Path -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Path</strong></div>
+                    <div class="col-8">
+                        <code class="text-wrap d-block" style="font-size: 0.8rem;">${mediaData.path || 'N/A'}</code>
+                    </div>
+                </div>
+                
+                <!-- Status -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Status</strong></div>
+                    <div class="col-8">${fullData.on_disk ? 'Downloaded' : 'Missing'}</div>
+                </div>
+                
+                <!-- Quality Profile -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Quality Profile</strong></div>
+                    <div class="col-8">${quality}</div>
+                </div>
+                
+                <!-- Size -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Size</strong></div>
+                    <div class="col-8">${fileSize}</div>
+                </div>
+                
+                <!-- Genres -->
+                ${mediaData.genres && mediaData.genres.length > 0 ? `
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Genres</strong></div>
+                    <div class="col-8">
+                        ${mediaData.genres.map(genre => `<span class="badge bg-secondary me-1 mb-1">${genre}</span>`).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <!-- Rating -->
+                ${mediaData.ratings?.value ? `
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Rating</strong></div>
+                    <div class="col-8">
+                        <span class="badge bg-primary">${mediaData.ratings.value}/10</span>
+                        ${mediaData.ratings.votes ? `<small class="text-muted ms-1">(${mediaData.ratings.votes} votes)</small>` : ''}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+
+        <!-- Files Section -->
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">FILES</h6>
+                <button class="btn btn-sm btn-outline-warning refresh-files-btn" 
+                        data-type="${mediaType}" 
+                        data-id="${internalId}">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th class="border-0 ps-2">Relative Path</th>
+                                <th class="border-0 text-end pe-2">Size</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="text-wrap ps-2" style="font-size: 0.8rem;">
+                                    <code>${relativePath}</code>
+                                </td>
+                                <td class="text-end pe-2">${fileSize}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overview Section -->
+        ${mediaData.overview ? `
+        <div class="card bg-dark border-secondary">
+            <div class="card-header">
+                <h6 class="mb-0">OVERVIEW</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-0" style="font-size: 0.9rem; line-height: 1.4;">${mediaData.overview}</p>
+            </div>
+        </div>
+        ` : ''}
+    `;
+    
+    detailsContent.innerHTML = html;
+    
+    // Add event listeners to the new buttons
+    attachButtonEventListeners();
+}
+function renderTVDetails_old(mediaData, fullData, mediaType, internalId) {
+    const detailsContent = document.getElementById('detailsContent');
+    
+    // Get poster image
+    const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
+    const posterUrl = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
+    
+    // Format file size
+    const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
+    
+    // Get quality information
+    const quality = mediaData.seriesType || 'Standard';
+    
+    // Get seasons data
+    const seasons = mediaData.seasons || [];
+    
+    // Get statistics
+    const stats = mediaData.statistics || {};
+    const totalEpisodes = stats.episodeCount || 0;
+    const downloadedEpisodes = stats.episodeFileCount || 0;
+    const completionPercent = stats.percentOfEpisodes || 0;
+    
+    const html = `
+        <!-- Poster and Basic Info Row -->
+        <div class="row mb-3">
+            <!-- Poster Column - Fixed Width -->
+            <div class="col-4 pe-0">
+                <img src="${posterUrl}" 
+                     class="img-fluid rounded w-100" 
+                     alt="${mediaData.title}"
+                     onerror="this.src='/static/images/favicon.png'"
+                     style="max-width: 120px;">
+            </div>
+            
+            <!-- Title and Details Column -->
+            <div class="col-8 ps-2">
+                <h4 class="mb-1">${mediaData.title || 'Unknown Title'}</h4>
+                <div class="d-flex align-items-center flex-wrap mb-2">
+                    ${mediaData.certification ? `<span class="badge bg-dark me-1">${mediaData.certification}</span>` : ''}
+                    <span class="me-1">${mediaData.year || ''}</span>
+                    <span class="">${mediaData.network || ''}</span>
+                </div>
+                
+                <!-- Status Badges -->
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    <span class="badge ${fullData.on_disk ? 'bg-success' : 'bg-warning'}">
+                        ${fullData.on_disk ? 'Downloaded' : 'Missing'}
+                    </span>
+                    <span class="badge ${fullData.monitored ? 'bg-success' : 'bg-secondary'}">
+                        ${fullData.monitored ? 'Monitored' : 'Not Monitored'}
+                    </span>
+                    ${mediaData.status ? `<span class="badge bg-info">${mediaData.status}</span>` : ''}
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="d-grid gap-2 d-flex">
+                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle" 
+                            data-type="${mediaType}" 
+                            data-id="${internalId}"
+                            data-monitored="${fullData.monitored}">
+                        ${fullData.monitored ? 'Unmonitor' : 'Monitor'}
+                    </button>
+                    <button class="btn btn-primary flex-fill search-btn" 
+                            data-type="${mediaType}" 
+                            data-id="${internalId}">
+                        <i class="fas fa-search me-1"></i> Search
+                    </button>
+                    <button class="btn btn-danger flex-fill delete-btn" 
+                            data-type="${mediaType}" 
+                            data-id="${internalId}">
+                        <i class="fas fa-trash me-1"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TV Show Details Card -->
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">TV SHOW DETAILS</h6>
+            </div>
+            <div class="card-body p-2">
+                <!-- Path -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Path</strong></div>
+                    <div class="col-8">
+                        <code class="text-wrap d-block" style="font-size: 0.8rem;">${mediaData.path || 'N/A'}</code>
+                    </div>
+                </div>
+                
+                <!-- Status -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Status</strong></div>
+                    <div class="col-8">${fullData.on_disk ? 'Downloaded' : 'Missing'}</div>
+                </div>
+                
+                <!-- Quality Profile -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Quality Profile</strong></div>
+                    <div class="col-8">${quality}</div>
+                </div>
+                
+                <!-- Size -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Size</strong></div>
+                    <div class="col-8">${fileSize}</div>
+                </div>
+                
+                <!-- Episodes Progress -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Episodes</strong></div>
+                    <div class="col-8">
+                        ${downloadedEpisodes}/${totalEpisodes} (${completionPercent}% complete)
+                        <div class="progress mt-1" style="height: 6px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: ${completionPercent}%;" 
+                                 aria-valuenow="${completionPercent}" 
+                                 aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Genres -->
+                ${mediaData.genres && mediaData.genres.length > 0 ? `
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Genres</strong></div>
+                    <div class="col-8">
+                        ${mediaData.genres.map(genre => `<span class="badge bg-secondary me-1 mb-1">${genre}</span>`).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <!-- Rating -->
+                ${mediaData.ratings?.value ? `
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Rating</strong></div>
+                    <div class="col-8">
+                        <span class="badge bg-primary">${mediaData.ratings.value}/10</span>
+                        ${mediaData.ratings.votes ? `<small class="text-muted ms-1">(${mediaData.ratings.votes} votes)</small>` : ''}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+
+        <!-- Seasons Section -->
+        <div class="seasons-container mb-3" id="seasonsContainer">
+            <div class="text-center my-4">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading episodes...</span>
+                </div>
+                <p>Loading episodes...</p>
+            </div>
+        </div>
+
+        <!-- Overview Section -->
+        ${mediaData.overview ? `
+        <div class="card bg-dark border-secondary">
+            <div class="card-header">
+                <h6 class="mb-0">OVERVIEW</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-0" style="font-size: 0.9rem; line-height: 1.4;">${mediaData.overview}</p>
+            </div>
+        </div>
+        ` : ''}
+    `;
+    
+    detailsContent.innerHTML = html;
+    
+    // Load episodes after the modal is populated
+    loadTVShowEpisodes(internalId, seasons);
+    
+    // Add event listeners to the new buttons
+    attachButtonEventListeners();
+}
+
+function renderTVDetails(mediaData, fullData, mediaType, internalId) {
+    const detailsContent = document.getElementById('detailsContent');
+    
+    // Get poster image
+    const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
+    const posterUrl = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
+    
+    // Format file size
+    const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
+    
+    // Get quality information
+    const quality = mediaData.seriesType || 'Standard';
+    
+    // Get seasons data
+    const seasons = mediaData.seasons || [];
+    
+    // Get statistics
+    const stats = mediaData.statistics || {};
+    const totalEpisodes = stats.episodeCount || 0;
+    const downloadedEpisodes = stats.episodeFileCount || 0;
+    const completionPercent = stats.percentOfEpisodes || 0;
+    
+    const html = `
+        <!-- Poster and Basic Info Row -->
+        <div class="row mb-3">
+            <!-- Poster Column - Fixed Width -->
+            <div class="col-4 pe-0">
+                <img src="${posterUrl}" 
+                     class="img-fluid rounded w-100" 
+                     alt="${mediaData.title}"
+                     onerror="this.src='/static/images/favicon.png'"
+                     style="max-width: 120px;">
+            </div>
+            
+            <!-- Title and Details Column -->
+            <div class="col-8 ps-2">
+                <h4 class="mb-1">${mediaData.title || 'Unknown Title'}</h4>
+                <div class="d-flex align-items-center flex-wrap mb-2">
+                    ${mediaData.certification ? `<span class="badge bg-dark me-1">${mediaData.certification}</span>` : ''}
+                    <span class="me-1">${mediaData.year || ''}</span>
+                    <span class="">${mediaData.network || ''}</span>
+                </div>
+                
+                <!-- Status Badges -->
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    <span class="badge ${fullData.on_disk ? 'bg-success' : 'bg-warning'}">
+                        ${fullData.on_disk ? 'Downloaded' : 'Missing'}
+                    </span>
+                    <span class="badge ${fullData.monitored ? 'bg-success' : 'bg-secondary'}">
+                        ${fullData.monitored ? 'Monitored' : 'Not Monitored'}
+                    </span>
+                    ${mediaData.status ? `<span class="badge bg-info">${mediaData.status}</span>` : ''}
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="d-grid gap-2 d-flex">
+                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle" 
+                            data-type="${mediaType}" 
+                            data-id="${internalId}"
+                            data-monitored="${fullData.monitored}">
+                        ${fullData.monitored ? 'Unmonitor' : 'Monitor'}
+                    </button>
+                    <button class="btn btn-primary flex-fill search-btn" 
+                            data-type="${mediaType}" 
+                            data-id="${internalId}">
+                        <i class="fas fa-search me-1"></i> Search
+                    </button>
+                    <button class="btn btn-danger flex-fill delete-btn" 
+                            data-type="${mediaType}" 
+                            data-id="${internalId}">
+                        <i class="fas fa-trash me-1"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TV Show Details Card -->
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">TV SHOW DETAILS</h6>
+            </div>
+            <div class="card-body p-2">
+                <!-- Path -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Path</strong></div>
+                    <div class="col-8">
+                        <code class="text-wrap d-block" style="font-size: 0.8rem;">${mediaData.path || 'N/A'}</code>
+                    </div>
+                </div>
+                
+                <!-- Status -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Status</strong></div>
+                    <div class="col-8">${fullData.on_disk ? 'Downloaded' : 'Missing'}</div>
+                </div>
+                
+                <!-- Quality Profile -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Quality Profile</strong></div>
+                    <div class="col-8">${quality}</div>
+                </div>
+                
+                <!-- Size -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Size</strong></div>
+                    <div class="col-8">${fileSize}</div>
+                </div>
+                
+                <!-- Episodes Progress -->
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Episodes</strong></div>
+                    <div class="col-8">
+                        ${downloadedEpisodes}/${totalEpisodes} (${completionPercent}% complete)
+                        <div class="progress mt-1" style="height: 6px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: ${completionPercent}%;" 
+                                 aria-valuenow="${completionPercent}" 
+                                 aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Genres -->
+                ${mediaData.genres && mediaData.genres.length > 0 ? `
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Genres</strong></div>
+                    <div class="col-8">
+                        ${mediaData.genres.map(genre => `<span class="badge bg-secondary me-1 mb-1">${genre}</span>`).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <!-- Rating -->
+                ${mediaData.ratings?.value ? `
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Rating</strong></div>
+                    <div class="col-8">
+                        <span class="badge bg-primary">${mediaData.ratings.value}/10</span>
+                        ${mediaData.ratings.votes ? `<small class="text-muted ms-1">(${mediaData.ratings.votes} votes)</small>` : ''}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+
+        <!-- Seasons Section -->
+        <div class="seasons-container mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">SEASONS</h6>
+                <button class="btn btn-sm btn-outline-primary" id="loadEpisodesBtn" data-series-id="${internalId}">
+                    <i class="fas fa-sync-alt me-1"></i> Load Episodes
+                </button>
+            </div>
+            <div id="seasonsList">
+                <!-- Seasons will be loaded here when user clicks the button -->
+                <div class="text-center text-muted p-4">
+                    <i class="fas fa-tv fa-2x mb-2"></i>
+                    <p>Click "Load Episodes" to view season details</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overview Section -->
+        ${mediaData.overview ? `
+        <div class="card bg-dark border-secondary">
+            <div class="card-header">
+                <h6 class="mb-0">OVERVIEW</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-0" style="font-size: 0.9rem; line-height: 1.4;">${mediaData.overview}</p>
+            </div>
+        </div>
+        ` : ''}
+    `;
+    
+    detailsContent.innerHTML = html;
+    
+    // Add event listener for the load episodes button
+    const loadEpisodesBtn = document.getElementById('loadEpisodesBtn');
+    if (loadEpisodesBtn) {
+        loadEpisodesBtn.addEventListener('click', function() {
+            const seriesId = this.getAttribute('data-series-id');
+            loadTVShowEpisodes(seriesId);
+        });
+    }
+    
+    // Add event listeners to the new buttons
+    attachButtonEventListeners();
+}
+
+// New function to load episodes for TV shows
+function loadTVShowEpisodes(seriesId) {
+    const button = document.getElementById('loadEpisodesBtn');
+    const seasonsList = document.getElementById('seasonsList');
+    
+    // Check if elements exist
+    if (!button || !seasonsList) {
+        console.error('Required elements not found');
+        return;
+    }
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+    
+    fetch(`/api/series/${seriesId}/seasons`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch episodes');
+            }
+            return response.json();
+        })
+        .then(seasonsWithEpisodes => {
+            renderSeasonCards(seasonsWithEpisodes);
+            // Hide the button after successful load
+            button.style.display = 'none';
+        })
+        .catch(error => {
+            console.error('Error loading episodes:', error);
+            seasonsList.innerHTML = `
+                <div class="alert alert-danger">
+                    Error loading episodes: ${error.message}
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="loadTVShowEpisodes(${seriesId})">Retry</button>
+                </div>`;
+            // Reset button
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Load Episodes';
+        });
+}
+
+// Function to render season cards with episodes
+function renderSeasonCards(seasonsWithEpisodes) {
+    const container = document.getElementById('seasonsList');
+    
+    // Check if container exists
+    if (!container) {
+        console.error('seasonsList container not found');
+        return;
+    }
+    
+    if (!seasonsWithEpisodes || seasonsWithEpisodes.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No episodes data available</div>';
+        return;
+    }
+    
+    // Sort seasons by season number
+    seasonsWithEpisodes.sort((a, b) => a.seasonNumber - b.seasonNumber);
+    
+    const seasonsHtml = seasonsWithEpisodes.map(season => {
+        return `
+            <div class="card season-card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Season ${season.seasonNumber}</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="episode-list">
+                        ${season.episodes && season.episodes.length > 0 ? 
+                            season.episodes.map(episode => `
+                                <div class="episode-item d-flex justify-content-between align-items-center ${episode.hasFile ? 'downloaded' : 'missing'}">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <span class="episode-number">${episode.episodeNumber}</span>
+                                                <span class="episode-title">Episode ${episode.episodeNumber}</span>
+                                                ${episode.title && episode.title !== `Episode ${episode.episodeNumber}` ? 
+                                                    `<small class="text-muted d-block">${episode.title}</small>` : ''}
+                                            </div>
+                                            <div class="episode-date">${formatEpisodeDate(episode.airDate)}</div>
+                                        </div>
+                                    </div>
+                                    <div class="episode-actions ms-2">
+                                        ${episode.hasFile ? 
+                                            `<button class="btn btn-sm btn-danger delete-episode-btn" 
+                                                data-episode-id="${episode.id}"
+                                                title="Delete episode file">
+                                                <i class="fas fa-trash"></i>
+                                            </button>` :
+                                            `<button class="btn btn-sm btn-primary search-episode-btn" 
+                                                data-episode-id="${episode.id}"
+                                                title="Search for episode">
+                                                <i class="fas fa-search"></i>
+                                            </button>`
+                                        }
+                                    </div>
+                                </div>
+                            `).join('') : 
+                            '<div class="episode-item text-center p-2">No episodes available</div>'
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = seasonsHtml;
+    
+    // Attach event listeners to the new buttons
+    attachEpisodeEventListeners();
+}
+
+// Function to attach event listeners to episode action buttons
+function attachEpisodeEventListeners() {
+    // Search episode buttons
+    document.querySelectorAll('.search-episode-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent triggering parent click events
+            const episodeId = this.getAttribute('data-episode-id');
+            searchEpisode(episodeId, this);
+        });
+    });
+    
+    // Delete episode buttons
+    document.querySelectorAll('.delete-episode-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent triggering parent click events
+            const episodeId = this.getAttribute('data-episode-id');
+            deleteEpisode(episodeId, this);
+        });
+    });
+}
+
+// Function to search for an episode
+function searchEpisode(episodeId, button) {
+    const originalHtml = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+    
+    fetch(`/api/episode/${episodeId}/search`, {
+        method: 'POST'
+    })
+    .then(response => {
+        if (response.ok) {
+            button.innerHTML = '<i class="fas fa-check text-success"></i>';
+            setTimeout(() => {
+                button.innerHTML = originalHtml;
+                button.disabled = false;
+            }, 2000);
+        } else {
+            throw new Error('Search failed');
+        }
+    })
+    .catch(error => {
+        console.error('Error searching episode:', error);
+        button.innerHTML = '<i class="fas fa-times text-danger"></i>';
+        setTimeout(() => {
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        }, 2000);
+    });
+}
+
+// Function to delete an episode file
+function deleteEpisode(episodeId, button) {
+    if (!confirm('Are you sure you want to delete this episode file?')) {
+        return;
+    }
+    
+    const originalHtml = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+    
+    fetch(`/api/episode/${episodeId}`, {
+        method: 'DELETE'
+    })
+    .then(response => {
+        if (response.ok) {
+            button.innerHTML = '<i class="fas fa-check text-success"></i>';
+            
+            // Update the episode item to show it's now missing
+            const episodeItem = button.closest('.episode-item');
+            episodeItem.classList.remove('downloaded');
+            episodeItem.classList.add('missing');
+            
+            // Replace delete button with search button
+            setTimeout(() => {
+                button.outerHTML = `
+                    <button class="btn btn-sm btn-primary search-episode-btn" 
+                        data-episode-id="${episodeId}"
+                        title="Search for episode">
+                        <i class="fas fa-search"></i>
+                    </button>
+                `;
+                
+                // Re-attach event listener to the new button
+                attachEpisodeEventListeners();
+            }, 1000);
+        } else {
+            throw new Error('Delete failed');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting episode:', error);
+        button.innerHTML = '<i class="fas fa-times text-danger"></i>';
+        setTimeout(() => {
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        }, 2000);
+    });
+}
+// Helper function to format episode dates
+function formatEpisodeDate(dateString) {
+    if (!dateString) return 'TBA';
+    
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid Date';
+        
+        // Format as "Mon Day Year" (e.g., "Nov 5 2025")
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    } catch (e) {
+        return dateString; // Return original if formatting fails
+    }
+}
+
+// Helper function to format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 // --- Show actions ---

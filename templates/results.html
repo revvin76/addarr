@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>addarr: Search Results</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="/static/css/styles.css" rel="stylesheet">
     <link rel="icon" type="image/png" href="/static/images/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
@@ -33,31 +34,38 @@
         </div>
     </div>    
     <div class="container mt-4 text-xs">
-        
-    <!-- Search Bar -->
-    <div class="row justify-content-center mb-4 search-form-container">
-        <div class="col-md-8 col-lg-6">
-            <form action="/search" method="POST" onsubmit="return validateForm()">
-                <div class="row g-2">
-                    <div class="col-12">
-                        <input type="text" class="form-control form-control-lg" 
-                            name="query" placeholder="Search movies and TV shows..." 
-                            value="{{ query }}" required>
-                    </div>
-                    <div class="col-12">
-                        <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
 
-    <!-- Filter Buttons - Made Full Width -->
-    <div class="btn-group w-100 mb-4" role="group" aria-label="Media type filter">
-        <button type="button" class="btn btn-outline-primary active flex-fill" data-filter="all">All</button>
-        <button type="button" class="btn btn-outline-primary flex-fill" data-filter="movie">Movies</button>
-        <button type="button" class="btn btn-outline-primary flex-fill" data-filter="tv">TV Shows</button>
-    </div>
+        
+        <!-- Filter and Search Controls -->
+        <div class="row mb-4">
+            <div class="col-md-6 mb-2">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-filter"></i>
+                    </span>
+                    <select id="mediaFilter" class="form-select">
+                        <option value="all">All Media</option>
+                        <option value="movie">Movies Only</option>
+                        <option value="tv">TV Shows Only</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <form action="/search" method="POST" onsubmit="return validateForm()">
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <input type="text" class="form-control form-control-lg" 
+                                name="query" placeholder="Search movies and TV shows..." 
+                                value="{{ query }}" required>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary btn-lg w-100">Search</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         {% if results %}
             <div class="row" id="resultsGrid">
@@ -131,24 +139,18 @@
     <script>
     // Filter functionality
     document.addEventListener('DOMContentLoaded', function() {
-        const filterButtons = document.querySelectorAll('[data-filter]');
+        const mediaFilter = document.getElementById('mediaFilter');
         
-        filterButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                // Update active button
-                filterButtons.forEach(btn => btn.classList.remove('active'));
-                this.classList.add('active');
-                
-                const filter = this.getAttribute('data-filter');
-                const items = document.querySelectorAll('.result-item');
-                
-                items.forEach(item => {
-                    if (filter === 'all') {
-                        item.style.display = 'block';
-                    } else {
-                        item.style.display = item.getAttribute('data-media-type') === filter ? 'block' : 'none';
-                    }
-                });
+        mediaFilter.addEventListener('change', function() {
+            const filter = this.value;
+            const items = document.querySelectorAll('.result-item');
+            
+            items.forEach(item => {
+                if (filter === 'all') {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = item.getAttribute('data-media-type') === filter ? 'block' : 'none';
+                }
             });
         });
 

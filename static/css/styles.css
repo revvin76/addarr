@@ -986,3 +986,208 @@ input:checked + .toggle-slider:before {
     border-top-right-radius: 0.375rem;
     border-bottom-right-radius: 0.375rem;
 }
+/* Enhanced manage modal styles */
+.card.bg-dark.border-secondary {
+    border: 1px solid #495057 !important;
+}
+
+.card.bg-dark.border-secondary .card-header {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid #495057;
+    padding: 0.75rem 1rem;
+}
+
+.card.bg-dark.border-secondary .card-header h6 {
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.table-dark {
+    --bs-table-bg: transparent;
+    --bs-table-border-color: #495057;
+}
+
+.table-dark th {
+    border-bottom: 1px solid #495057;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.table-dark td {
+    border-bottom: 1px solid #495057;
+    vertical-align: middle;
+}
+
+.code-wrap {
+    word-break: break-all;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+/* Status cards */
+.card.bg-dark .card-body {
+    padding: 0.75rem;
+}
+
+/* Button enhancements */
+.btn-group-vertical .btn {
+    text-align: left;
+}
+
+.refresh-files-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+/* Text wrapping for long paths */
+.text-wrap {
+    word-break: break-all;
+    white-space: normal;
+}
+
+/* Mobile-optimized manage modal */
+.modal-dialog {
+    margin: 0.5rem;
+    max-width: none;
+}
+
+.modal-content {
+    border-radius: 8px;
+}
+
+/* Compact table for mobile */
+.table-responsive {
+    font-size: 0.8rem;
+}
+
+.table th, .table td {
+    padding: 0.5rem 0.25rem;
+}
+
+/* Better spacing for mobile cards */
+.card-body.p-2 {
+    padding: 0.5rem !important;
+}
+
+/* Action buttons mobile optimization */
+.d-grid.d-flex .btn {
+    font-size: 0.8rem;
+    padding: 0.375rem 0.5rem;
+}
+
+/* Text wrapping improvements */
+.text-wrap {
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Modal body padding adjustment */
+.modal-body {
+    padding: 1rem !important;
+}
+
+/* Compact badge spacing */
+.badge.me-1 {
+    margin-right: 0.25rem !important;
+}
+
+.badge.mb-1 {
+    margin-bottom: 0.25rem !important;
+}
+
+/* Poster size constraint */
+.col-4.pe-0 img {
+    max-height: 180px;
+    object-fit: cover;
+}
+
+/* Header sizing for mobile */
+.modal-header .modal-title {
+    font-size: 1.1rem;
+}
+
+.card-header h6 {
+    font-size: 0.85rem;
+}
+
+/* Button group spacing */
+.d-grid.gap-2 {
+    gap: 0.5rem !important;
+}
+
+/* Table header alignment */
+.table th {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.season-card {
+    margin-bottom: 15px;
+    border: 1px solid #495057;
+}
+
+.season-card .card-header {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid #495057;
+    padding: 0.75rem 1rem;
+}
+
+.episode-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.episode-item {
+    border-bottom: 1px solid #495057;
+    padding: 10px 15px;
+    transition: background-color 0.2s;
+}
+
+.episode-item:last-child {
+    border-bottom: none;
+}
+
+.episode-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.episode-item.downloaded {
+    border-left: 3px solid #28a745;
+}
+
+.episode-item.missing {
+    border-left: 3px solid #dc3545;
+}
+
+.episode-number {
+    font-weight: bold;
+    color: #ffffff;
+    margin-right: 8px;
+}
+
+.episode-title {
+    color: #cccccc;
+}
+
+.episode-date {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.episode-actions {
+    min-width: 40px;
+}
+
+.episode-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.text-muted {
+    --bs-text-opacity: 1;
+    color: var(--text-muted) !important;
+}

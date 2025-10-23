@@ -1223,14 +1223,14 @@ def print_welcome():
     # App info text
     app_info = f"""
     {Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}
-    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.5')}
+    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.6')}
     {Fore.WHITE}• Local: {Fore.CYAN}http://127.0.0.1:5000{Style.RESET_ALL}
     {Fore.WHITE}• Network: {Fore.CYAN}http://{get_ip_address()}:5000{Style.RESET_ALL}
     """
     
     # Add DuckDNS info if enabled
     if CONFIG['duckdns']['enabled'] and CONFIG['duckdns']['domain']:
-        app_info += f"    {Fore.WHITE}• DuckDNS: {Fore.CYAN}https://{CONFIG['duckdns']['domain']}.duckdns.org{Style.RESET_ALL}\n"
+        app_info += f"{Fore.WHITE}• DuckDNS: {Fore.CYAN}https://{CONFIG['duckdns']['domain']}.duckdns.org{Style.RESET_ALL}\n"
     
     # Print logo and info
     my_art = AsciiArt.from_image('static/images/logo.png')
