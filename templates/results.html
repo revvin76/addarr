@@ -33,19 +33,41 @@
         </div>
     </div>    
     <div class="container mt-4 text-xs">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0 text-xs">Search Results for "{{ query }}"</h2>
-            <a href="/" class="btn btn-secondary text-xs">← Back to Search</a>
+        
+    <!-- Search Bar -->
+    <div class="row justify-content-center mb-4 search-form-container">
+        <div class="col-md-8 col-lg-6">
+            <form action="/search" method="POST" onsubmit="return validateForm()">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <input type="text" class="form-control form-control-lg" 
+                            name="query" placeholder="Search movies and TV shows..." 
+                            value="{{ query }}" required>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
+                    </div>
+                </div>
+            </form>
         </div>
+    </div>
+
+    <!-- Filter Buttons - Made Full Width -->
+    <div class="btn-group w-100 mb-4" role="group" aria-label="Media type filter">
+        <button type="button" class="btn btn-outline-primary active flex-fill" data-filter="all">All</button>
+        <button type="button" class="btn btn-outline-primary flex-fill" data-filter="movie">Movies</button>
+        <button type="button" class="btn btn-outline-primary flex-fill" data-filter="tv">TV Shows</button>
+    </div>
 
         {% if results %}
-            <div class="row">
+            <div class="row" id="resultsGrid">
                 {% for result in results %}
-                    <div class="col-6 col-xs-6 mb-3">
-                        <div class="search-result-card h-100" 
-                            data-media-type="{{ media_type }}" 
-                            data-media-id="{{ result.tvdbId if media_type == 'tv' else result.tmdbId }}"
-                            onclick="showDetails('{{ media_type }}', {{ result.tvdbId if media_type == 'tv' else result.tmdbId }})">                        
+                    <div class="col-6 col-xs-6 mb-3 result-item" 
+                         data-media-type="{{ result.media_type }}">
+                        <div class="search-result-card h-100 {{ 'movie-card' if result.media_type == 'movie' else 'tv-card' }}" 
+                            data-media-type="{{ result.media_type }}" 
+                            data-media-id="{{ result.tvdbId if result.media_type == 'tv' else result.tmdbId }}"
+                            onclick="showDetails('{{ result.media_type }}', {{ result.tvdbId if result.media_type == 'tv' else result.tmdbId }})">                        
                             <!-- Thumbnail container with overlay -->
                             <div class="search-result-thumbnail-container">
                                 <img src="{{ result.remotePoster if result.remotePoster else '/static/images/favicon.png' }}" 
@@ -53,6 +75,14 @@
                                     alt="{{ result.title }}"
                                     onerror="this.onerror=null; this.src='/static/images/favicon.png'">
                                 <div class="fade-overlay"></div>
+                                <!-- Media type watermark -->
+                                <div class="watermark-icon position-absolute">
+                                    {% if result.media_type == 'movie' %}
+                                        <i class="fas fa-film"></i>
+                                    {% else %}
+                                        <i class="fas fa-tv"></i>
+                                    {% endif %}
+                                </div>
                             </div>
                             
                             <!-- Card content -->
@@ -99,12 +129,29 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
-
-    let player = null;
-    let trailerIframe = null;
-    let currentTrailerKey = null;    
-
+    // Filter functionality
     document.addEventListener('DOMContentLoaded', function() {
+        const filterButtons = document.querySelectorAll('[data-filter]');
+        
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Update active button
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                
+                const filter = this.getAttribute('data-filter');
+                const items = document.querySelectorAll('.result-item');
+                
+                items.forEach(item => {
+                    if (filter === 'all') {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = item.getAttribute('data-media-type') === filter ? 'block' : 'none';
+                    }
+                });
+            });
+        });
+
         // Lazy-load library status for visible items
         const lazyLoadStatus = () => {
             const cards = document.querySelectorAll('.search-result-card:not(.status-checked)');
@@ -151,9 +198,16 @@
         window.addEventListener('scroll', lazyLoadStatus);
     });
 
-
+    // Form validation function
+    function validateForm() {
+        const query = document.querySelector('input[name="query"]').value.trim();
+        if (!query) {
+            alert('Please enter a search term');
+            return false;
+        }
+        return true;
+    }
     </script>
-
 
     <div id="overlay-backdrop" class="overlay-backdrop"></div>
     <div class="spinner-border spinner-radarr" role="status">

@@ -1,5 +1,6 @@
 let currentShowId = null; // track show id for delete/search actions
 let deferredPrompt;
+let player = null;
 const installButton = document.getElementById('install-button'); // Add this button to your HTML
 
 window.addEventListener('beforeinstallprompt', (e) => {

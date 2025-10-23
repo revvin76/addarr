@@ -50,9 +50,9 @@
     <div class="container d-flex flex-column justify-content-center" style="min-height: calc(100vh - 120px);">
         <div class="text-center mb-4">
             <h3 class="text-light">Welcome to ADDARR</h3>
-            <p class="text-light">Please enter the title, choose Movie or TV Show and hit Search.</p>
+            <p class="text-light">Search for movies and TV shows to add to your media library.</p>
         </div>
-    
+
         <button id="install-button" class="btn btn-primary" style="display: none;">
             Install Addarr
         </button>
@@ -63,23 +63,17 @@
                     <div class="row g-3">
                         <div class="col-12">
                             <input type="text" class="form-control form-control-lg" 
-                                   name="query" placeholder="Search movies or TV shows..." required>
+                                name="query" placeholder="Search movies and TV shows..." required>
                         </div>
-                        <div class="col-6">
-                            <select class="form-select form-select-lg" name="media_type">
-                                <option value="movie">Movie</option>
-                                <option value="tv">TV Show</option>
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <button type="submit" class="btn btn-primary btn-lg w-100">Search</button>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
                         </div>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-    
+        
 
 
 <div class="config-overlay" id="configOverlay"></div>

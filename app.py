@@ -252,6 +252,7 @@ def index():
             duckdns_token=CONFIG['duckdns']['token'],
             duckdns_enabled=CONFIG['duckdns']['enabled']            
         )
+    
     except Exception as e:
         logging.error(f"Version check failed: {str(e)}", exc_info=True)
         return render_template(
@@ -370,10 +371,10 @@ def get_tmdb_details():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-@app.route('/search', methods=['POST'])
+@app.route('/search_old', methods=['POST'])
 @log_request_response
 @debug_log
-def search():
+def search_old():
     query = request.form['query']
     media_type = request.form['media_type']
     print(f"Searching {media_type} for: {query}")
@@ -399,7 +400,54 @@ def search():
     except Exception as e:
         print(f"Search error: {str(e)}")
         return render_template('error.html', error=str(e))
-
+    
+@app.route('/search', methods=['POST'])
+@log_request_response
+@debug_log
+def search():
+    query = request.form['query']
+    print(f"Searching for: {query}")
+    
+    try:
+        # Search both Radarr and Sonarr simultaneously
+        movie_results = search_radarr(query)
+        tv_results = search_sonarr(query)
+        
+        # Ensure results are always lists
+        movie_results = movie_results if isinstance(movie_results, list) else []
+        tv_results = tv_results if isinstance(tv_results, list) else []
+        
+        # Add media type to each result for filtering
+        for movie in movie_results:
+            movie['media_type'] = 'movie'
+        for tv_show in tv_results:
+            tv_show['media_type'] = 'tv'
+            
+        # Alternate between Sonarr and Radarr results to preserve their individual sort order
+        combined_results = []
+        max_length = max(len(movie_results), len(tv_results))
+        
+        for i in range(max_length):
+            # Add TV show (Sonarr) result if available
+            if i < len(tv_results):
+                combined_results.append(tv_results[i])
+            # Add movie (Radarr) result if available  
+            if i < len(movie_results):
+                combined_results.append(movie_results[i])
+        
+        print(f"Found {len(movie_results)} movies and {len(tv_results)} TV shows")
+        print(f"Combined results: {len(combined_results)} items (alternating TV/Movie)")
+            
+        return render_template(
+            'results.html',
+            results=combined_results,
+            media_type='combined',
+            query=query
+        )
+        
+    except Exception as e:
+        print(f"Search error: {str(e)}")
+        return render_template('error.html', error=str(e))
 def search_radarr(query):
     url = f"{CONFIG['radarr']['url']}/api/v3/movie/lookup"
     params = {
@@ -1066,7 +1114,7 @@ def delete_episode(episode_id):
         return jsonify({'error': str(e)}), 500
             
 # Check and update DuckDNS
-def update_duckdns_if_needed():
+def update_duckdns_if_needed_old():
     if not CONFIG['duckdns']['enabled'] or not CONFIG['duckdns']['domain'] or not CONFIG['duckdns']['token']:
         logging.debug("DuckDNS update skipped - not enabled or missing credentials")
         return False
@@ -1102,7 +1150,59 @@ def update_duckdns_if_needed():
     except Exception as e:
         logging.error(f"Unexpected error during DuckDNS update: {str(e)}")
         return False
-
+def update_duckdns_if_needed():
+    """Check and update DuckDNS with detailed logging"""
+    if not CONFIG['duckdns']['enabled']:
+        logging.info("DuckDNS: Update skipped - DuckDNS is not enabled")
+        return False
+        
+    if not CONFIG['duckdns']['domain'] or not CONFIG['duckdns']['token']:
+        logging.warning("DuckDNS: Update skipped - Missing domain or token")
+        return False
+    
+    logging.info("DuckDNS: Starting IP check and update process...")
+    current_ip = get_ip_address()
+    last_ip = None
+    
+    # Check if IP has changed
+    ip_file = os.path.join(os.path.dirname(__file__), 'last_ip.txt')
+    if os.path.exists(ip_file):
+        with open(ip_file, 'r') as f:
+            last_ip = f.read().strip()
+        logging.info(f"DuckDNS: Last known IP: {last_ip}")
+    else:
+        logging.info("DuckDNS: No previous IP found - first time update")
+    
+    logging.info(f"DuckDNS: Current external IP: {current_ip}")
+    
+    if current_ip == last_ip:
+        logging.info("DuckDNS: IP unchanged - no update required")
+        return False
+    
+    # Update DuckDNS
+    try:
+        logging.info(f"DuckDNS: Attempting to update {CONFIG['duckdns']['domain']}.duckdns.org to IP: {current_ip}")
+        url = f"https://www.duckdns.org/update?domains={CONFIG['duckdns']['domain']}&token={CONFIG['duckdns']['token']}&ip={current_ip}"
+        response = requests.get(url, timeout=10)
+        
+        if response.text.strip() == "OK":
+            with open(ip_file, 'w') as f:
+                f.write(current_ip)
+            logging.info(f"DuckDNS: ✅ Successfully updated to {current_ip}")
+            print(f"✅ DuckDNS: Successfully updated {CONFIG['duckdns']['domain']}.duckdns.org to {current_ip}")
+            return True
+        else:
+            logging.error(f"DuckDNS: ❌ Update failed. Response: {response.text}")
+            print(f"❌ DuckDNS: Update failed. Response: {response.text}")
+            return False
+    except requests.exceptions.RequestException as e:
+        logging.error(f"DuckDNS: ❌ Network error during update: {str(e)}")
+        print(f"❌ DuckDNS: Network error during update: {str(e)}")
+        return False
+    except Exception as e:
+        logging.error(f"DuckDNS: ❌ Unexpected error during update: {str(e)}")
+        print(f"❌ DuckDNS: Unexpected error during update: {str(e)}")
+        return False
 def get_ip_address():
     """Get the local IP address for network access"""
     import socket
@@ -1116,19 +1216,25 @@ def get_ip_address():
         ip_address = '127.0.0.1'  # Fallback to localhost
     return ip_address
 
-def print_welcome():    
+def print_welcome():
+    """Print welcome message and logo only once"""
     from colorama import Fore, Style
     
     # App info text
     app_info = f"""
     {Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}
-    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.4')}
+    {Fore.WHITE}• Version: {os.getenv('APP_VERSION', '1.0.5')}
     {Fore.WHITE}• Local: {Fore.CYAN}http://127.0.0.1:5000{Style.RESET_ALL}
     {Fore.WHITE}• Network: {Fore.CYAN}http://{get_ip_address()}:5000{Style.RESET_ALL}
     """
+    
+    # Add DuckDNS info if enabled
+    if CONFIG['duckdns']['enabled'] and CONFIG['duckdns']['domain']:
+        app_info += f"    {Fore.WHITE}• DuckDNS: {Fore.CYAN}https://{CONFIG['duckdns']['domain']}.duckdns.org{Style.RESET_ALL}\n"
+    
+    # Print logo and info
     my_art = AsciiArt.from_image('static/images/logo.png')
     my_art.to_terminal()
-
     print(app_info)
     print(f"{Fore.GREEN}✅ Ready to add media!{Style.RESET_ALL}\n")
 
