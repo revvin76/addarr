@@ -90,3 +90,4 @@ instance/
 
 updates/
 !updates/.gitkeep
+HOWTO.txt

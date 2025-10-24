@@ -157,7 +157,7 @@ def log_request_response(f):
 # Update functions
 @debug_log
 def check_github_for_updates():
-    """Check GitHub for new releases"""
+    # """Check GitHub for new releases"""
     try:
         url = f"https://api.github.com/repos/{CONFIG['update']['github_repo']}/releases/latest"
         response = requests.get(url, timeout=10)
@@ -192,7 +192,6 @@ def check_github_for_updates():
 
 @debug_log
 def ensure_updates_folder():
-    """Create updates folder if it doesn't exist"""
     updates_folder = CONFIG['update']['updates_folder']
     if not os.path.exists(updates_folder):
         os.makedirs(updates_folder)
@@ -201,7 +200,6 @@ def ensure_updates_folder():
 
 @debug_log
 def download_update():
-    """Download the latest release from GitHub to updates folder"""
     try:
         update_info = check_github_for_updates()
         
@@ -246,7 +244,6 @@ def download_update():
 
 @debug_log
 def get_downloaded_updates():
-    """Get list of downloaded updates"""
     try:
         updates_folder = ensure_updates_folder()
         update_files = []
@@ -277,7 +274,7 @@ def get_downloaded_updates():
 
 @debug_log
 def format_file_size(size_bytes):
-    """Format file size in human-readable format"""
+    # """Format file size in human-readable format"""
     if size_bytes == 0:
         return "0 B"
     
@@ -291,7 +288,7 @@ def format_file_size(size_bytes):
 
 @debug_log
 def cleanup_old_updates(keep_count=3):
-    """Keep only the most recent updates and delete older ones"""
+    # """Keep only the most recent updates and delete older ones"""
     try:
         update_files = get_downloaded_updates()
         
@@ -323,7 +320,7 @@ def cleanup_old_updates(keep_count=3):
     
 @debug_log
 def set_env(key, value):
-    """Set an environment variable in the .env file"""
+    # """Set an environment variable in the .env file"""
     try:
         env_path = os.path.join(os.path.dirname(__file__), '.env')
         env_lines = []
@@ -359,7 +356,7 @@ def set_env(key, value):
 
 @debug_log
 def update_checker():
-    """Background thread to check for updates periodically"""
+    # """Background thread to check for updates periodically"""
     while True:
         try:
             # Check if enough time has passed since last check
@@ -394,21 +391,21 @@ update_thread.start()
 @app.route('/api/update/check')
 @debug_log
 def check_update():
-    """Check for updates manually"""
+    # """Check for updates manually"""
     update_info = check_github_for_updates()
     return jsonify(update_info)
 
 @app.route('/api/update/download', methods=['POST'])
 @debug_log
 def download_update_route():
-    """Download update manually"""
+    # """Download update manually"""
     result = download_update()
     return jsonify(result)
 
 @app.route('/api/update/status')
 @debug_log
 def update_status():
-    """Get update notification status"""
+    # """Get update notification status"""
     return jsonify({
         'update_notification': os.getenv('UPDATE_NOTIFICATION', 'false') == 'true',
         'latest_version': os.getenv('LATEST_VERSION', ''),
@@ -418,14 +415,14 @@ def update_status():
 @app.route('/api/update/dismiss', methods=['POST'])
 @debug_log
 def dismiss_update_notification():
-    """Dismiss the update notification"""
+    # """Dismiss the update notification"""
     set_env('UPDATE_NOTIFICATION', 'false')
     return jsonify({'success': True})
 
 @app.route('/api/update/list')
 @debug_log
 def list_downloaded_updates():
-    """Get list of downloaded updates"""
+    # """Get list of downloaded updates"""
     update_files = get_downloaded_updates()
     return jsonify({
         'updates': update_files,
@@ -435,7 +432,7 @@ def list_downloaded_updates():
 @app.route('/api/update/cleanup', methods=['POST'])
 @debug_log
 def cleanup_updates():
-    """Clean up old updates"""
+    # """Clean up old updates"""
     keep_count = request.json.get('keep_count', 3) if request.is_json else 3
     result = cleanup_old_updates(keep_count)
     return jsonify(result)
@@ -443,7 +440,7 @@ def cleanup_updates():
 @app.route('/api/update/delete/<version>', methods=['DELETE'])
 @debug_log
 def delete_update(version):
-    """Delete a specific update"""
+    # """Delete a specific update"""
     try:
         updates_folder = ensure_updates_folder()
         filename = f"addarr_{version}.zip"
@@ -470,8 +467,6 @@ if initial_update_info.get('update_available'):
     set_env('LATEST_VERSION', initial_update_info['latest_version'])
 
 CONFIG['update']['last_checked'] = time.time()
-
-# ... (rest of your existing routes and functions remain the same)
 
 @app.route('/')
 @log_request_response
@@ -505,7 +500,7 @@ def index():
 # ... (all your other existing routes remain exactly the same)
 
 def get_ip_address():
-    """Get the local IP address for network access"""
+    # """Get the local IP address for network access"""
     import socket
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -516,7 +511,7 @@ def get_ip_address():
     return ip_address
 
 def print_welcome():
-    """Print welcome message and logo only once"""
+    # """Print welcome message and logo only once"""
     from colorama import Fore, Style
     
     app_info = f"""
