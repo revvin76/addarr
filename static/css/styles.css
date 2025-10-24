@@ -401,6 +401,9 @@ iframe {
 .modal {
     z-index: 1070;
 }
+#updatesListModal {
+    z-index: 2070;
+}
 
 #imageModal.show {
     background-color: rgba(0, 0, 0, 0.93);
@@ -1228,4 +1231,47 @@ input:checked + .toggle-slider:before {
 .version-badge {
     font-family: 'Courier New', monospace;
     font-size: 0.9em;
+}
+#downloadedUpdatesModal {
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+.settings-panel {
+  z-index: 1000;
+}
+
+/* Fix modal z-index issues */
+#downloadedUpdatesModal {
+  z-index: 9999 !important;
+}
+
+.modal-backdrop {
+  z-index: 9998 !important;
+}
+
+.settings-panel {
+  z-index: 1000;
+}
+
+/* Ensure settings panel closes when updates modal opens */
+.settings-hidden .settings-panel {
+  display: none;
+}
+/* Fix modal and overlay issues */
+.modal-backdrop {
+    z-index: 1040 !important;
+}
+
+#downloadedUpdatesModal {
+    z-index: 1050 !important;
+}
+
+.settings-panel {
+    z-index: 1030 !important;
+}
+
+/* When updates modal is open, hide settings panel */
+body.modal-open .settings-panel {
+    display: none !important;
 }

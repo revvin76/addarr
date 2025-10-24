@@ -416,6 +416,118 @@
 
 <script>
     // Register service worker
+            // Fetch Radarr configuration data
+        function fetchRadarrData() {
+            const radarrUrl = document.getElementById('radarrUrl').value;
+            const apiKey = document.getElementById('radarrApiKey').value;
+            
+            if (!radarrUrl || !apiKey) return;
+            
+            // Fetch root folders
+            fetch(`${radarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('radarrRootFolder');
+                    select.innerHTML = '';
+                    data.forEach(folder => {
+                        const option = document.createElement('option');
+                        option.value = folder.path;
+                        option.textContent = folder.path;
+                        if (folder.path === "{{ radarr_root_folder }}") {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading Radarr root folders:', error));
+            
+            // Fetch quality profiles
+            fetch(`${radarrUrl}/api/v3/qualityprofile?apikey=${apiKey}`)
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('radarrQualityProfile');
+                    select.innerHTML = '';
+                    data.forEach(profile => {
+                        const option = document.createElement('option');
+                        option.value = profile.id;
+                        option.textContent = profile.name;
+                        if (profile.id === {{ radarr_quality_profile }}) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading Radarr quality profiles:', error));
+        }
+    
+    // Fetch Sonarr configuration data
+    function fetchSonarrData() {
+        const sonarrUrl = document.getElementById('sonarrUrl').value;
+        const apiKey = document.getElementById('sonarrApiKey').value;
+        
+        if (!sonarrUrl || !apiKey) return;
+        
+        // Fetch root folders
+        fetch(`${sonarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('sonarrRootFolder');
+                select.innerHTML = '';
+                data.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder.path;
+                    option.textContent = folder.path;
+                    if (folder.path === "{{ sonarr_root_folder }}") {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading Sonarr root folders:', error));
+        
+        // Fetch quality profiles
+        fetch(`${sonarrUrl}/api/v3/qualityprofile?apikey=${apiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('sonarrQualityProfile');
+                select.innerHTML = '';
+                data.forEach(profile => {
+                    const option = document.createElement('option');
+                    option.value = profile.id;
+                    option.textContent = profile.name;
+                    if (profile.id === {{ sonarr_quality_profile }}) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading Sonarr quality profiles:', error));
+        
+        // Fetch language profiles (Sonarr only)
+        fetch(`${sonarrUrl}/api/v3/languageprofile?apikey=${apiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('sonarrLanguageProfile');
+                select.innerHTML = '';
+                data.forEach(profile => {
+                    const option = document.createElement('option');
+                    option.value = profile.id;
+                    option.textContent = profile.name;
+                    if (profile.id === {{ sonarr_language_profile }}) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading Sonarr language profiles:', error));
+    }
+        function loadConfigurationData() {
+            // Load Radarr data
+            fetchRadarrData();
+            // Load Sonarr data
+            fetchSonarrData();
+        }
+
     document.addEventListener('DOMContentLoaded', () => {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -552,120 +664,6 @@ document.getElementById('configPanel').addEventListener('show.bs.collapse', func
             }
         });        
 
-        // Load debuguration data
-        function loadConfigurationData() {
-            // Load Radarr data
-            fetchRadarrData();
-            // Load Sonarr data
-            fetchSonarrData();
-        }
-        
-        // Fetch Radarr configuration data
-        function fetchRadarrData() {
-            const radarrUrl = document.getElementById('radarrUrl').value;
-            const apiKey = document.getElementById('radarrApiKey').value;
-            
-            if (!radarrUrl || !apiKey) return;
-            
-            // Fetch root folders
-            fetch(`${radarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('radarrRootFolder');
-                    select.innerHTML = '';
-                    data.forEach(folder => {
-                        const option = document.createElement('option');
-                        option.value = folder.path;
-                        option.textContent = folder.path;
-                        if (folder.path === "{{ radarr_root_folder }}") {
-                            option.selected = true;
-                        }
-                        select.appendChild(option);
-                    });
-                })
-                .catch(error => console.error('Error loading Radarr root folders:', error));
-            
-            // Fetch quality profiles
-            fetch(`${radarrUrl}/api/v3/qualityprofile?apikey=${apiKey}`)
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('radarrQualityProfile');
-                    select.innerHTML = '';
-                    data.forEach(profile => {
-                        const option = document.createElement('option');
-                        option.value = profile.id;
-                        option.textContent = profile.name;
-                        if (profile.id === {{ radarr_quality_profile }}) {
-                            option.selected = true;
-                        }
-                        select.appendChild(option);
-                    });
-                })
-                .catch(error => console.error('Error loading Radarr quality profiles:', error));
-        }
-    
-    // Fetch Sonarr configuration data
-    function fetchSonarrData() {
-        const sonarrUrl = document.getElementById('sonarrUrl').value;
-        const apiKey = document.getElementById('sonarrApiKey').value;
-        
-        if (!sonarrUrl || !apiKey) return;
-        
-        // Fetch root folders
-        fetch(`${sonarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)
-            .then(response => response.json())
-            .then(data => {
-                const select = document.getElementById('sonarrRootFolder');
-                select.innerHTML = '';
-                data.forEach(folder => {
-                    const option = document.createElement('option');
-                    option.value = folder.path;
-                    option.textContent = folder.path;
-                    if (folder.path === "{{ sonarr_root_folder }}") {
-                        option.selected = true;
-                    }
-                    select.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Error loading Sonarr root folders:', error));
-        
-        // Fetch quality profiles
-        fetch(`${sonarrUrl}/api/v3/qualityprofile?apikey=${apiKey}`)
-            .then(response => response.json())
-            .then(data => {
-                const select = document.getElementById('sonarrQualityProfile');
-                select.innerHTML = '';
-                data.forEach(profile => {
-                    const option = document.createElement('option');
-                    option.value = profile.id;
-                    option.textContent = profile.name;
-                    if (profile.id === {{ sonarr_quality_profile }}) {
-                        option.selected = true;
-                    }
-                    select.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Error loading Sonarr quality profiles:', error));
-        
-        // Fetch language profiles (Sonarr only)
-        fetch(`${sonarrUrl}/api/v3/languageprofile?apikey=${apiKey}`)
-            .then(response => response.json())
-            .then(data => {
-                const select = document.getElementById('sonarrLanguageProfile');
-                select.innerHTML = '';
-                data.forEach(profile => {
-                    const option = document.createElement('option');
-                    option.value = profile.id;
-                    option.textContent = profile.name;
-                    if (profile.id === {{ sonarr_language_profile }}) {
-                        option.selected = true;
-                    }
-                    select.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Error loading Sonarr language profiles:', error));
-    }
-    
     // Test connection buttons
     document.getElementById('testRadarr').addEventListener('click', function() {
         testConnection('radarr');
@@ -906,7 +904,9 @@ document.getElementById('testDuckDNS').addEventListener('click', function() {
     });
 });
 </script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>    
 
 </body>
 </html>

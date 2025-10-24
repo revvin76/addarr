@@ -1328,8 +1328,19 @@ function downloadUpdate() {
             if (data.success) {
                 btn.innerHTML = '<i class="fas fa-check text-success me-2"></i>Downloaded';
                 showUpdateDownloadedNotification(data);
+                
+                // Auto-cleanup old updates after successful download
+                cleanupUpdates();
+                
+                // Optionally auto-apply the update
+                setTimeout(() => {
+                    if (confirm('Update downloaded successfully! Would you like to apply it now?')) {
+                        applyUpdate(data.version);
+                    }
+                }, 1000);
             } else {
                 btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Download Failed';
+                showToast('error', `Download failed: ${data.error}`);
             }
             setTimeout(() => {
                 btn.innerHTML = originalHtml;
@@ -1339,10 +1350,54 @@ function downloadUpdate() {
         .catch(error => {
             console.error('Error downloading update:', error);
             btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Download Failed';
+            showToast('error', 'Download failed');
             setTimeout(() => {
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
             }, 3000);
+        });
+}
+
+function applyUpdateSimple(version) {
+    if (!confirm(`Apply update to version ${version}? The application will need to restart.`)) {
+        return;
+    }
+    
+    const btn = document.querySelector(`[data-version="${version}"]`) || document.getElementById('applyLatestUpdateBtn');
+    const originalHtml = btn ? btn.innerHTML : 'Apply Update';
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Applying...';
+    }
+    
+    fetch(`/api/update/apply-simple/${version}`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', data.message);
+                
+                // Update the UI to reflect new version
+                setTimeout(() => {
+                    if (confirm('Update applied successfully! Restart the application now?')) {
+                        location.reload();
+                    }
+                }, 1000);
+            } else {
+                showToast('error', `Apply failed: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error applying update:', error);
+            showToast('error', 'Apply failed');
+        })
+        .finally(() => {
+            if (btn) {
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }, 3000);
+            }
         });
 }
 
@@ -1406,6 +1461,18 @@ function checkUpdateNotification() {
 }
 
 function showUpdateAppliedNotification(updateData) {
+    // Check if Bootstrap is available
+    if (typeof bootstrap === 'undefined') {
+        console.warn('Bootstrap not available for update notification');
+        // Fallback: show a simple alert
+        alert(`Addarr has been updated to version ${updateData.latest_version}! Some changes may require a page refresh.`);
+        
+        // Still dismiss the notification
+        fetch('/api/update/dismiss', { method: 'POST' })
+            .catch(error => console.error('Error dismissing update notification:', error));
+        return;
+    }
+
     const modalHtml = `
         <div class="modal fade" id="updateAppliedModal" tabindex="-1">
             <div class="modal-dialog">
@@ -1468,9 +1535,12 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function listDownloadedUpdates() {
+    let configPanel = document.getElementById('configPanel');
     fetch('/api/update/list')
         .then(response => response.json())
         .then(data => {
+            configPanel.classList.remove('open');
+            configOverlay.classList.remove('open');
             showDownloadedUpdatesList(data.updates);
         })
         .catch(error => {
@@ -1511,9 +1581,19 @@ function showDownloadedUpdatesList(updates) {
                                                 <td>${update.formatted_size}</td>
                                                 <td>${update.formatted_date}</td>
                                                 <td>
-                                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUpdate('${update.version}')">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button class="btn btn-outline-success" 
+                                                                onclick="applyUpdateSimple('${update.version}')" 
+                                                                data-version="${update.version}"
+                                                                title="Apply Update">
+                                                            <i class="fas fa-play"></i> Apply
+                                                        </button>
+                                                        <button class="btn btn-outline-danger" 
+                                                                onclick="deleteUpdate('${update.version}')" 
+                                                                title="Delete Update">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         `).join('')}
@@ -1521,7 +1601,11 @@ function showDownloadedUpdatesList(updates) {
                                 </table>
                             </div>
                             <div class="mt-3">
-                                <button class="btn btn-sm btn-outline-warning" onclick="cleanupUpdates()">
+                                <button class="btn btn-success me-2" id="applyLatestUpdateBtn" 
+                                        onclick="applyUpdateSimple('${updates[0].version}')">
+                                    <i class="fas fa-bolt me-1"></i>Apply Latest Update (${updates[0].version})
+                                </button>
+                                <button class="btn btn-outline-warning" onclick="cleanupUpdates()">
                                     <i class="fas fa-broom me-1"></i>Clean Up Old Updates (Keep 3)
                                 </button>
                             </div>
@@ -1712,3 +1796,205 @@ document.addEventListener('DOMContentLoaded', function() {
         listUpdatesBtn.addEventListener('click', listDownloadedUpdates);
     }
 });
+function applyUpdate(version) {
+  const btn = document.querySelector(`[data-version="${version}"]`) || 
+              document.getElementById('applyUpdateBtn');
+  
+  let originalHtml = 'Apply';
+  if (btn) {
+    originalHtml = btn.innerHTML;
+    btn.innerHTML = 'Applying...';
+    btn.disabled = true;
+  }
+
+  fetch(`/api/update/apply/${version}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showNotification(data.message, 'success');
+      // Auto-refresh after delay to see updated version
+      setTimeout(() => {
+        window.location.reload();
+      }, 5000);
+    } else {
+      showNotification(`Update failed: ${data.error}`, 'error');
+      if (btn) {
+        btn.innerHTML = 'Apply Failed';
+        setTimeout(() => {
+          btn.innerHTML = originalHtml;
+          btn.disabled = false;
+        }, 3000);
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error applying update:', error);
+    showNotification(`Update failed: ${error.message}`, 'error');
+    if (btn) {
+      btn.innerHTML = 'Apply Failed';
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }, 3000);
+    }
+  });
+}
+
+function applyLatestUpdate() {
+    const btn = document.getElementById('applyLatestUpdateBtn');
+    const originalHtml = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Applying...';
+    
+    fetch('/api/update/apply-latest', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                btn.innerHTML = '<i class="fas fa-check text-success me-2"></i>Applied Successfully';
+                showUpdateAppliedNotification(data);
+                
+                // Offer to restart the application
+                setTimeout(() => {
+                    if (confirm('Update applied successfully! Restart the application to complete the update?')) {
+                        restartApplication();
+                    }
+                }, 2000);
+            } else {
+                btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Apply Failed';
+                showToast('error', `Apply failed: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error applying update:', error);
+            btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Apply Failed';
+            showToast('error', 'Apply failed');
+        })
+        .finally(() => {
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }, 5000);
+        });
+}
+
+function restartApplication() {
+    if (!confirm('Are you sure you want to restart the application? This will interrupt any ongoing operations.')) {
+        return;
+    }
+    
+    fetch('/api/update/restart', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', 'Application is restarting...');
+                // The page will reload when the app restarts
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            } else {
+                showToast('error', `Restart failed: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error restarting application:', error);
+            showToast('error', 'Restart failed');
+        });
+}
+
+function extractUpdate(version) {
+    fetch(`/api/update/extract/${version}`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', `Update ${version} extracted successfully`);
+            } else {
+                showToast('error', `Extraction failed: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error extracting update:', error);
+            showToast('error', 'Extraction failed');
+        });
+}
+
+function showDownloadedUpdatesList(updates) {
+    const modalHtml = `
+        <div class="modal fade" id="updatesListModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-download me-2"></i>
+                            Downloaded Updates
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${updates.length === 0 ? 
+                            '<div class="text-center text-muted p-4"><i class="fas fa-inbox fa-3x mb-3"></i><p>No updates downloaded yet</p></div>' :
+                            `
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Version</th>
+                                            <th>Size</th>
+                                            <th>Downloaded</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${updates.map(update => `
+                                            <tr>
+                                                <td><strong>${update.version}</strong></td>
+                                                <td>${update.formatted_size}</td>
+                                                <td>${update.formatted_date}</td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button class="btn btn-outline-success" onclick="applyUpdate('${update.version}')" title="Apply Update">
+                                                            <i class="fas fa-play"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-danger" onclick="deleteUpdate('${update.version}')" title="Delete Update">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-success me-2" id="applyLatestUpdateBtn" onclick="applyLatestUpdate()">
+                                    <i class="fas fa-bolt me-1"></i>Apply Latest Update
+                                </button>
+                                <button class="btn btn-outline-warning" onclick="cleanupUpdates()">
+                                    <i class="fas fa-broom me-1"></i>Clean Up Old Updates (Keep 3)
+                                </button>
+                            </div>
+                            `
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('updatesListModal'));
+    modal.show();
+    
+    // Remove modal from DOM when hidden
+    document.getElementById('updatesListModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
