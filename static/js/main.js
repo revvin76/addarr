@@ -1466,3 +1466,249 @@ document.addEventListener('DOMContentLoaded', function() {
         downloadUpdateBtn.addEventListener('click', downloadUpdate);
     }
 });
+
+function listDownloadedUpdates() {
+    fetch('/api/update/list')
+        .then(response => response.json())
+        .then(data => {
+            showDownloadedUpdatesList(data.updates);
+        })
+        .catch(error => {
+            console.error('Error listing updates:', error);
+        });
+}
+
+function showDownloadedUpdatesList(updates) {
+    const modalHtml = `
+        <div class="modal fade" id="updatesListModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-download me-2"></i>
+                            Downloaded Updates
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${updates.length === 0 ? 
+                            '<div class="text-center text-muted p-4"><i class="fas fa-inbox fa-3x mb-3"></i><p>No updates downloaded yet</p></div>' :
+                            `
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Version</th>
+                                            <th>Size</th>
+                                            <th>Downloaded</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${updates.map(update => `
+                                            <tr>
+                                                <td><strong>${update.version}</strong></td>
+                                                <td>${update.formatted_size}</td>
+                                                <td>${update.formatted_date}</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUpdate('${update.version}')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-sm btn-outline-warning" onclick="cleanupUpdates()">
+                                    <i class="fas fa-broom me-1"></i>Clean Up Old Updates (Keep 3)
+                                </button>
+                            </div>
+                            `
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('updatesListModal'));
+    modal.show();
+    
+    // Remove modal from DOM when hidden
+    document.getElementById('updatesListModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
+
+function deleteUpdate(version) {
+    if (!confirm(`Are you sure you want to delete update ${version}?`)) {
+        return;
+    }
+    
+    fetch(`/api/update/delete/${version}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', `Deleted update ${version}`);
+                // Refresh the updates list
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('updatesListModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    listDownloadedUpdates();
+                }, 1000);
+            } else {
+                showToast('error', `Failed to delete: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting update:', error);
+            showToast('error', 'Failed to delete update');
+        });
+}
+
+function cleanupUpdates() {
+    fetch('/api/update/cleanup', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showToast('error', `Cleanup failed: ${data.error}`);
+            } else {
+                showToast('success', `Cleaned up ${data.deleted} old updates, kept ${data.kept}`);
+                // Refresh the updates list
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('updatesListModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    listDownloadedUpdates();
+                }, 1000);
+            }
+        })
+        .catch(error => {
+            console.error('Error cleaning up updates:', error);
+            showToast('error', 'Cleanup failed');
+        });
+}
+
+function showToast(type, message) {
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : 'danger'} border-0 position-fixed top-0 end-0 m-3`;
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-${type === 'success' ? 'check' : 'exclamation-triangle'} me-2"></i>
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    // Remove toast after it's hidden
+    toast.addEventListener('hidden.bs.toast', () => {
+        toast.remove();
+    });
+}
+
+// Update the existing downloadUpdate function to show file info
+function downloadUpdate() {
+    const btn = document.getElementById('downloadUpdateBtn');
+    const originalHtml = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Downloading...';
+    
+    fetch('/api/update/download', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                btn.innerHTML = '<i class="fas fa-check text-success me-2"></i>Downloaded';
+                showUpdateDownloadedNotification(data);
+                // Auto-cleanup old updates after successful download
+                cleanupUpdates();
+            } else {
+                btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Download Failed';
+                showToast('error', `Download failed: ${data.error}`);
+            }
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }, 5000);
+        })
+        .catch(error => {
+            console.error('Error downloading update:', error);
+            btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Download Failed';
+            showToast('error', 'Download failed');
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }, 3000);
+        });
+}
+
+// Update the existing checkForUpdates function to include list button
+function checkForUpdates() {
+    const btn = document.getElementById('checkUpdateBtn');
+    const originalHtml = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Checking...';
+    
+    fetch('/api/update/check')
+        .then(response => response.json())
+        .then(data => {
+            if (data.update_available) {
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle text-warning me-2"></i>Update Available';
+                document.getElementById('downloadUpdateBtn').style.display = 'block';
+                showUpdateAvailableNotification(data);
+            } else {
+                btn.innerHTML = '<i class="fas fa-check text-success me-2"></i>Up to Date';
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }, 3000);
+            }
+        })
+        .catch(error => {
+            console.error('Error checking for updates:', error);
+            btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Check Failed';
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }, 3000);
+        });
+}
+
+// Add event listeners when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Check for update notification
+    checkUpdateNotification();
+    
+    // Add update button event listeners
+    const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+    const downloadUpdateBtn = document.getElementById('downloadUpdateBtn');
+    const listUpdatesBtn = document.getElementById('listUpdatesBtn');
+    
+    if (checkUpdateBtn) {
+        checkUpdateBtn.addEventListener('click', checkForUpdates);
+    }
+    
+    if (downloadUpdateBtn) {
+        downloadUpdateBtn.addEventListener('click', downloadUpdate);
+    }
+    
+    if (listUpdatesBtn) {
+        listUpdatesBtn.addEventListener('click', listDownloadedUpdates);
+    }
+});

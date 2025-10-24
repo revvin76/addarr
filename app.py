@@ -55,7 +55,8 @@ CONFIG.update({
     'update': {
         'github_repo': 'revvin76/addarr',
         'check_interval': 12 * 60 * 60,  # 12 hours in seconds
-        'last_checked': 0
+        'last_checked': 0,
+        'updates_folder': 'updates'  # New updates folder
     }
 })
 
@@ -190,8 +191,17 @@ def check_github_for_updates():
         return {'update_available': False, 'error': str(e)}
 
 @debug_log
+def ensure_updates_folder():
+    """Create updates folder if it doesn't exist"""
+    updates_folder = CONFIG['update']['updates_folder']
+    if not os.path.exists(updates_folder):
+        os.makedirs(updates_folder)
+        logging.info(f"Created updates folder: {updates_folder}")
+    return updates_folder
+
+@debug_log
 def download_update():
-    """Download the latest release from GitHub"""
+    """Download the latest release from GitHub to updates folder"""
     try:
         update_info = check_github_for_updates()
         
@@ -203,19 +213,20 @@ def download_update():
         
         logging.info(f"Downloading update {latest_version} from {release_url}")
         
+        # Ensure updates folder exists
+        updates_folder = ensure_updates_folder()
+        
         # Download the release
         response = requests.get(release_url, timeout=30)
         if response.status_code != 200:
             return {'success': False, 'error': f"Download failed: {response.status_code}"}
         
-        # Save the update file
-        update_file = f"update_{latest_version}.zip"
+        # Save the update file to updates folder
+        update_file = os.path.join(updates_folder, f"addarr_{latest_version}.zip")
         with open(update_file, 'wb') as f:
             f.write(response.content)
         
-        # Extract and apply update (simplified - in practice you'd need to handle file replacement carefully)
-        # This is a placeholder - actual implementation would depend on your deployment method
-        logging.info(f"Update {latest_version} downloaded successfully")
+        logging.info(f"Update {latest_version} downloaded successfully to {update_file}")
         
         # Set update notification flag
         set_env('UPDATE_NOTIFICATION', 'true')
@@ -224,13 +235,92 @@ def download_update():
         return {
             'success': True, 
             'message': f'Update {latest_version} downloaded successfully',
-            'version': latest_version
+            'version': latest_version,
+            'file_path': update_file,
+            'file_size': os.path.getsize(update_file)
         }
         
     except Exception as e:
         logging.error(f"Error downloading update: {str(e)}")
         return {'success': False, 'error': str(e)}
 
+@debug_log
+def get_downloaded_updates():
+    """Get list of downloaded updates"""
+    try:
+        updates_folder = ensure_updates_folder()
+        update_files = []
+        
+        for filename in os.listdir(updates_folder):
+            if filename.startswith('addarr_') and filename.endswith('.zip'):
+                file_path = os.path.join(updates_folder, filename)
+                file_stat = os.stat(file_path)
+                version = filename.replace('addarr_', '').replace('.zip', '')
+                
+                update_files.append({
+                    'filename': filename,
+                    'version': version,
+                    'file_path': file_path,
+                    'size': file_stat.st_size,
+                    'downloaded_at': file_stat.st_mtime,
+                    'formatted_size': format_file_size(file_stat.st_size),
+                    'formatted_date': datetime.fromtimestamp(file_stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                })
+        
+        # Sort by version (newest first)
+        update_files.sort(key=lambda x: x['version'], reverse=True)
+        return update_files
+        
+    except Exception as e:
+        logging.error(f"Error getting downloaded updates: {str(e)}")
+        return []
+
+@debug_log
+def format_file_size(size_bytes):
+    """Format file size in human-readable format"""
+    if size_bytes == 0:
+        return "0 B"
+    
+    size_names = ["B", "KB", "MB", "GB"]
+    i = 0
+    while size_bytes >= 1024 and i < len(size_names) - 1:
+        size_bytes /= 1024.0
+        i += 1
+    
+    return f"{size_bytes:.2f} {size_names[i]}"
+
+@debug_log
+def cleanup_old_updates(keep_count=3):
+    """Keep only the most recent updates and delete older ones"""
+    try:
+        update_files = get_downloaded_updates()
+        
+        if len(update_files) <= keep_count:
+            return {'deleted': 0, 'kept': len(update_files)}
+        
+        # Keep the most recent ones
+        updates_to_keep = update_files[:keep_count]
+        updates_to_delete = update_files[keep_count:]
+        
+        deleted_files = []
+        for update in updates_to_delete:
+            try:
+                os.remove(update['file_path'])
+                deleted_files.append(update['filename'])
+                logging.info(f"Deleted old update: {update['filename']}")
+            except Exception as e:
+                logging.error(f"Error deleting {update['filename']}: {str(e)}")
+        
+        return {
+            'deleted': len(deleted_files),
+            'kept': len(updates_to_keep),
+            'deleted_files': deleted_files
+        }
+        
+    except Exception as e:
+        logging.error(f"Error cleaning up old updates: {str(e)}")
+        return {'error': str(e)}
+    
 @debug_log
 def set_env(key, value):
     """Set an environment variable in the .env file"""
@@ -331,6 +421,44 @@ def dismiss_update_notification():
     """Dismiss the update notification"""
     set_env('UPDATE_NOTIFICATION', 'false')
     return jsonify({'success': True})
+
+@app.route('/api/update/list')
+@debug_log
+def list_downloaded_updates():
+    """Get list of downloaded updates"""
+    update_files = get_downloaded_updates()
+    return jsonify({
+        'updates': update_files,
+        'total_count': len(update_files)
+    })
+
+@app.route('/api/update/cleanup', methods=['POST'])
+@debug_log
+def cleanup_updates():
+    """Clean up old updates"""
+    keep_count = request.json.get('keep_count', 3) if request.is_json else 3
+    result = cleanup_old_updates(keep_count)
+    return jsonify(result)
+
+@app.route('/api/update/delete/<version>', methods=['DELETE'])
+@debug_log
+def delete_update(version):
+    """Delete a specific update"""
+    try:
+        updates_folder = ensure_updates_folder()
+        filename = f"addarr_{version}.zip"
+        file_path = os.path.join(updates_folder, filename)
+        
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logging.info(f"Deleted update: {filename}")
+            return jsonify({'success': True, 'message': f'Deleted {filename}'})
+        else:
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+            
+    except Exception as e:
+        logging.error(f"Error deleting update: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # Initial update check on startup
 logging.info("Performing initial update check...")

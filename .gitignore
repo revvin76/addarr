@@ -87,3 +87,6 @@ yarn-error.log*
 instance/
 .env
 *.local
+
+updates/
+!updates/.gitkeep
