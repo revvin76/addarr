@@ -7,29 +7,30 @@
 # Radarr settings
 # Radarr is used for managing movie libraries  
 RADARR_URL=http://localhost:7878
-RADARR_API_KEY=****
+RADARR_API_KEY=****************************
 RADARR_QUALITY_PROFILE=4
 RADARR_ROOT_FOLDER=E:\Movies
 
 # Sonarr settings
 # Sonarr is used for managing TV series libraries   
-SONARR_URL=http://localhost:8989
-SONARR_API_KEY=****
 SONARR_QUALITY_PROFILE=4
 SONARR_LANGUAGE_PROFILE=1
-SONARR_ROOT_FOLDER=E:\\TV
+SONARR_URL=http://localhost:8989
+SONARR_API_KEY==****************************
+SONARR_ROOT_FOLDER=E:\TV
 
 # TMDB settings
 # TMDB is used for fetching movie and TV series metadata
-TMDB_TOKEN=****
-TMDB_KEY=****
+TMDB_TOKEN==****************************
+TMDB_KEY==****************************
 
 # Application settings
 # These settings control the behavior of the Addarr application
-ENABLE_AUTO_UPDATE=false
+AUTO_APPLY_UPDATES=true
+UPDATE_CHECK_INTERVAL=3600
 FLASK_DEBUG=true
 
 # DuckDNS Settings
-DUCKDNS_DOMAIN=yourdomain.duckdns.org
-DUCKDNS_TOKEN=your_duckdns_token
+DUCKDNS_DOMAIN=mydomain
+DUCKDNS_TOKEN==****************************
 DUCKDNS_ENABLED=true

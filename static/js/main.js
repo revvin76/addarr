@@ -1671,3 +1671,152 @@ async function loadVersionInfo() {
     });
 }
 
+// Check for update notifications on page load
+document.addEventListener('DOMContentLoaded', function() {
+    checkForUpdateNotification();
+    
+    // Check for updates every 5 minutes
+    setInterval(checkForUpdates, 5 * 60 * 1000);
+});
+
+function checkForUpdateNotification() {
+    fetch('/api/version/update-notification')
+        .then(response => response.json())
+        .then(data => {
+            if (data.pending_update) {
+                showUpdateNotification(data.pending_update);
+            }
+        })
+        .catch(error => console.error('Error checking update notification:', error));
+}
+
+function showUpdateNotification(updateInfo) {
+    const changesList = updateInfo.changes && updateInfo.changes.length > 0 
+        ? `<ul class="mb-3">${updateInfo.changes.map(change => `<li>${change}</li>`).join('')}</ul>`
+        : '<p class="mb-3">No specific changes listed.</p>';
+    
+    const notificationHtml = `
+        <div class="modal fade" id="updateNotificationModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Update Applied Successfully
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-success">
+                            <h6 class="alert-heading">Addarr has been updated to version ${updateInfo.new_version}</h6>
+                            <p class="mb-2"><strong>Applied:</strong> ${new Date(updateInfo.applied_at).toLocaleString()}</p>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <h6>Recent Changes:</h6>
+                            ${changesList}
+                        </div>
+                        
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                The application will continue to run normally. Some changes may require a page refresh.
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" onclick="location.reload()">
+                            <i class="fas fa-sync-alt me-1"></i> Refresh Page
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', notificationHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('updateNotificationModal'));
+    modal.show();
+    
+    // Remove modal from DOM when hidden
+    document.getElementById('updateNotificationModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
+
+function checkForUpdates() {
+    fetch('/api/version/check-update')
+        .then(response => response.json())
+        .then(data => {
+            if (data.update_available) {
+                showUpdateAvailableNotification(data);
+            }
+        })
+        .catch(error => console.error('Error checking for updates:', error));
+}
+
+function showUpdateAvailableNotification(updateInfo) {
+    // Only show if user is on the main page
+    if (!window.location.pathname === '/' || document.getElementById('updateAvailableToast')) {
+        return;
+    }
+    
+    const changesPreview = updateInfo.changes && updateInfo.changes.length > 0 
+        ? updateInfo.changes.slice(0, 3).map(change => `<li>${change}</li>`).join('')
+        : '<li>Various improvements and bug fixes</li>';
+    
+    const toastHtml = `
+        <div id="updateAvailableToast" class="toast align-items-center text-white bg-primary border-0 position-fixed top-0 end-0 m-3" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <h6 class="mb-1">Update Available!</h6>
+                    <p class="mb-1">Version ${updateInfo.new_version} is ready to install.</p>
+                    <small>Changes include:</small>
+                    <ul class="small mb-2">${changesPreview}</ul>
+                    <div class="mt-2 pt-2 border-top">
+                        <button class="btn btn-sm btn-light me-2" onclick="applyUpdate()">Install Now</button>
+                        <button class="btn btn-sm btn-outline-light" data-bs-dismiss="toast">Later</button>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', toastHtml);
+    const toast = new bootstrap.Toast(document.getElementById('updateAvailableToast'));
+    toast.show();
+}
+
+function applyUpdate() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Installing...';
+    
+    fetch('/api/version/apply-update', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                button.innerHTML = '<i class="fas fa-check"></i> Installed!';
+                setTimeout(() => {
+                    // The update notification will appear on next page load
+                    location.reload();
+                }, 2000);
+            } else {
+                throw new Error(data.error || 'Update failed');
+            }
+        })
+        .catch(error => {
+            console.error('Update failed:', error);
+            button.innerHTML = '<i class="fas fa-times"></i> Failed';
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }, 3000);
+        });
+}

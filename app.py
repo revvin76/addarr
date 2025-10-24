@@ -14,10 +14,13 @@ import time
 from ascii_magic import AsciiArt
 from collections import deque
 import traceback
+from version_manager import VersionManager
 
 load_dotenv()
 
 app = Flask(__name__)
+
+version_manager = VersionManager()
 
 # Configuration
 CONFIG = {
@@ -593,11 +596,20 @@ def update_checker():
     """Background thread to check for updates periodically"""
     while True:
         try:
-            update_available = check_for_updates()
-            if update_available:
-                # Here you could implement a restart mechanism
-                restart_app()
+            update_info = version_manager.check_for_updates()
+            
+            if update_info.get('update_available'):
+                logging.info(f"Update available: {update_info['new_version']}")
                 
+                # Apply update automatically if enabled
+                if os.getenv('AUTO_APPLY_UPDATES', 'true').lower() == 'true':
+                    result = version_manager.apply_update()
+                    if result.get('success'):
+                        logging.info(f"Auto-update applied: {result['new_version']}")
+                        # The notification will be shown on next page load
+                    else:
+                        logging.error(f"Auto-update failed: {result.get('error')}")
+            
             time.sleep(CONFIG['app']['update_interval'])
             
         except Exception as e:
@@ -740,18 +752,6 @@ def check_library_status():
 def serve_image(filename):
     return send_from_directory('static/images', filename)
 
-if os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true':
-    try:
-        update_thread = threading.Thread(
-            target=update_checker,
-            daemon=True,
-            name="AutoUpdater"
-        )
-        update_thread.start()
-        logging.info("Auto-update thread started")
-    except Exception as e:
-        logging.error(f"Failed to start update thread: {str(e)}")
-
 if os.getenv('FLASK_DEBUG') == '1':
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
@@ -759,44 +759,55 @@ if os.getenv('FLASK_DEBUG') == '1':
 @debug_log
 def get_current_version():
     try:
-        repo = git.Repo(search_parent_directories=True)
+        version_info = version_manager.get_current_version()
+        return jsonify(version_info)
+    except Exception as e:
         return jsonify({
-            'hash': repo.head.commit.hexsha[:7],
-            'date': repo.head.commit.committed_datetime.isoformat()
+            'version': 'unknown',
+            'error': str(e)
         })
-    except Exception as e:
-        return jsonify({'hash': 'unknown', 'error': str(e)})
 
-@app.route('/api/version/latest')
+@app.route('/api/version/check-update')
 @debug_log
-def get_latest_version():
+def check_for_updates():
     try:
-        response = requests.get('https://api.github.com/repos/yourusername/yourrepo/releases/latest')
-        return jsonify(response.json())
+        update_info = version_manager.check_for_updates()
+        return jsonify(update_info)
     except Exception as e:
-        return jsonify({'tag_name': 'unknown', 'error': str(e)})
+        return jsonify({
+            'update_available': False,
+            'error': str(e)
+        })
 
-@app.route('/api/settings', methods=['GET', 'POST'])
+@app.route('/api/version/apply-update', methods=['POST'])
 @debug_log
-def handle_settings():
-    if request.method == 'GET':
-        return jsonify({'auto_update': os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true'})
-    else:
-        auto_update = request.json.get('auto_update', True)
-        # Update your configuration here (write to .env or config file)
-        return jsonify({'success': True})
-
-@app.route('/api/update', methods=['POST'])
-@debug_log
-def trigger_update():
+def apply_update():
     try:
-        repo = git.Repo(search_parent_directories=True)
-        origin = repo.remotes.origin
-        origin.fetch()
-        repo.git.reset('--hard', f'origin/{CONFIG["app"]["branch"]}')
-        return jsonify({'success': True})
+        result = version_manager.apply_update()
+        
+        # Store update info for the notification
+        if result.get('success'):
+            update_info = version_manager.check_for_updates()
+            session['pending_update'] = {
+                'applied_at': datetime.now().isoformat(),
+                'new_version': result.get('new_version', {}).get('version'),
+                'changes': update_info.get('changes', [])
+            }
+        
+        return jsonify(result)
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/version/update-notification')
+@debug_log
+def get_update_notification():
+    """Check if there's a pending update notification to show"""
+    pending_update = session.pop('pending_update', None)
+    return jsonify({'pending_update': pending_update})
+
 
 @app.route('/manage')
 @log_request_response
@@ -1243,14 +1254,6 @@ if __name__ == '__main__':
     from colorama import init
     init()  # Initialize colorama
     
-    if os.getenv('ENABLE_AUTO_UPDATE', 'true').lower() == 'true':
-        update_thread = threading.Thread(
-            target=update_checker,
-            daemon=True,
-            name="ForceUpdater"
-        )
-        update_thread.start()
-
     if CONFIG['duckdns']['enabled']:
         try:
             duckdns_thread = threading.Thread(
