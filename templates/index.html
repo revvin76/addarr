@@ -44,8 +44,6 @@
         </div>
     </div>
 
-
-
     <!-- Main Content - Centered Form -->
     <div class="container d-flex flex-column justify-content-center" style="min-height: calc(100vh - 120px);">
         <div class="text-center mb-4">
@@ -74,13 +72,10 @@
         </div>
     </div>
         
-
-
 <div class="config-overlay" id="configOverlay"></div>
 <div class="config-overlay" id="debugOverlay"></div>
 
 <div class="config-panel" id="configPanel">
-
     <div class="config-header">
         <h3>Configuration</h3>
         <button class="btn btn-sm btn-outline-radarr" id="closeConfig">&times;</button>
@@ -184,32 +179,22 @@
         </div>
 
         <div class="config-section">
-            <h4>Version Control</h4>
-            
+            <h4>Version Information</h4>
             <div class="version-info">
                 <div class="version-row">
-                    <p>Current: <code>{{ current_version }}</code></p>
+                    <p>Current Version: <code>{{ current_version }}</code></p>
                 </div>
-                <div class="version-row">
-                    <p>Latest: <code>{{ latest_version }}</code></p>
-                </div>
-            </div>
-            
-            <div class="form-group form-switch">
-                <label class="form-check-label" for="auto-update-toggle">
-                    Enable Auto-Updates
-                </label>
-                <div class="toggle-switch">
-                    <input type="checkbox" class="form-check-input" id="auto-update-toggle">
-                    <span class="toggle-slider"></span>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-radarr" id="checkUpdateBtn">
+                        <i class="fas fa-sync-alt me-2"></i>Check for Updates
+                    </button>
+                    <button type="button" class="btn btn-outline-radarr" id="downloadUpdateBtn" style="display: none;">
+                        <i class="fas fa-download me-2"></i>Download Update
+                    </button>
                 </div>
             </div>
-            
-            <button type="button" id="update-now" class="btn btn-outline-radarr">
-                <i class="bi bi-cloud-arrow-down-fill"></i> Update Now
-            </button>
-        </div>        
-        
+        </div>
+
         <button type="submit" class="btn btn-radarr save-config">Save Configuration</button>
     </form>
 </div>
@@ -234,14 +219,12 @@
 </div>
 
 <div id="debugPanel" class="config-panel">
+    <div class="config-header">
+        <h3>Debug APIs</h3>
+        <button class="btn btn-sm btn-outline-radarr" id="closeDebug">&times;</button>
+    </div>
 
-        <div class="config-header">
-            <h3>Debug APIs</h3>
-            <button class="btn btn-sm btn-outline-radarr" id="closeDebug">&times;</button>
-        </div>
-
-        <div class="panel-content">
-    
+    <div class="panel-content">
         <div class="api-debug-container">
             <!-- Sidebar -->
             <div class="api-sidebar">
@@ -444,21 +427,12 @@
         }
     });
 
-
 // Load settings on panel open
 document.getElementById('configPanel').addEventListener('show.bs.collapse', function() {
-    // Load current auto-update setting
-    fetch('/api/settings')
-        .then(res => res.json())
-        .then(settings => {
-            document.getElementById('auto-update-toggle').checked = settings.auto_update;
-        });
-    
-    // Load version info
-    loadVersionInfo();
+    // Load configuration data
+    loadConfigurationData();
 });
 
-    // Add this to your existing script section
     document.addEventListener('DOMContentLoaded', function() {
         // Config panel toggle
         const configToggle = document.getElementById('configToggle');
@@ -608,7 +582,6 @@ document.getElementById('configPanel').addEventListener('show.bs.collapse', func
                 })
                 .catch(error => console.error('Error loading Radarr root folders:', error));
             
-                <!-- RADARR_PROFILE = {{ radarr_quality_profile }} -->
             // Fetch quality profiles
             fetch(`${radarrUrl}/api/v3/qualityprofile?apikey=${apiKey}`)
                 .then(response => response.json())
@@ -634,14 +607,6 @@ document.getElementById('configPanel').addEventListener('show.bs.collapse', func
         const apiKey = document.getElementById('sonarrApiKey').value;
         
         if (!sonarrUrl || !apiKey) return;
-        
-        console.log(`Fetching Sonarr data from ${sonarrUrl} with API key ${apiKey}`);
-        console.log(`Sonarr Root Folder: {{ sonarr_root_folder }}`);
-        console.log(`Sonarr Quality Profile: {{ sonarr_quality_profile }}`);
-        console.log(`Sonarr Language Profile: {{ sonarr_language_profile }}`);
-        console.log(`Sonarr URL: ${sonarrUrl}`);
-        console.log(`Sonarr API Key: ${apiKey}`);
-        console.log(`Sonarr Root Folder: {{ sonarr_root_folder }}`);
         
         // Fetch root folders
         fetch(`${sonarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)

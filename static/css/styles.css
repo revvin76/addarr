@@ -1191,3 +1191,41 @@ input:checked + .toggle-slider:before {
     --bs-text-opacity: 1;
     color: var(--text-muted) !important;
 }
+
+/* Update notification styles */
+.version-info {
+    background-color: #2a2a2a;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.version-row {
+    margin-bottom: 0.5rem;
+}
+
+.version-row:last-child {
+    margin-bottom: 0;
+}
+
+/* Toast notifications */
+.toast {
+    z-index: 1080;
+}
+
+/* Update modal styles */
+.modal-header.bg-success {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+}
+
+/* Button states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Version badge */
+.version-badge {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}

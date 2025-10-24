@@ -160,165 +160,6 @@ function showManageDetails(mediaType, externalId, internalId) {
 }
 
 // Function to populate modal with details for manage page
-function populateManageModalDetails_old(data, mediaType, internalId) {
-    const detailsContent = document.getElementById('detailsContent');
-    
-    // Extract the actual media data
-    const mediaData = data.data || data;
-    
-    // Get poster image
-    const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
-    const posterUrl = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
-    
-    // Create HTML content based on the data
-    let html = `
-        <div class="row">
-            <div class="col-md-4">
-                <img src="${posterUrl}" 
-                     class="img-fluid rounded mb-3" 
-                     alt="${mediaData.title}"
-                     onerror="this.src='/static/images/favicon.png'">
-                
-                <div class="d-grid gap-2">
-                    <button class="btn ${data.monitored ? 'btn-warning' : 'btn-success'} monitor-toggle" 
-                            data-type="${mediaType}" 
-                            data-id="${internalId}"
-                            data-monitored="${data.monitored}">
-                        ${data.monitored ? 'Unmonitor' : 'Monitor'}
-                    </button>
-                    <button class="btn btn-primary search-btn" 
-                            data-type="${mediaType}" 
-                            data-id="${internalId}">
-                        <i class="fas fa-search me-1"></i> Search
-                    </button>
-                    <button class="btn btn-danger delete-btn" 
-                            data-type="${mediaType}" 
-                            data-id="${internalId}">
-                        <i class="fas fa-trash me-1"></i> Delete
-                    </button>
-                </div>
-            </div>
-            <div class="col-md-8">
-                <h3>${mediaData.title || 'Unknown Title'}</h3>
-                <p class="text-muted">${mediaData.year || ''} • ${mediaType === 'movie' ? 'Movie' : 'TV Show'}</p>
-                
-                <div class="mb-3">
-                    <strong>Status:</strong> 
-                    <span class="badge ${data.monitored ? 'bg-success' : 'bg-secondary'}">
-                        ${data.monitored ? 'Monitored' : 'Not Monitored'}
-                    </span>
-                    <span class="badge ${data.on_disk ? 'bg-success' : 'bg-warning'} ms-1">
-                        ${data.on_disk ? 'Downloaded' : 'Not Downloaded'}
-                    </span>
-                    ${mediaData.status ? `<span class="badge bg-info ms-1">${mediaData.status}</span>` : ''}
-                </div>
-                
-                ${mediaData.overview ? `<p class="mb-3">${mediaData.overview}</p>` : ''}
-                
-                ${mediaData.genres && mediaData.genres.length > 0 ? `
-                    <div class="mb-3">
-                        <strong>Genres:</strong> 
-                        ${mediaData.genres.map(genre => `<span class="badge bg-secondary me-1">${genre}</span>`).join('')}
-                    </div>
-                ` : ''}
-                
-                ${mediaData.certification ? `
-                    <div class="mb-3">
-                        <strong>Certification:</strong> 
-                        <span class="badge bg-dark">${mediaData.certification}</span>
-                    </div>
-                ` : ''}
-                
-                ${mediaData.ratings?.value ? `
-                    <div class="mb-3">
-                        <strong>Rating:</strong> 
-                        <span class="badge bg-primary">${mediaData.ratings.value}/10</span>
-                        ${mediaData.ratings.votes ? `<small class="text-muted ms-1">(${mediaData.ratings.votes} votes)</small>` : ''}
-                    </div>
-                ` : ''}
-                
-                ${mediaData.runtime ? `
-                    <div class="mb-3">
-                        <strong>Runtime:</strong> ${mediaData.runtime} minutes
-                    </div>
-                ` : ''}
-                
-                ${mediaData.network ? `
-                    <div class="mb-3">
-                        <strong>Network:</strong> ${mediaData.network}
-                    </div>
-                ` : ''}
-                
-                ${mediaData.added ? `
-                    <div class="mb-3">
-                        <strong>Added:</strong> ${new Date(mediaData.added).toLocaleDateString()}
-                    </div>
-                ` : ''}
-                
-                ${mediaData.path ? `
-                    <div class="mb-3">
-                        <strong>Path:</strong> <code>${mediaData.path}</code>
-                    </div>
-                ` : ''}
-                
-                ${mediaType === 'tv' ? `
-                    <div class="mb-3">
-                        <strong>Seasons:</strong> ${mediaData.seasonCount || mediaData.statistics?.seasonCount || 0}
-                    </div>
-                    <div class="mb-3">
-                        <strong>Episodes:</strong> ${mediaData.episode_count || mediaData.statistics?.episodeCount || 0} 
-                        (${mediaData.download_status || mediaData.statistics?.percentOfEpisodes || 0}% complete)
-                    </div>
-                    
-                    ${mediaData.seasons && mediaData.seasons.length > 0 ? `
-                        <div class="mt-4">
-                            <h5>Seasons</h5>
-                            <div class="accordion" id="seasonsAccordion">
-                                ${mediaData.seasons.map((season, index) => `
-                                    <div class="accordion-item">
-                                        <h2 class="accordion-header" id="heading${index}">
-                                            <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" 
-                                                    data-bs-toggle="collapse" data-bs-target="#collapse${index}" 
-                                                    aria-expanded="${index === 0 ? 'true' : 'false'}" 
-                                                    aria-controls="collapse${index}">
-                                                Season ${season.seasonNumber} 
-                                                <span class="badge ${season.statistics.percentOfEpisodes === 100 ? 'bg-success' : 'bg-warning'} ms-2">
-                                                    ${season.statistics.episodeFileCount}/${season.statistics.episodeCount} episodes
-                                                </span>
-                                            </button>
-                                        </h2>
-                                        <div id="collapse${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" 
-                                             aria-labelledby="heading${index}" data-bs-parent="#seasonsAccordion">
-                                            <div class="accordion-body">
-                                                ${season.statistics.episodeCount > 0 ? `
-                                                    <p>Episodes: ${season.statistics.episodeFileCount}/${season.statistics.episodeCount} downloaded</p>
-                                                    <div class="progress mb-3">
-                                                        <div class="progress-bar" role="progressbar" 
-                                                             style="width: ${season.statistics.percentOfEpisodes}%;" 
-                                                             aria-valuenow="${season.statistics.percentOfEpisodes}" 
-                                                             aria-valuemin="0" aria-valuemax="100">
-                                                            ${season.statistics.percentOfEpisodes}%
-                                                        </div>
-                                                    </div>
-                                                ` : '<p>No episodes in this season</p>'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    ` : ''}
-                ` : ''}
-            </div>
-        </div>`;
-    
-    detailsContent.innerHTML = html;
-    
-    // Add event listeners to the new buttons
-    attachButtonEventListeners();
-}
-
-// Function to populate modal with details for manage page
 function populateManageModalDetails(data, mediaType, internalId) {
     const detailsContent = document.getElementById('detailsContent');
     
@@ -511,187 +352,6 @@ function renderMovieDetails(mediaData, fullData, mediaType, internalId) {
     `;
     
     detailsContent.innerHTML = html;
-    
-    // Add event listeners to the new buttons
-    attachButtonEventListeners();
-}
-function renderTVDetails_old(mediaData, fullData, mediaType, internalId) {
-    const detailsContent = document.getElementById('detailsContent');
-    
-    // Get poster image
-    const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
-    const posterUrl = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
-    
-    // Format file size
-    const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
-    
-    // Get quality information
-    const quality = mediaData.seriesType || 'Standard';
-    
-    // Get seasons data
-    const seasons = mediaData.seasons || [];
-    
-    // Get statistics
-    const stats = mediaData.statistics || {};
-    const totalEpisodes = stats.episodeCount || 0;
-    const downloadedEpisodes = stats.episodeFileCount || 0;
-    const completionPercent = stats.percentOfEpisodes || 0;
-    
-    const html = `
-        <!-- Poster and Basic Info Row -->
-        <div class="row mb-3">
-            <!-- Poster Column - Fixed Width -->
-            <div class="col-4 pe-0">
-                <img src="${posterUrl}" 
-                     class="img-fluid rounded w-100" 
-                     alt="${mediaData.title}"
-                     onerror="this.src='/static/images/favicon.png'"
-                     style="max-width: 120px;">
-            </div>
-            
-            <!-- Title and Details Column -->
-            <div class="col-8 ps-2">
-                <h4 class="mb-1">${mediaData.title || 'Unknown Title'}</h4>
-                <div class="d-flex align-items-center flex-wrap mb-2">
-                    ${mediaData.certification ? `<span class="badge bg-dark me-1">${mediaData.certification}</span>` : ''}
-                    <span class="me-1">${mediaData.year || ''}</span>
-                    <span class="">${mediaData.network || ''}</span>
-                </div>
-                
-                <!-- Status Badges -->
-                <div class="d-flex flex-wrap gap-1 mb-2">
-                    <span class="badge ${fullData.on_disk ? 'bg-success' : 'bg-warning'}">
-                        ${fullData.on_disk ? 'Downloaded' : 'Missing'}
-                    </span>
-                    <span class="badge ${fullData.monitored ? 'bg-success' : 'bg-secondary'}">
-                        ${fullData.monitored ? 'Monitored' : 'Not Monitored'}
-                    </span>
-                    ${mediaData.status ? `<span class="badge bg-info">${mediaData.status}</span>` : ''}
-                </div>
-            </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="row mb-3">
-            <div class="col-12">
-                <div class="d-grid gap-2 d-flex">
-                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle" 
-                            data-type="${mediaType}" 
-                            data-id="${internalId}"
-                            data-monitored="${fullData.monitored}">
-                        ${fullData.monitored ? 'Unmonitor' : 'Monitor'}
-                    </button>
-                    <button class="btn btn-primary flex-fill search-btn" 
-                            data-type="${mediaType}" 
-                            data-id="${internalId}">
-                        <i class="fas fa-search me-1"></i> Search
-                    </button>
-                    <button class="btn btn-danger flex-fill delete-btn" 
-                            data-type="${mediaType}" 
-                            data-id="${internalId}">
-                        <i class="fas fa-trash me-1"></i> Delete
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- TV Show Details Card -->
-        <div class="card bg-dark border-secondary mb-3">
-            <div class="card-header">
-                <h6 class="mb-0">TV SHOW DETAILS</h6>
-            </div>
-            <div class="card-body p-2">
-                <!-- Path -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Path</strong></div>
-                    <div class="col-8">
-                        <code class="text-wrap d-block" style="font-size: 0.8rem;">${mediaData.path || 'N/A'}</code>
-                    </div>
-                </div>
-                
-                <!-- Status -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Status</strong></div>
-                    <div class="col-8">${fullData.on_disk ? 'Downloaded' : 'Missing'}</div>
-                </div>
-                
-                <!-- Quality Profile -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Quality Profile</strong></div>
-                    <div class="col-8">${quality}</div>
-                </div>
-                
-                <!-- Size -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Size</strong></div>
-                    <div class="col-8">${fileSize}</div>
-                </div>
-                
-                <!-- Episodes Progress -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Episodes</strong></div>
-                    <div class="col-8">
-                        ${downloadedEpisodes}/${totalEpisodes} (${completionPercent}% complete)
-                        <div class="progress mt-1" style="height: 6px;">
-                            <div class="progress-bar" role="progressbar" 
-                                 style="width: ${completionPercent}%;" 
-                                 aria-valuenow="${completionPercent}" 
-                                 aria-valuemin="0" aria-valuemax="100">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Genres -->
-                ${mediaData.genres && mediaData.genres.length > 0 ? `
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Genres</strong></div>
-                    <div class="col-8">
-                        ${mediaData.genres.map(genre => `<span class="badge bg-secondary me-1 mb-1">${genre}</span>`).join('')}
-                    </div>
-                </div>
-                ` : ''}
-                
-                <!-- Rating -->
-                ${mediaData.ratings?.value ? `
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Rating</strong></div>
-                    <div class="col-8">
-                        <span class="badge bg-primary">${mediaData.ratings.value}/10</span>
-                        ${mediaData.ratings.votes ? `<small class="text-muted ms-1">(${mediaData.ratings.votes} votes)</small>` : ''}
-                    </div>
-                </div>
-                ` : ''}
-            </div>
-        </div>
-
-        <!-- Seasons Section -->
-        <div class="seasons-container mb-3" id="seasonsContainer">
-            <div class="text-center my-4">
-                <div class="spinner-border" role="status">
-                    <span class="visually-hidden">Loading episodes...</span>
-                </div>
-                <p>Loading episodes...</p>
-            </div>
-        </div>
-
-        <!-- Overview Section -->
-        ${mediaData.overview ? `
-        <div class="card bg-dark border-secondary">
-            <div class="card-header">
-                <h6 class="mb-0">OVERVIEW</h6>
-            </div>
-            <div class="card-body">
-                <p class="mb-0" style="font-size: 0.9rem; line-height: 1.4;">${mediaData.overview}</p>
-            </div>
-        </div>
-        ` : ''}
-    `;
-    
-    detailsContent.innerHTML = html;
-    
-    // Load episodes after the modal is populated
-    loadTVShowEpisodes(internalId, seasons);
     
     // Add event listeners to the new buttons
     attachButtonEventListeners();
@@ -1105,6 +765,7 @@ function deleteEpisode(episodeId, button) {
         }, 2000);
     });
 }
+
 // Helper function to format episode dates
 function formatEpisodeDate(dateString) {
     if (!dateString) return 'TBA';
@@ -1498,6 +1159,7 @@ function renderEpisodes(episodes) {
         container.appendChild(seasonDiv);
     });
 }
+
 function deleteEpisode(episodeId) {
     if (!confirm('Delete this episode file?')) return;
     fetch(`/api/episode/${episodeId}`, { method: 'DELETE' })
@@ -1564,57 +1226,6 @@ function attachButtonEventListeners() {
       .then(r => r.ok ? alert('Search started') : alert('Failed to search'));
   });
 }
-// Version Control Functions
-async function loadVersionInfo() {
-    try {
-        // Get current version
-        const currentVer = await fetch('/api/version').then(res => res.json());
-        document.getElementById('current-version').textContent = currentVer.hash || 'Unknown';
-        
-        // Get latest version
-        const latestVer = await fetch('/api/version/latest').then(res => res.json());
-        document.getElementById('latest-version').textContent = latestVer.tag_name || 'Unknown';
-        
-        // Update button state
-        const updateBtn = document.getElementById('update-now');
-        if (latestVer.tag_name && currentVer.hash) {
-            updateBtn.disabled = latestVer.tag_name === currentVer.hash;
-        }
-    } catch (error) {
-        console.error('Version check failed:', error);
-    }
-}
-
-// Auto-update toggle
-// document.getElementById('auto-update-toggle').addEventListener('change', function() {
-//     fetch('/api/settings', {
-//         method: 'POST',
-//         headers: {'Content-Type': 'application/json'},
-//         body: JSON.stringify({auto_update: this.checked})
-//     });
-// });
-
-// // Manual update
-// document.getElementById('update-now').addEventListener('click', async function() {
-//     const btn = this;
-//     btn.disabled = true;
-//     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Updating...';
-    
-//     try {
-//         const response = await fetch('/api/update', {method: 'POST'});
-//         if (response.ok) {
-//             alert('Update successful! The app will reload.');
-//             setTimeout(() => location.reload(), 2000);
-//         } else {
-//             throw new Error('Update failed');
-//         }
-//     } catch (error) {
-//         alert('Update failed: ' + error.message);
-//         btn.disabled = false;
-//         btn.innerHTML = '<i class="bi bi-cloud-arrow-down-fill"></i> Update Now';
-//     }
-// });
-
 
     function addItemFromModal(mediaType, mediaId) {
         const btn = document.getElementById('modalAddButton');
@@ -1671,32 +1282,132 @@ async function loadVersionInfo() {
     });
 }
 
-// Check for update notifications on page load
-document.addEventListener('DOMContentLoaded', function() {
-    checkForUpdateNotification();
+// Update functionality
+function checkForUpdates() {
+    const btn = document.getElementById('checkUpdateBtn');
+    const originalHtml = btn.innerHTML;
     
-    // Check for updates every 5 minutes
-    setInterval(checkForUpdates, 5 * 60 * 1000);
-});
-
-function checkForUpdateNotification() {
-    fetch('/api/version/update-notification')
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Checking...';
+    
+    fetch('/api/update/check')
         .then(response => response.json())
         .then(data => {
-            if (data.pending_update) {
-                showUpdateNotification(data.pending_update);
+            if (data.update_available) {
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle text-warning me-2"></i>Update Available';
+                document.getElementById('downloadUpdateBtn').style.display = 'block';
+                showUpdateAvailableNotification(data);
+            } else {
+                btn.innerHTML = '<i class="fas fa-check text-success me-2"></i>Up to Date';
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }, 3000);
             }
         })
-        .catch(error => console.error('Error checking update notification:', error));
+        .catch(error => {
+            console.error('Error checking for updates:', error);
+            btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Check Failed';
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }, 3000);
+        });
 }
 
-function showUpdateNotification(updateInfo) {
-    const changesList = updateInfo.changes && updateInfo.changes.length > 0 
-        ? `<ul class="mb-3">${updateInfo.changes.map(change => `<li>${change}</li>`).join('')}</ul>`
-        : '<p class="mb-3">No specific changes listed.</p>';
+function downloadUpdate() {
+    const btn = document.getElementById('downloadUpdateBtn');
+    const originalHtml = btn.innerHTML;
     
-    const notificationHtml = `
-        <div class="modal fade" id="updateNotificationModal" tabindex="-1">
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Downloading...';
+    
+    fetch('/api/update/download', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                btn.innerHTML = '<i class="fas fa-check text-success me-2"></i>Downloaded';
+                showUpdateDownloadedNotification(data);
+            } else {
+                btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Download Failed';
+            }
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }, 5000);
+        })
+        .catch(error => {
+            console.error('Error downloading update:', error);
+            btn.innerHTML = '<i class="fas fa-times text-danger me-2"></i>Download Failed';
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }, 3000);
+        });
+}
+
+function showUpdateAvailableNotification(updateInfo) {
+    // Create or update toast notification
+    let toast = document.getElementById('updateAvailableToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'updateAvailableToast';
+        toast.className = 'toast align-items-center text-white bg-warning border-0 position-fixed top-0 end-0 m-3';
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Update Available!</strong> Version ${updateInfo.latest_version} is ready to download.
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        document.body.appendChild(toast);
+    }
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+}
+
+function showUpdateDownloadedNotification(downloadResult) {
+    // Show success notification
+    const toast = document.createElement('div');
+    toast.className = 'toast align-items-center text-white bg-success border-0 position-fixed top-0 end-0 m-3';
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Update Downloaded!</strong> Version ${downloadResult.version} has been downloaded. The update will be applied on next restart.
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    // Remove toast after it's hidden
+    toast.addEventListener('hidden.bs.toast', () => {
+        toast.remove();
+    });
+}
+
+// Check for update notification on page load
+function checkUpdateNotification() {
+    fetch('/api/update/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.update_notification) {
+                showUpdateAppliedNotification(data);
+            }
+        })
+        .catch(error => console.error('Error checking update status:', error));
+}
+
+function showUpdateAppliedNotification(updateData) {
+    const modalHtml = `
+        <div class="modal fade" id="updateAppliedModal" tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-success text-white">
@@ -1708,20 +1419,10 @@ function showUpdateNotification(updateInfo) {
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-success">
-                            <h6 class="alert-heading">Addarr has been updated to version ${updateInfo.new_version}</h6>
-                            <p class="mb-2"><strong>Applied:</strong> ${new Date(updateInfo.applied_at).toLocaleString()}</p>
+                            <h6 class="alert-heading">Addarr has been updated!</h6>
+                            <p class="mb-0">The application has been updated to version <strong>${updateData.latest_version}</strong>.</p>
                         </div>
-                        
-                        <div class="mt-3">
-                            <h6>Recent Changes:</h6>
-                            ${changesList}
-                        </div>
-                        
-                        <div class="mt-3">
-                            <small class="text-muted">
-                                The application will continue to run normally. Some changes may require a page refresh.
-                            </small>
-                        </div>
+                        <p class="mb-0">Some changes may require a page refresh to take effect.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -1734,89 +1435,34 @@ function showUpdateNotification(updateInfo) {
         </div>
     `;
     
-    // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', notificationHtml);
-    
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('updateNotificationModal'));
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('updateAppliedModal'));
     modal.show();
     
+    // Dismiss the notification so it doesn't show again
+    fetch('/api/update/dismiss', { method: 'POST' })
+        .catch(error => console.error('Error dismissing update notification:', error));
+    
     // Remove modal from DOM when hidden
-    document.getElementById('updateNotificationModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('updateAppliedModal').addEventListener('hidden.bs.modal', function() {
         this.remove();
     });
 }
 
-function checkForUpdates() {
-    fetch('/api/version/check-update')
-        .then(response => response.json())
-        .then(data => {
-            if (data.update_available) {
-                showUpdateAvailableNotification(data);
-            }
-        })
-        .catch(error => console.error('Error checking for updates:', error));
-}
-
-function showUpdateAvailableNotification(updateInfo) {
-    // Only show if user is on the main page
-    if (!window.location.pathname === '/' || document.getElementById('updateAvailableToast')) {
-        return;
+// Add event listeners when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Check for update notification
+    checkUpdateNotification();
+    
+    // Add update button event listeners
+    const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+    const downloadUpdateBtn = document.getElementById('downloadUpdateBtn');
+    
+    if (checkUpdateBtn) {
+        checkUpdateBtn.addEventListener('click', checkForUpdates);
     }
     
-    const changesPreview = updateInfo.changes && updateInfo.changes.length > 0 
-        ? updateInfo.changes.slice(0, 3).map(change => `<li>${change}</li>`).join('')
-        : '<li>Various improvements and bug fixes</li>';
-    
-    const toastHtml = `
-        <div id="updateAvailableToast" class="toast align-items-center text-white bg-primary border-0 position-fixed top-0 end-0 m-3" role="alert">
-            <div class="d-flex">
-                <div class="toast-body">
-                    <h6 class="mb-1">Update Available!</h6>
-                    <p class="mb-1">Version ${updateInfo.new_version} is ready to install.</p>
-                    <small>Changes include:</small>
-                    <ul class="small mb-2">${changesPreview}</ul>
-                    <div class="mt-2 pt-2 border-top">
-                        <button class="btn btn-sm btn-light me-2" onclick="applyUpdate()">Install Now</button>
-                        <button class="btn btn-sm btn-outline-light" data-bs-dismiss="toast">Later</button>
-                    </div>
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', toastHtml);
-    const toast = new bootstrap.Toast(document.getElementById('updateAvailableToast'));
-    toast.show();
-}
-
-function applyUpdate() {
-    const button = event.target;
-    const originalText = button.innerHTML;
-    
-    button.disabled = true;
-    button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Installing...';
-    
-    fetch('/api/version/apply-update', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                button.innerHTML = '<i class="fas fa-check"></i> Installed!';
-                setTimeout(() => {
-                    // The update notification will appear on next page load
-                    location.reload();
-                }, 2000);
-            } else {
-                throw new Error(data.error || 'Update failed');
-            }
-        })
-        .catch(error => {
-            console.error('Update failed:', error);
-            button.innerHTML = '<i class="fas fa-times"></i> Failed';
-            setTimeout(() => {
-                button.innerHTML = originalText;
-                button.disabled = false;
-            }, 3000);
-        });
-}
+    if (downloadUpdateBtn) {
+        downloadUpdateBtn.addEventListener('click', downloadUpdate);
+    }
+});
