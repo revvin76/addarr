@@ -91,3 +91,6 @@ instance/
 updates/
 !updates/.gitkeep
 HOWTO.txt
+
+ssh*
+addarr.log

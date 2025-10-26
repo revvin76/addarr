@@ -1,154 +1,138 @@
-# Addarr 🎬
+# Addarr 🎬  
+A lightweight Flask web interface to search and add movies/TV shows to Radarr/Sonarr — now with automatic updates, secure tunnels, and dynamic DNS support.
 
-A lightweight Flask web interface to search and add movies/TV shows to Radarr/Sonarr with automatic updates and dynamic DNS support.
-
-![Demo Screenshot 1](/static/images/Screenshot1.png) ![Demo Screenshot 2](/static/images/Screenshot2.png) ![Demo Screenshot 3](/static/images/Screenshot3.png)
-![Demo Screenshot 4](/static/images/Screenshot4.png) ![Demo Screenshot 5](/static/images/Screenshot5.png) 
-
----
-
-## Features ✨
-- 🔍 **Search** movies (Radarr) and TV shows (Sonarr)  
-- ➕ **One-click add** to your library  
-- 🎥 **Trailer previews** (YouTube integration via TMDB)  
-- 📊 **Detailed info** (ratings, genres, status)  
-- 🔄 **Auto-update** from GitHub  
-- 🌐 **DuckDNS integration** for dynamic DNS updates  
-- ⚙️ **Web-based configuration** for all settings  
-- 📜 **Log viewer** built into the interface  
-- 🐛 **Debug panel** for API testing  
+![Main screen](/static/images/Screenshot1.png) ![Unified media search](/static/images/Screenshot2.png) ![Movie result](/static/images/Screenshot3.png)
+![TV Show result](/static/images/Screenshot4.png) ![Media Manager](/static/images/Screenshot5.png) ![Manage Movie](/static/images/Screenshot4.png) ![Manage TV Show](/static/images/Screenshot5.png) 
 
 ---
 
-## Prerequisites 📋
-- Python 3.8+  
-- Radarr/Sonarr instances (with API keys)  
-- TMDB API key (for trailers/metadata) *(optional)*  
-- DuckDNS account *(optional, for dynamic DNS)*  
+## 🚀 Version 1.0.5 Highlights
+
+### 🧩 New Features
+- **Automated GitHub Update System**
+  - Checks for new releases and downloads updates automatically.
+  - Option to manually trigger updates via API or UI.
+  - Can auto-apply updates and restart the application seamlessly.
+- **Localhost.run Tunnel Integration**
+  - One-click public URL generation for remote access.
+  - Automatic hostname generation and persistence.
+  - SSH key support and live health monitoring.
+- **Enhanced Logging & Debugging**
+  - Full request/response logging.
+  - `/logs` endpoint for viewing live logs.
+  - Rotating log file handling to prevent size bloat.
+- **DuckDNS IP Updater**
+  - Automatically updates DuckDNS domain if IP changes.
+  - Logs updates and previous IPs.
+- **Improved Configuration Handling**
+  - `.env` values are editable and auto-updated when environment changes.
+  - Added safe environment writer with validation.
+- **Update Management APIs**
+  - `/api/update/check` — check GitHub for new releases.
+  - `/api/update/download` — download latest release.
+  - `/api/update/apply/<version>` — apply an update.
+  - `/api/update/apply-latest` — one-click update to newest version.
+  - `/api/update/cleanup` — delete old versions, keeping only the most recent.
+  - `/api/update/list` — list all downloaded updates.
+- **Tunnel Management APIs**
+  - `/api/tunnel/start`, `/api/tunnel/stop`, `/api/tunnel/restart`
+  - `/api/tunnel/status` — live tunnel information.
+  - `/api/tunnel/regenerate-hostname` — generate new tunnel hostname instantly.
+  - `/api/tunnel/set-ssh-key` — assign SSH key and restart tunnel.
 
 ---
 
-## Installation 🛠️
+## ⚙️ Configuration
 
-### 1. Clone the repo
+Create a `.env` file in the root directory or copy from the provided `demo_env` template.
+
+```bash
+cp demo_env .env
+```
+
+Then modify your `.env` to include:
+- Radarr/Sonarr API details
+- TMDB API keys (optional)
+- DuckDNS domain and token (optional)
+- GitHub repo name for updates (e.g., `revvin76/addarr`)
+- Optional SSH key path for tunnel authentication
+
+---
+
+## 🛠 Installation
+
+### 1. Clone the repository
 ```bash
 git clone https://github.com/revvin76/addarr.git
 cd addarr
 ```
 
-### 2. Create and configure your .env file
-Create a .env file in the root folder. There is a demo_env file you can use as a template.
+### 2. Create and configure environment
 ```bash
-# .env file for Addarr application
-# This file contains environment variables for configuring the application and its dependencies.
-
-# Radarr and Sonarr settings
-# Replace '****' with your actual API keys
-# Ensure the URLs are correct and accessible from your application  
-# Radarr settings
-# Radarr is used for managing movie libraries  
-RADARR_URL=http://localhost:7878
-RADARR_API_KEY=****
-RADARR_QUALITY_PROFILE=4
-RADARR_ROOT_FOLDER=E:\Movies
-
-# Sonarr settings
-# Sonarr is used for managing TV series libraries   
-SONARR_URL=http://localhost:8989
-SONARR_API_KEY=****
-SONARR_QUALITY_PROFILE=4
-SONARR_LANGUAGE_PROFILE=1
-SONARR_ROOT_FOLDER=E:\\TV
-
-# TMDB settings
-# TMDB is used for fetching movie and TV series metadata
-TMDB_TOKEN=****
-TMDB_KEY=****
-
-# Application settings
-# These settings control the behavior of the Addarr application
-ENABLE_AUTO_UPDATE=false
-FLASK_DEBUG=true
-
-# DuckDNS Settings
-DUCKDNS_DOMAIN=yourdomain.duckdns.org
-DUCKDNS_TOKEN=your_duckdns_token
-DUCKDNS_ENABLED=true
+cp demo_env .env
 ```
 
-### 3. Install the requirements
+### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Launch!
+### 4. Run Addarr
 ```bash
 python app.py
 ```
 
-The application will be available at http://localhost:5000
+Visit:  
+👉 [http://localhost:5000](http://localhost:5000)
 
+---
 
-## Configuration Options ⚙️
-All settings can be configured through the web interface after initial setup:
+## 🧠 API Reference (v1.0.5)
 
-**Radarr/Sonarr Settings:**
-- API endpoints
-- Quality profiles
-- Root folders
-**Application Settings:**
-- Auto-update toggle
-- Debug mode
-- DuckDNS configuration
-**Version Control:**
-- View current version
-- Check for updates
-- View release notes
+| Endpoint | Method | Description |
+|-----------|---------|-------------|
+| `/api/update/check` | GET | Check for new releases on GitHub |
+| `/api/update/download` | POST | Download the latest available update |
+| `/api/update/apply/<version>` | POST | Apply downloaded update |
+| `/api/update/apply-latest` | POST | Automatically apply the newest update |
+| `/api/update/cleanup` | POST | Clean old updates (keep 3 latest) |
+| `/api/tunnel/start` | POST | Start localhost.run tunnel |
+| `/api/tunnel/stop` | POST | Stop the tunnel |
+| `/api/tunnel/status` | GET | Get tunnel status |
+| `/api/tunnel/regenerate-hostname` | POST | Generate new tunnel hostname |
+| `/api/tunnel/set-ssh-key` | POST | Assign SSH key for secure tunnel |
+| `/api/debug/update-status` | GET | Debug info on update state |
+| `/api/debug/tunnel` | GET | Debug tunnel connectivity |
 
-## Usage 🖥️
-### Search for media:
-- Enter a movie or TV show title
-- Select media type (Movie/TV)
-- Click Search
+---
 
-### Add to library:
-- View details of any result
-- Click "Add to Radarr/Sonarr"
+## 🧩 Features Summary
+- 🔍 Search movies (Radarr) and TV shows (Sonarr)
+- ➕ One-click add to library
+- 🎬 TMDB trailer and metadata integration
+- 📦 Auto-updater with version control
+- 🌍 Localhost.run tunnel for secure public access
+- 🦆 DuckDNS dynamic IP updater
+- 🧾 Log viewer (`/logs`)
+- 🧠 Debug panel for update/tunnel testing
+- ⚙️ Configuration persistence through `.env`
 
-### Configure settings:
-- Click the gear icon (⚙️) in the top right
-- Modify any settings as needed
-- Click "Save Configuration"
+---
 
-### View logs:
-- Click the list icon (📋) in the top right
-- View real-time application logs
+## 🧰 Troubleshooting
 
-## Advanced Features 🔧
-### DuckDNS Integration
-- Automatically updates your DuckDNS domain with your current IP
-- Configure in the DuckDNS settings section
-- Requires domain and token from DuckDNS
+**❌ Auto-update not working**  
+- Ensure `.env` includes `GITHUB_REPO` and `ENABLE_AUTO_UPDATE=true`
 
-### Debug Panel
-- Test API endpoints directly
-- View request/response details
-- Useful for troubleshooting
+**❌ Tunnel fails to connect**  
+- Check that `ssh` is installed and in PATH  
+- Try clearing `TUNNEL_HOSTNAME` and restarting the app
 
-### Auto-Updates
-- Checks GitHub for updates hourly
-- Can be toggled on/off in settings
-- Shows update notifications with release notes
+**❌ DuckDNS not updating**  
+- Verify `DUCKDNS_ENABLED=true`  
+- Check your DuckDNS token and domain name
 
-## Troubleshooting 🛠️
-### Issue: Can't connect to Radarr/Sonarr
-- ✅ Verify URLs and API keys are correct
-- ✅ Check that the services are running and accessible
+---
 
-### Issue: Auto-updates not working
-- ✅ Ensure ENABLE_AUTO_UPDATE=true in .env
-- ✅ Check internet connectivity
-
-### Issue: DuckDNS not updating
-- ✅ Verify domain and token are correct
-- ✅ Check that DuckDNS is enabled in settings
+## 🧾 License
+MIT License © 2025 Revvin76
