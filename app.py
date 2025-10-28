@@ -21,14 +21,14 @@ import requests
 import atexit
 import re
 
-# Global variables for tunnel management
+# Global variables
 tunnel_process = None
 tunnel_thread = None
 tunnel_running = False
+shutdown_event = False
+app = Flask(__name__)
 
 load_dotenv()
-
-app = Flask(__name__)
 
 # Configuration
 CONFIG = {
@@ -46,15 +46,13 @@ CONFIG = {
         'language_profile_id': os.getenv('SONARR_LANGUAGE_PROFILE')   
     }
 }
-
 CONFIG.update({
     'app': {
-        'debug': os.getenv('FLASK_DEBUG', 'False') == 'False',
+        'debug': os.getenv('FLASK_DEBUG', 'false').lower() == 'true',
         'version': os.getenv('APP_VERSION', '1.0.0'),
-        'port' : os.getenv('SERVER_PORT', '5000')
+        'port' : os.getenv('SERVER_PORT', 5000)
     }
 })
-
 CONFIG.update({
     'duckdns': {
         'domain': os.getenv('DUCKDNS_DOMAIN', ''),
@@ -62,8 +60,6 @@ CONFIG.update({
         'enabled': os.getenv('DUCKDNS_ENABLED', 'false').lower() == 'true'
     }
 })
-
-# Update configuration
 CONFIG.update({
     'update': {
         'github_repo':  os.getenv('GITHUB_REPO', ''),
@@ -78,7 +74,7 @@ def setup_logging():
     log_file = 'addarr.log'
     
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG if os.getenv('FLASK_DEBUG') == '1' else logging.INFO)
+    logger.setLevel(logging.DEBUG if CONFIG['app']['debug'] else logging.INFO)
     
     # File handler (rotating)
     file_handler = RotatingFileHandler(
@@ -100,12 +96,19 @@ def debug_log(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         logger = logging.getLogger(func.__module__)
-        if logger.isEnabledFor(logging.DEBUG):
+        
+        # Only log if debug is actually enabled
+        if CONFIG['app']['debug'] and logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Entering {func.__name__} with args: {args}, kwargs: {kwargs}")
+        
         try:
             result = func(*args, **kwargs)
-            if logger.isEnabledFor(logging.DEBUG):
+            
+            # Don't log large HTML responses
+            if (CONFIG['app']['debug'] and logger.isEnabledFor(logging.DEBUG) and 
+                not (isinstance(result, str) and len(result) > 1000)):
                 logger.debug(f"Exiting {func.__name__} with result: {result}")
+            
             return result
         except Exception as e:
             logger.error(f"Error in {func.__name__}: {str(e)}", exc_info=True)
@@ -114,60 +117,6 @@ def debug_log(func):
 
 setup_logging()
 
-def log_request_response(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Log request
-        request_data = {
-            'method': request.method,
-            'path': request.path,
-            'args': dict(request.args),
-            'remote_addr': request.remote_addr
-        }
-        
-        # Only include form/json if not sensitive
-        if not any(s in request.path.lower() for s in ['login', 'auth']):
-            if request.form:
-                request_data['form'] = dict(request.form)
-            if request.is_json:
-                try:
-                    request_data['json'] = request.json
-                except:
-                    request_data['json'] = "Invalid JSON"
-        
-        logging.info(f"Request: {json.dumps(request_data, indent=2)}")
-        
-        start_time = time.time()
-        
-        try:
-            response = f(*args, **kwargs)
-            
-            # Handle both Response objects and direct string returns
-            if isinstance(response, str):
-                # For template responses, create a mock response for logging
-                response_data = {
-                    'status_code': 200,
-                    'type': 'template',
-                    'processing_time': f"{time.time() - start_time:.3f}s"
-                }
-            else:
-                # For proper Response objects
-                response_data = {
-                    'status_code': response.status_code,
-                    'type': 'response',
-                    'processing_time': f"{time.time() - start_time:.3f}s"
-                }
-                
-            logging.info(f"Response: {json.dumps(response_data, indent=2)}")
-            return response
-            
-        except Exception as e:
-            logging.error(f"Error in {f.__name__}: {str(e)}", exc_info=True)
-            raise
-    
-    return decorated_function
-
-# Update functions
 @debug_log
 def check_github_for_updates():
     # """Check GitHub for new releases"""
@@ -180,10 +129,12 @@ def check_github_for_updates():
             current_version = CONFIG['app']['version']
             latest_version = latest_release.get('tag_name', '').lstrip('v')
             
-            logging.info(f"Current version: {current_version}, Latest version: {latest_version}")
+            if CONFIG['app']['debug']:
+                logging.info(f"Current version: {current_version}, Latest version: {latest_version}")
             
             if latest_version > current_version:
-                logging.info(f"Update available: {latest_version}")
+                if CONFIG['app']['debug']:
+                    logging.info(f"Update available: {latest_version}")
                 return {
                     'update_available': True,
                     'current_version': current_version,
@@ -193,7 +144,8 @@ def check_github_for_updates():
                     'published_at': latest_release.get('published_at')
                 }
             else:
-                logging.info("No update available")
+                if CONFIG['app']['debug']:
+                    logging.info("No update available")
                 return {'update_available': False}
         else:
             logging.warning(f"GitHub API returned status {response.status_code}")
@@ -370,7 +322,8 @@ def set_env(key, value):
         
         # Update current environment
         os.environ[key] = value
-        logging.info(f"Set {key}={value}")
+        if CONFIG['app']['debug']:
+            logging.info(f"Set {key}={value}")
         return True
         
     except Exception as e:
@@ -453,7 +406,7 @@ def parse_tunnel_url(line):
     
     return None, None
 
-def start_tunnel(port=5000):
+def start_tunnel(port=CONFIG['app']['port']):
     """Start the localhost.run tunnel with proper URL detection - non-blocking"""
     global tunnel_process, tunnel_thread, tunnel_running
     
@@ -473,9 +426,9 @@ def start_tunnel(port=5000):
                 preferred_hostname = os.getenv('TUNNEL_HOSTNAME', '')
                 
                 if ssh_key_path:
-                    print(f"🌐 Starting authenticated localhost.run tunnel to port {port}...")
+                    logging.debug(f"Starting authenticated localhost.run tunnel to port {port}")
                 else:
-                    print(f"🌐 Starting localhost.run tunnel to port {port} (no-key mode)...")
+                    logging.debug(f"Starting localhost.run tunnel to port {port} (no-key mode)")
                 
                 # Build SSH command - be explicit about the forwarding
                 cmd = [
@@ -496,7 +449,7 @@ def start_tunnel(port=5000):
                 else:
                     cmd.extend(['-p', '2222', 'ssh.localhost.run'])  # No-key endpoint
                 
-                print(f"🔧 Running command: {' '.join(cmd)}")
+                logging.debug(f"Running tunnel command: {' '.join(cmd)}")
                 
                 # Use Popen with proper non-blocking setup
                 tunnel_process = subprocess.Popen(
@@ -509,7 +462,7 @@ def start_tunnel(port=5000):
                     errors='replace'
                 )
                 
-                print("⏳ Tunnel process started, waiting for connection...")
+                logging.debug("Tunnel process started, waiting for connection...")
                 
                 tunnel_url_found = False
                 used_preferred_hostname = False
@@ -520,16 +473,15 @@ def start_tunnel(port=5000):
                         break
                     
                     line = line.strip()
-                    if line:
-                        if CONFIG['app']['debug']:
-                            print(f"[localhost.run] {line}")
+                    if line and CONFIG['app']['debug']:
+                        logging.debug(f"[localhost.run] {line}")
                     
                     # Skip welcome messages and documentation
                     if any(phrase in line.lower() for phrase in [
                         'welcome to', 'follow your', 'to set up', 'more details',
                         'if you get', 'to explore', 'documentation', 'custom domains',
                         '===============================================================================',
-                        'open your tunnel address', 'qr:', '** your connection id is'
+                        '** your connection id is'
                     ]):
                         continue
                     
@@ -546,35 +498,35 @@ def start_tunnel(port=5000):
                         set_env('TUNNEL_HOSTNAME', subdomain)
                         tunnel_url_found = True
                         
-                        # Test the tunnel immediately
-                        print("🧪 Testing tunnel connection...")
+                        # Test the tunnel immediately (silent unless debug)
+                        if CONFIG['app']['debug']:
+                            logging.debug("Testing tunnel connection...")
                         test_tunnel_connection(tunnel_url)
                         
-                        # Also print the QR code line if it exists
+                        # Always print QR code
                         if 'qr:' in line.lower():
                             print(f"📱 {line}")
                     
-                    # Check for authentication success
-                    if 'authenticated' in line.lower() and '@' in line:
-                        print(f"✅ {line}")
-                    
-                    # Check for tunnel establishment
-                    if 'tunneled with tls termination' in line.lower():
-                        print(f"🔗 {line}")
+                    # Only show authentication and establishment in debug mode
+                    if CONFIG['app']['debug']:
+                        if 'authenticated' in line.lower() and '@' in line:
+                            logging.debug(f"Authentication: {line}")
+                        if 'tunneled with tls termination' in line.lower():
+                            logging.debug(f"Tunnel established: {line}")
                 
                 return_code = tunnel_process.wait()
                 tunnel_process = None
                 
-                if tunnel_running and return_code != 0:
-                    print(f"❌ Tunnel connection lost (exit code: {return_code}). Reconnecting in 10 seconds...")
+                if tunnel_running and return_code != 0 and not shutdown_event:
+                    logging.error(f"Tunnel connection lost (exit code: {return_code}). Reconnecting in 10 seconds...")
                     time.sleep(10)
-                elif not tunnel_running:
-                    print("🛑 Tunnel stopped by user")
+                elif not tunnel_running or shutdown_event:
+                    logging.debug("Tunnel stopped by user")
                     break
                     
             except Exception as e:
                 if tunnel_running:
-                    print(f"❌ Error with localhost.run tunnel: {e}. Retrying in 10 seconds...")
+                    logging.error(f"Error with localhost.run tunnel: {e}. Retrying in 10 seconds...")
                     time.sleep(10)
                 else:
                     break
@@ -588,23 +540,23 @@ def start_tunnel(port=5000):
 def test_tunnel_connection(tunnel_url):
     """Test if the tunnel URL is accessible"""
     try:
-        print(f"🧪 Testing {tunnel_url}...")
+        logging.debug(f"🧪 Testing {tunnel_url}...")
         response = requests.get(tunnel_url, timeout=10, verify=False)
         if response.status_code == 200:
-            print(f"✅ Tunnel test successful! Status: {response.status_code}")
+            logging.debug(f"✅ Tunnel test successful! Status: {response.status_code}")
         else:
-            print(f"⚠️ Tunnel responded with status: {response.status_code}")
+            logging.debug(f"⚠️ Tunnel responded with status: {response.status_code}")
     except requests.exceptions.SSLError:
-        print("⚠️ SSL certificate error (expected for localhost.run)")
+        logging.debug("⚠️ SSL certificate error (expected for localhost.run)")
         # Try without SSL verification
         try:
             response = requests.get(tunnel_url, timeout=10, verify=False)
-            print(f"✅ Tunnel test successful (without SSL)! Status: {response.status_code}")
+            logging.debug(f"✅ Tunnel test successful (without SSL)! Status: {response.status_code}")
         except Exception as e:
-            print(f"❌ Tunnel test failed: {e}")
+            logging.debug(f"❌ Tunnel test failed: {e}")
     except Exception as e:
-        print(f"❌ Tunnel test failed: {e}")
-        
+        logging.debug(f"❌ Tunnel test failed: {e}")        
+
 def stop_tunnel():
     """Stop the tunnel gracefully"""
     global tunnel_process, tunnel_running
@@ -617,15 +569,11 @@ def stop_tunnel():
             print("Terminating tunnel process...")
             tunnel_process.terminate()
             
-            # Wait a bit for graceful termination
-            for _ in range(10):
-                if tunnel_process.poll() is not None:
-                    break
-                time.sleep(0.05)
-            
-            # Force kill if still running
-            if tunnel_process.poll() is None:
-                print("Force killing tunnel process...")
+            # Wait for process to terminate with timeout
+            try:
+                tunnel_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                print("Process didn't terminate, killing...")
                 tunnel_process.kill()
                 tunnel_process.wait()
                 
@@ -636,38 +584,38 @@ def stop_tunnel():
     
     print("Tunnel stopped")
 
-def check_server_health(port=5000, timeout=5, retries=3):
-    """Check if the Flask server is responding"""
+def check_server_health(port=CONFIG['app']['port'], timeout=5, retries=3):
+    """Check if the Flask server is responding - silent version"""
     for attempt in range(retries):
         try:
             response = requests.get(f'http://localhost:{port}/', timeout=timeout)
             if response.status_code == 200:
                 if CONFIG['app']['debug']:
-                    print(f"✅ Server health check passed (attempt {attempt + 1})")
+                    logging.debug(f"Server health check passed (attempt {attempt + 1})")
                 return True
             else:
                 if CONFIG['app']['debug']:
-                    print(f"⚠️ Server returned status {response.status_code} (attempt {attempt + 1})")
+                    logging.debug(f"Server returned status {response.status_code} (attempt {attempt + 1})")
         except requests.exceptions.ConnectionError:
             if CONFIG['app']['debug']:
-                print(f"⏳ Server not ready yet (attempt {attempt + 1})")
+                logging.debug(f"Server not ready yet (attempt {attempt + 1})")
         except Exception as e:
             if CONFIG['app']['debug']:
-                print(f"❌ Health check error: {e} (attempt {attempt + 1})")
+                logging.debug(f"Health check error: {e} (attempt {attempt + 1})")
         
         time.sleep(1)  # Wait before retry
     
     return False
 
-def monitor_server_health(port=5000, check_interval=10):
+def monitor_server_health(port=CONFIG['app']['port'], check_interval=10):
     """Monitor server health and stop tunnel if server is down"""
     consecutive_failures = 0
     max_failures = 3
     
-    while tunnel_running:
+    while tunnel_running and not shutdown_event:
         time.sleep(check_interval)
         
-        if not tunnel_running:
+        if not tunnel_running or shutdown_event:
             break
             
         if check_server_health(port):
@@ -675,14 +623,14 @@ def monitor_server_health(port=5000, check_interval=10):
         else:
             consecutive_failures += 1
             if CONFIG['app']['debug']:
-                print(f"⚠️ Server health check failed ({consecutive_failures}/{max_failures})")
+                logging.debug(f"Server health check failed ({consecutive_failures}/{max_failures})")
             
             if consecutive_failures >= max_failures:
-                print("❌ Server appears to be stopped. Stopping tunnel...")
+                logging.warning("Server appears to be stopped. Stopping tunnel...")
                 stop_tunnel()
                 break
 
-def start_health_monitor(port=5000):
+def start_health_monitor(port=CONFIG['app']['port']):
     """Start the server health monitor in a separate thread"""
     health_thread = threading.Thread(
         target=monitor_server_health, 
@@ -692,15 +640,12 @@ def start_health_monitor(port=5000):
     )
     health_thread.start()
 
-def restart_tunnel(port=5000):
+def restart_tunnel(port=CONFIG['app']['port']):
     """Restart the tunnel with new settings"""
     print("Restarting tunnel...")
     stop_tunnel()
     time.sleep(2)
     return start_tunnel(port)
-
-# Register cleanup function
-atexit.register(stop_tunnel)
 
 # API endpoints for tunnel management
 @app.route('/api/tunnel/status')
@@ -718,7 +663,7 @@ def get_tunnel_status():
 @debug_log
 def restart_tunnel_route():
     """Restart the tunnel"""
-    port = request.json.get('port', 5000) if request.is_json else 5000
+    port = request.json.get('port', CONFIG['app']['port']) if request.is_json else CONFIG['app']['port']
     hostname = restart_tunnel(port)
     return jsonify({
         'success': True,
@@ -737,7 +682,7 @@ def stop_tunnel_route():
 @debug_log
 def start_tunnel_route():
     """Start the tunnel"""
-    port = request.json.get('port', 5000) if request.is_json else 5000
+    port = request.json.get('port', CONFIG['app']['port']) if request.is_json else CONFIG['app']['port']
     hostname = start_tunnel(port)
     return jsonify({
         'success': True,
@@ -789,7 +734,6 @@ def set_ssh_key():
     
 @app.route('/get_media_details')
 @debug_log
-@log_request_response
 def get_media_details():
     media_type = request.args.get('type')
     media_id = request.args.get('id')
@@ -825,7 +769,8 @@ def update_checker():
                     check_interval = 3600
                 
                 if current_time - last_checked >= check_interval:
-                    logging.info("Checking for updates...")
+                    if CONFIG['app']['debug']:
+                        logging.info("Checking for updates...")
                     
                     update_info = check_github_for_updates()
                     if update_info.get('update_available'):
@@ -836,22 +781,26 @@ def update_checker():
                         already_downloaded = any(update['version'] == latest_version for update in existing_updates)
                         
                         if not already_downloaded:
-                            logging.info(f"Update available: {latest_version}")
+                            if CONFIG['app']['debug']:
+                                logging.info(f"Update available: {latest_version}")
                             # Auto-download the update
                             download_result = download_update()
                             if download_result.get('success'):
-                                logging.info(f"Auto-downloaded update: {download_result['version']}")
+                                if CONFIG['app']['debug']:
+                                    logging.info(f"Auto-downloaded update: {download_result['version']}")
                                 
                                 # Auto-apply the update after download
                                 apply_result = apply_update(download_result['version'])
                                 if apply_result.get('success'):
-                                    logging.info(f"Auto-applied update: {download_result['version']}")
+                                    if CONFIG['app']['debug']:
+                                        logging.info(f"Auto-applied update: {download_result['version']}")
                                 else:
                                     logging.error(f"Auto-apply failed: {apply_result.get('error')}")
                             else:
                                 logging.error(f"Auto-download failed: {download_result.get('error')}")
                         else:
-                            logging.info(f"Update {latest_version} already downloaded, skipping download")
+                            if CONFIG['app']['debug']:
+                                logging.info(f"Update {latest_version} already downloaded, skipping download")
                     
                     # Update last_checked as float
                     CONFIG['update']['last_checked'] = current_time
@@ -1183,14 +1132,18 @@ def handle_exception(e):
 def update_duckdns_if_needed():
     """Check and update DuckDNS with detailed logging"""
     if not CONFIG['duckdns']['enabled']:
-        logging.info("DuckDNS: Update skipped - DuckDNS is not enabled")
+        if CONFIG['app']['debug']:
+            logging.debug("DuckDNS: Update skipped - DuckDNS is not enabled")
         return False
         
     if not CONFIG['duckdns']['domain'] or not CONFIG['duckdns']['token']:
-        logging.warning("DuckDNS: Update skipped - Missing domain or token")
+        if CONFIG['app']['debug']:
+            logging.debug("DuckDNS: Update skipped - Missing domain or token")
         return False
     
-    logging.info("DuckDNS: Starting IP check and update process...")
+    if CONFIG['app']['debug']:
+        logging.debug("DuckDNS: Starting IP check and update process...")
+    
     current_ip = get_ip_address()
     last_ip = None
     
@@ -1199,41 +1152,43 @@ def update_duckdns_if_needed():
     if os.path.exists(ip_file):
         with open(ip_file, 'r') as f:
             last_ip = f.read().strip()
-        logging.info(f"DuckDNS: Last known IP: {last_ip}")
+        if CONFIG['app']['debug']:
+            logging.debug(f"DuckDNS: Last known IP: {last_ip}")
     else:
-        logging.info("DuckDNS: No previous IP found - first time update")
+        if CONFIG['app']['debug']:
+            logging.debug("DuckDNS: No previous IP found - first time update")
     
-    logging.info(f"DuckDNS: Current external IP: {current_ip}")
+    if CONFIG['app']['debug']:
+        logging.debug(f"DuckDNS: Current external IP: {current_ip}")
     
     if current_ip == last_ip:
-        logging.info("DuckDNS: IP unchanged - no update required")
+        if CONFIG['app']['debug']:
+            logging.debug("DuckDNS: IP unchanged - no update required")
         return False
     
     # Update DuckDNS
     try:
-        logging.info(f"DuckDNS: Attempting to update {CONFIG['duckdns']['domain']}.duckdns.org to IP: {current_ip}")
+        if CONFIG['app']['debug']:
+            logging.debug(f"DuckDNS: Attempting to update {CONFIG['duckdns']['domain']}.duckdns.org to IP: {current_ip}")
+        
         url = f"https://www.duckdns.org/update?domains={CONFIG['duckdns']['domain']}&token={CONFIG['duckdns']['token']}&ip={current_ip}"
         response = requests.get(url, timeout=10)
         
         if response.text.strip() == "OK":
             with open(ip_file, 'w') as f:
                 f.write(current_ip)
-            logging.info(f"DuckDNS: [SUCCESS] Successfully updated to {current_ip}")
-            print(f"[SUCCESS] DuckDNS: Successfully updated {CONFIG['duckdns']['domain']}.duckdns.org to {current_ip}")
+            logging.info(f"DuckDNS: Successfully updated to {current_ip}")
             return True
         else:
-            logging.error(f"DuckDNS: [ERROR] Update failed. Response: {response.text}")
-            print(f"[ERROR] DuckDNS: Update failed. Response: {response.text}")
+            logging.error(f"DuckDNS: Update failed. Response: {response.text}")
             return False
     except requests.exceptions.RequestException as e:
-        logging.error(f"DuckDNS: [ERROR] Network error during update: {str(e)}")
-        print(f"[ERROR] DuckDNS: Network error during update: {str(e)}")
+        logging.error(f"DuckDNS: Network error during update: {str(e)}")
         return False
     except Exception as e:
-        logging.error(f"DuckDNS: [ERROR] Unexpected error during update: {str(e)}")
-        print(f"[ERROR] DuckDNS: Unexpected error during update: {str(e)}")
-        return False
-    
+        logging.error(f"DuckDNS: Unexpected error during update: {str(e)}")
+        return False   
+
 def get_ip_address():
     """Get the local IP address for network access"""
     import socket
@@ -1462,7 +1417,6 @@ def restart_application_route():
 
 
 @app.route('/logs')
-@log_request_response
 @debug_log
 def get_logs():
     try:
@@ -1501,7 +1455,6 @@ def get_logs():
         }), 500
 
 @app.route('/offline.html')
-@log_request_response
 @debug_log
 def offline():
     try:
@@ -1515,7 +1468,6 @@ def not_found(e):
     return render_template('error.html'), 404
 
 @app.route('/get_tmdb_details')
-@log_request_response
 @debug_log
 def get_tmdb_details():
     media_type = request.args.get('type')  # 'tv' or 'movie'
@@ -1571,7 +1523,6 @@ def get_tmdb_details():
         return jsonify({'error': str(e)}), 500
       
 @app.route('/search', methods=['POST'])
-@log_request_response
 @debug_log
 def search():
     query = request.form['query']
@@ -1637,7 +1588,6 @@ def search_sonarr(query):
     return response.json()
 
 @app.route('/add', methods=['POST'])
-@log_request_response
 @debug_log
 def add_to_arr():
     data = request.json
@@ -1808,7 +1758,6 @@ def get_sonarr_details(tvdb_id):
 
 # Add this new endpoint
 @app.route('/check_library_status')
-@log_request_response
 @debug_log
 def check_library_status():
     media_type = request.args.get('type')
@@ -1832,13 +1781,11 @@ def check_library_status():
     return jsonify({'in_library': in_library})
 
 @app.route('/images/<path:filename>')
-@log_request_response
 @debug_log
 def serve_image(filename):
     return send_from_directory('static/images', filename)
 
 @app.route('/manage')
-@log_request_response
 @debug_log
 def manage_media():
     try:
@@ -1876,7 +1823,6 @@ def manage_media():
 
 @app.route('/get_media_manage')
 @debug_log
-@log_request_response
 def get_media_manage():
     media_type = request.args.get('type')
     media_id = request.args.get('id')
@@ -1933,7 +1879,6 @@ def delete_movie_manage(movie_id):
     url = f"{CONFIG['radarr']['url']}/api/v3/movie/{movie_id}"
     r = requests.delete(url, params={'apikey': CONFIG['radarr']['api_key']})
     return jsonify({"success": r.status_code == 200})
-
 
 @app.route('/delete_movie_file/<int:movie_id>', methods=['POST'])
 @debug_log
@@ -2154,8 +2099,8 @@ def delete_episode(episode_id):
     
 
 
-
-logging.info("Performing initial update check...")
+if CONFIG['app']['debug']:
+    logging.info("Performing initial update check...")
 initial_update_info = check_github_for_updates()
 if initial_update_info.get('update_available'):
     latest_version = initial_update_info['latest_version']
@@ -2165,17 +2110,18 @@ if initial_update_info.get('update_available'):
     already_downloaded = any(update['version'] == latest_version for update in existing_updates)
     
     if not already_downloaded:
-        logging.info(f"Initial check: Update available - {latest_version}")
+        if CONFIG['app']['debug']:
+            logging.info(f"Initial check: Update available - {latest_version}")
         # Don't auto-download on initial check, just notify
         set_env('UPDATE_NOTIFICATION', 'true')
         set_env('LATEST_VERSION', latest_version)
     else:
-        logging.info(f"Initial check: Update {latest_version} already downloaded")
+        if CONFIG['app']['debug']:
+            logging.info(f"Initial check: Update {latest_version} already downloaded")
 
 CONFIG['update']['last_checked'] = time.time()
 
 @app.route('/')
-@log_request_response
 @debug_log
 def index():
     try:
@@ -2225,11 +2171,15 @@ def print_welcome():
     # Build tunnel URL display
     if tunnel_hostname:
         # Try both possible domain formats
+        # tunnel_urls = [
+        #     f"https://{tunnel_hostname}.lhr.life",
+        #     f"https://{tunnel_hostname}.localhost.run"
+        # ]
+        #tunnel_display = f"{Fore.CYAN}{tunnel_urls[0]}{Style.RESET_ALL} or {Fore.CYAN}{tunnel_urls[1]}{Style.RESET_ALL}"
         tunnel_urls = [
-            f"https://{tunnel_hostname}.lhr.life",
-            f"https://{tunnel_hostname}.localhost.run"
+            f"https://{tunnel_hostname}.lhr.life"
         ]
-        tunnel_display = f"{Fore.CYAN}{tunnel_urls[0]}{Style.RESET_ALL} or {Fore.CYAN}{tunnel_urls[1]}{Style.RESET_ALL}"
+        tunnel_display = f"{Fore.CYAN}{tunnel_urls[0]}{Style.RESET_ALL}"
     else:
         tunnel_display = "Not configured"
     
@@ -2261,11 +2211,18 @@ if __name__ == '__main__':
     
     def signal_handler(sig, frame):
         print("\n🛑 Shutting down gracefully...")
+        global tunnel_running, shutdown_event
+        
+        # Set shutdown flag to prevent restarts
+        shutdown_event = True
+        tunnel_running = False
+        
+        # Stop tunnel first
         stop_tunnel()
-        # Give a moment for cleanup
-        time.sleep(2)
+        
+        # Exit immediately
         sys.exit(0)
-    
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
@@ -2293,7 +2250,8 @@ if __name__ == '__main__':
         
         # Start tunnel (only in main process)
         if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
-            print("🌐 Starting tunnel...")
+            if CONFIG['app']['debug']:
+                logging.debug("Starting tunnel...")
             tunnel_hostname = start_tunnel(port=CONFIG['app']['port'])
             
             # Start health monitor
@@ -2317,14 +2275,20 @@ if __name__ == '__main__':
     # Keep the main thread alive and responsive
     try:
         print("🏃 Application running. Press Ctrl-C to stop.")
-        while True:
+        while not shutdown_event:
             time.sleep(1)
-            # Check if tunnel is still running
-            if tunnel_process and tunnel_process.poll() is not None:
-                print("⚠️ Tunnel process died, restarting...")
+            # Only check/restart tunnel if we're not shutting down
+            if not shutdown_event and tunnel_process and tunnel_process.poll() is not None:
+                logging.warning("Tunnel process died, restarting...")
                 start_tunnel(port=CONFIG['app']['port'])
     except KeyboardInterrupt:
-        print("\n🛑 Keyboard interrupt received...")
+        # This should be caught by the signal handler, but just in case
+        pass
+    except Exception as e:
+        logging.error(f"Unexpected error in main loop: {e}")
     finally:
+        # Clean shutdown
+        shutdown_event = True
+        tunnel_running = False
         stop_tunnel()
         print("👋 Goodbye!")
