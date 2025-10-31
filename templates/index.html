@@ -30,16 +30,22 @@
             </a>
             
             <div class="d-flex gap-2">
-                <button id="debugToggle" class="btn btn-outline-radarr">
-                    <i class="fas fa-bug"></i>
-                </button>
-                <button id="logToggle" class="btn btn-outline-radarr">
-                    <i class="fas fa-list-check"></i>
-                </button>
-                <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="collapse" data-bs-target="#configPanel">
-                    <i class="fas fa-cog"></i>
-                </button>
                 <a href="/manage" class="btn btn-outline-radarr me-2"><i class="fas fa-film"></i></a>
+                <!-- <button id="logToggle" class="btn btn-outline-radarr">
+                    <i class="fas fa-list-check"></i>
+                </button> -->
+                <!-- <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="collapse" data-bs-target="#configPanel">
+                    <i class="fas fa-cog"></i>
+                </button> -->
+                <button id="configToggle" class="btn btn-outline-radarr">
+                    <i class="fas fa-cog"></i>
+                </button>                
+                <button id="infoToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#infoModal">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+                <!-- <button id="debugToggle" class="btn btn-outline-radarr">
+                    <i class="fas fa-bug"></i>
+                </button> -->
             </div>
         </div>
     </div>
@@ -111,11 +117,11 @@
             <h4>Sonarr Settings</h4>
             <div class="form-group">
                 <label for="sonarrUrl">Sonarr URL</label>
-                <input type="text" class="form-control" id="sonarrUrl" name="SONARR_URL" value="{{ sonarr_url }}">
+                <input type="text" class="form-control" id="sonarrUrl" name="SONARR_URL" value="{{ config['sonarr']['url'] }}">
             </div>
             <div class="form-group">
                 <label for="sonarrApiKey">API Key</label>
-                <input type="text" class="form-control" id="sonarrApiKey" name="SONARR_API_KEY" value="{{ sonarr_api_key }}">
+                <input type="text" class="form-control" id="sonarrApiKey" name="SONARR_API_KEY" value="{{ config['sonarr']['api_key'] }}">
             </div>
             <div class="form-group">
                 <label for="sonarrRootFolder">Root Folder</label>
@@ -153,12 +159,12 @@
             <div class="form-group">
                 <label for="duckdnsDomain">Domain (without .duckdns.org)</label>
                 <input type="text" class="form-control" id="duckdnsDomain" name="DUCKDNS_DOMAIN" 
-                    value="{{ duckdns_domain }}">
+                    value="{{ config['duckdns']['domain'] }}">
             </div>
             <div class="form-group">
                 <label for="duckdnsToken">Token</label>
                 <input type="password" class="form-control" id="duckdnsToken" name="DUCKDNS_TOKEN" 
-                    value="{{ duckdns_token }}">
+                    value="{{ config['duckdns']['token'] }}">
             </div>
             <button type="button" class="btn btn-outline-radarr" id="testDuckDNS">Test Connection</button>
         </div>
@@ -182,7 +188,7 @@
             <h4>Version Information</h4>
             <div class="version-info">
                 <div class="version-row">
-                    <p>Current Version: <code>{{ current_version }}</code></p>
+                    <p>Current Version: <code>{{ config['app']['version'] }}</code></p>
                 </div>
                 <div class="d-grid gap-2">
                     <button type="button" class="btn btn-outline-radarr" id="checkUpdateBtn">
@@ -333,7 +339,7 @@
                                 <div class="col-md-10">
                                     <label for="url" class="form-label">API URL</label>
                                     <div class="input-group api-url-input-group">
-                                        <span class="input-group-text" id="baseUrl">{{ radarr_url if service == 'radarr' else sonarr_url }}/api/v3</span>
+                                        <span class="input-group-text" id="baseUrl">{{ config['radarr']['url'] if service == 'radarr' else config['sonarr']['url'] }}/api/v3</span>
                                         <input type="text" id="url" name="url" class="form-control" required>
                                     </div>
                                 </div>
@@ -342,7 +348,7 @@
                             <div class="mb-3">
                                 <label for="api_key" class="form-label">API Key</label>
                                 <input type="text" id="api_key" name="api_key" class="form-control" 
-                                    value="{{ radarr_api_key if service == 'radarr' else sonarr_api_key }}" required>
+                                    value="{{ config['radarr']['api_key'] if service == 'radarr' else config['sonarr']['api_key'] }}" required>
                             </div>
                             
                             <ul class="nav nav-pills mb-2" id="payloadTabs" role="tablist">
@@ -414,6 +420,126 @@
     </div>
 </div>
 
+<div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="infoModalLabel">
+                    <i class="fas fa-info-circle me-2"></i>About
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- App Name and Version -->
+                <div class="text-center mb-4">
+                    <img src="/static/images/logo.png" alt="Addarr Logo" height="80" class="mb-3">
+                    <p class="text-muted">Media Management System</p>
+                    <div class="d-flex justify-content-center gap-3">
+                        <span class="badge bg-radarr">Version: <span id="infoVersion">{{ config['app']['version'] }}</span></span>
+                        <span class="badge bg-secondary">Last Updated: <span id="infoLastUpdated">Loading...</span></span>
+                    </div>
+                </div>
+
+                <hr class="border-secondary">
+
+                <!-- Hosting Addresses -->
+                <div class="mb-4">
+                    <h5 class="text-radarr mb-3">
+                        <i class="fas fa-network-wired me-2"></i>Access URLs
+                    </h5>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-desktop me-2"></i>Local Access
+                                    </h6>
+                                    <code class="text-wrap d-block">http://127.0.0.1:{{ config['app']['port'] }}</code>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-wifi me-2"></i>Network Access
+                                    </h6>
+                                    <code class="text-wrap d-block" id="networkAddress">Loading...</code>
+                                </div>
+                            </div>
+                        </div>
+                        {% if config['duckdns']['enabled'] and config['duckdns']['domain'] %}
+                        <div class="col-md-6">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-globe me-2"></i>DuckDNS
+                                    </h6>
+                                    <code class="text-wrap d-block">http://{{ config['duckdns']['domain'] }}.duckdns.org:{{ config['app']['port'] }}</code>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if config['tunnel']['enabled'] %}
+                        <div class="col-md-6">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-cloud me-2"></i>Tunnel
+                                    </h6>
+                                    <code class="text-wrap d-block" id="tunnelAddress">Loading...</code>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <hr class="border-secondary">
+
+                <!-- Recent Changelog -->
+                <div>
+                    <h5 class="text-radarr mb-3">
+                        <i class="fas fa-history me-2"></i>Recent Changes
+                    </h5>
+                    <div class="card bg-dark border-secondary">
+                        <div class="card-body">
+                            <div id="changelogContent" class="changelog-content">
+                                <div class="text-center">
+                                    <div class="spinner-border spinner-border-sm text-radarr me-2" role="status"></div>
+                                    Loading changelog...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-end mt-2">
+                        <small class="text-muted">
+                            <a href="https://github.com/{{ config['update']['github_repo'] }}/blob/main/CHANGELOG.md" 
+                               target="_blank" class="text-radarr">
+                                View Full Changelog
+                            </a>
+                        </small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-radarr" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="globalLoadingSpinner" class="loading-spinner">
+    <div class="spinner-container">
+        <div class="spinner-border spinner-radarr" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
+    </div>
+</div>
+
 <script>
     // Register service worker
             // Fetch Radarr configuration data
@@ -433,7 +559,7 @@
                         const option = document.createElement('option');
                         option.value = folder.path;
                         option.textContent = folder.path;
-                        if (folder.path === "{{ radarr_root_folder }}") {
+                        if (folder.path === "{{ config['radarr']['root_folder'] }}") {
                             option.selected = true;
                         }
                         select.appendChild(option);
@@ -451,7 +577,7 @@
                         const option = document.createElement('option');
                         option.value = profile.id;
                         option.textContent = profile.name;
-                        if (profile.id === {{ radarr_quality_profile }}) {
+                        if (profile.id === {{ config['radarr']['quality_profile_id'] }}) {
                             option.selected = true;
                         }
                         select.appendChild(option);
@@ -477,7 +603,7 @@
                     const option = document.createElement('option');
                     option.value = folder.path;
                     option.textContent = folder.path;
-                    if (folder.path === "{{ sonarr_root_folder }}") {
+                    if (folder.path === "{{ config['sonarr']['root_folder'] }}") {
                         option.selected = true;
                     }
                     select.appendChild(option);
@@ -495,7 +621,7 @@
                     const option = document.createElement('option');
                     option.value = profile.id;
                     option.textContent = profile.name;
-                    if (profile.id === {{ sonarr_quality_profile }}) {
+                    if (profile.id === {{ config['sonarr']['quality_profile_id'] }}) {
                         option.selected = true;
                     }
                     select.appendChild(option);
@@ -513,7 +639,7 @@
                     const option = document.createElement('option');
                     option.value = profile.id;
                     option.textContent = profile.name;
-                    if (profile.id === {{ sonarr_language_profile }}) {
+                    if (profile.id === {{ config['sonarr']['language_profile_id'] }}) {
                         option.selected = true;
                     }
                     select.appendChild(option);
@@ -548,216 +674,101 @@ document.getElementById('configPanel').addEventListener('show.bs.collapse', func
     loadConfigurationData();
 });
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // Config panel toggle
-        const configToggle = document.getElementById('configToggle');
-        const configPanel = document.getElementById('configPanel');
-        const configOverlay = document.getElementById('configOverlay');
-        const closeConfig = document.getElementById('closeConfig');
-        
+document.addEventListener('DOMContentLoaded', function() {
+    const spinner = window.spinner || {
+        show: (msg) => console.log('Loading:', msg),
+        hide: () => console.log('Loading complete')
+    };
+
+    // Config panel toggle
+    const configToggle = document.getElementById('configToggle');
+    const configPanel = document.getElementById('configPanel');
+    const configOverlay = document.getElementById('configOverlay');
+    const closeConfig = document.getElementById('closeConfig');
+    
+    if (configToggle && configPanel) {
         configToggle.addEventListener('click', function() {
             configPanel.classList.add('open');
             configOverlay.classList.add('open');
             loadConfigurationData();
-        });       
+        });
+    }
+    
+    if (closeConfig) {
         closeConfig.addEventListener('click', function() {
             configPanel.classList.remove('open');
             configOverlay.classList.remove('open');
         });
+    }
+    
+    if (configOverlay) {
         configOverlay.addEventListener('click', function() {
             configPanel.classList.remove('open');
             configOverlay.classList.remove('open');
         });
-        
-        const debugToggle = document.getElementById('debugToggle');
-        const debugPanel = document.getElementById('debugPanel');
-        const debugOverlay = document.getElementById('debugOverlay');
-        const closedebug = document.getElementById('closedebug');
-
-        closeDebug.addEventListener('click', function() {
-            debugPanel.classList.remove('open');
-            debugOverlay.classList.remove('open');
-        });
-
-        if (debugToggle){
-            debugToggle.addEventListener('click', function() {
-                debugPanel.classList.add('open');
-                debugOverlay.classList.add('open');
-                loadDebugData();
-            });
-        }   
-        
-        if( closedebug){
-            closedebug.addEventListener('click', function() {
-                debugPanel.classList.remove('open');
-                debugOverlay.classList.remove('open');
-            });
-        }
-        if (debugOverlay) {
-            debugOverlay.addEventListener('click', function() {
-                debugPanel.classList.remove('open');
-                debugOverlay.classList.remove('open');
-            });
-        }
-
-        const logPanel = document.getElementById('logPanel');
-        const logContent = document.getElementById('logContent');
-        const refreshLogs = document.getElementById('refreshLogs');
-        const logLines = document.getElementById('logLines');
-        const closeLog = document.getElementById('closeLog');
-        
-        // Function to load logs
-        function loadLogs() {
-            const lines = Math.min(parseInt(logLines.value) || 500, 10000); // Limit to 10,000 lines max
-            logContent.textContent = 'Loading logs...';
-            
-            fetch(`/logs?lines=${lines}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        logContent.textContent = data.log;
-                        logContent.scrollTop = logContent.scrollHeight;
-                    } else {
-                        logContent.textContent = `Error: ${data.error}\n\n${data.traceback || 'No traceback available'}`;
-                    }
-                })
-                .catch(error => {
-                    logContent.textContent = `Failed to load logs: ${error.message}`;
-                });
-        }
-        // Event listeners
-        document.getElementById('logToggle').addEventListener('click', function() {
-            logPanel.classList.add('open');
-            loadLogs(); // Load logs when panel opens
-        });
-        
-        refreshLogs.addEventListener('click', loadLogs);
-        
-        closeLog.addEventListener('click', function() {
-            logPanel.classList.remove('open');
-        });
-        
-        // Allow Ctrl+F to search in logs when panel is open
-        logPanel.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'f') {
-                e.preventDefault();
-                const search = prompt('Search in logs:');
-                if (search) {
-                    const content = logContent.textContent;
-                    const index = content.toLowerCase().indexOf(search.toLowerCase());
-                    if (index >= 0) {
-                        logContent.focus();
-                        // Simple highlighting - you could enhance this
-                        logContent.innerHTML = content.replace(
-                            new RegExp(search, 'gi'),
-                            match => `<span class="highlight">${match}</span>`
-                        );
-                    } else {
-                        alert('Text not found in logs');
-                    }
-                }
-            }
-        });        
-
-    // Test connection buttons
-    document.getElementById('testRadarr').addEventListener('click', function() {
-        testConnection('radarr');
-    });
-    
-    document.getElementById('testSonarr').addEventListener('click', function() {
-        testConnection('sonarr');
-    });
-    
-    function testConnection(service) {
-        const url = document.getElementById(`${service}Url`).value;
-        const apiKey = document.getElementById(`${service}ApiKey`).value;
-        const button = document.getElementById(`test${service.charAt(0).toUpperCase() + service.slice(1)}`);
-        
-        if (!url || !apiKey) {
-            alert(`Please enter ${service} URL and API Key first`);
-            return;
-        }
-        
-        button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...';
-        
-        fetch(`${url}/api/v3/system/status?apikey=${apiKey}`)
-            .then(response => {
-                if (response.ok) {
-                    button.innerHTML = '<i class="fas fa-check"></i> Connection OK';
-                    button.classList.add('btn-success');
-                } else {
-                    throw new Error('Connection failed');
-                }
-            })
-            .catch(error => {
-                button.innerHTML = '<i class="fas fa-times"></i> Connection Failed';
-                button.classList.add('btn-danger');
-                console.error(`Error testing ${service} connection:`, error);
-            })
-            .finally(() => {
-                setTimeout(() => {
-                    button.innerHTML = 'Test Connection';
-                    button.classList.remove('btn-success', 'btn-danger');
-                    button.disabled = false;
-                }, 3000);
-            });
     }
-    
-    // Save configuration
-    document.getElementById('configForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(this);
-        const config = {};
-        formData.forEach((value, key) => {
-            config[key] = value;
+
+const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function() {
+            spinner.show('Processing...');
         });
-        
-        fetch('/save_config', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(config)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Configuration saved successfully!');
-                // Reload the page to apply changes
-                window.location.reload();
-            } else {
-                alert('Error saving configuration: ' + data.error);
+    });
+
+    // Add loading to navigation
+    const links = document.querySelectorAll('a[href]:not([target="_blank"]):not([href^="#"])');
+    links.forEach(link => {
+        link.addEventListener('click', function(e) {
+            // Don't intercept if it's the same page or has special handlers
+            if (this.getAttribute('href') && !this.getAttribute('href').startsWith('javascript')) {
+                spinner.show('Navigating...');
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error saving configuration');
         });
     });
 });
 
-// Toggle Debug Panel
-let debugPanel = document.getElementById('debugPanel');
-if (debugPanel) {
-    debugPanel.addEventListener('click', function (e) {
-        if (e.target === debugPanel || e.target.id === 'closeDebugPanel') {
-            debugPanel.classList.add('open');
+// Test connection buttons
+document.getElementById('testRadarr').addEventListener('click', function() {
+    testConnection('radarr');
+});
+
+document.getElementById('testSonarr').addEventListener('click', function() {
+    testConnection('sonarr');
+});
+
+// Save configuration
+document.getElementById('configForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const config = {};
+    formData.forEach((value, key) => {
+        config[key] = value;
+    });
+    
+    fetch('/save_config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Configuration saved successfully!');
+            // Reload the page to apply changes
+            window.location.reload();
+        } else {
+            alert('Error saving configuration: ' + data.error);
         }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving configuration');
     });
-}   
-let closeDebugPanel = document.getElementById('closeDebugPanel');
-if (closeDebugPanel) {
-    closeDebugPanel.addEventListener('click', function () {
-        debugPanel.classList.remove('open');
-    });
-}
+});
+
 
 let activeApp = '';  // Will be set by tab click
 
@@ -776,7 +787,7 @@ if (tvTab)  {
     });
 };
 function handleEndpointClick(endpoint) {
-    const baseUrl = activeApp === 'radarr' ? '{{ radarr_url }}' : '{{ sonarr_url }}';
+    const baseUrl = activeApp === 'radarr' ? '{{ config['radarr']['quality_profile_id'] }}' : '{{ config['sonarr']['url'] }}';
     const fullUrl = `${baseUrl}/api/v3/${endpoint}`;
     document.getElementById('requestUrl').value = fullUrl;
 
@@ -806,8 +817,8 @@ document.querySelectorAll('.api-endpoint').forEach(endpoint => {
         const method = this.dataset.method;
         const path = this.dataset.path;
 
-        const baseUrl = activeApp === 'radarr' ? "{{ radarr_url }}" : "{{ sonarr_url }}";
-        const apiKey = activeApp === 'radarr' ? "{{ radarr_api_key }}" : "{{ sonarr_api_key }}";
+        const baseUrl = activeApp === 'radarr' ? "{{ config['radarr']['url'] }}" : "{{ config['sonarr']['url'] }}";
+        const apiKey = activeApp === 'radarr' ? "{{ config['radarr']['api_key'] }}" : "{{ config['sonarr']['api_key'] }}";
 
         // Set form fields
         document.getElementById('method').value = method;

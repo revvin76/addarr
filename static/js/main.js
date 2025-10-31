@@ -1998,3 +1998,161 @@ function showDownloadedUpdatesList(updates) {
         this.remove();
     });
 }
+// Info Panel functionality
+function loadInfoPanel() {
+    // Load last updated time
+    fetch('/api/info/last-updated')
+        .then(response => response.json())
+        .then(data => {
+            if (data.last_updated) {
+                document.getElementById('infoLastUpdated').textContent = data.last_updated;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading last updated time:', error);
+            document.getElementById('infoLastUpdated').textContent = 'Error loading';
+        });
+    
+    // Load network info
+    fetch('/api/info/network')
+        .then(response => response.json())
+        .then(data => {
+            if (data.local_ip) {
+                document.getElementById('networkAddress').textContent = 
+                    `http://${data.local_ip}:${data.port}`;
+            }
+            if (data.tunnel_url) {
+                document.getElementById('tunnelAddress').textContent = data.tunnel_url;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading network info:', error);
+            document.getElementById('networkAddress').textContent = 'Error loading';
+        });
+    
+    // Load changelog
+    fetch('/api/info/changelog')
+        .then(response => response.json())
+        .then(data => {
+            const changelogContent = document.getElementById('changelogContent');
+            if (data.recent_changes) {
+                // Convert markdown to simple HTML
+                const htmlContent = convertMarkdownToHtml(data.recent_changes);
+                changelogContent.innerHTML = htmlContent;
+                
+                // Update last updated if available from changelog
+                if (data.last_updated && data.last_updated !== 'Unknown') {
+                    document.getElementById('infoLastUpdated').textContent = data.last_updated;
+                }
+            } else {
+                changelogContent.innerHTML = '<p class="text-muted">No changelog available.</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading changelog:', error);
+            document.getElementById('changelogContent').innerHTML = 
+                '<p class="text-muted">Error loading changelog.</p>';
+        });
+}
+
+// Simple markdown to HTML converter
+function convertMarkdownToHtml(markdown) {
+    return markdown
+        // Headers
+        .replace(/^### (.*$)/gim, '<h4>$1</h4>')
+        .replace(/^## (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^# (.*$)/gim, '<h2>$1</h2>')
+        // Bold and Italic
+        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+        // Links
+        .replace(/\[([^\[]+)\]\(([^\)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+        // Lists
+        .replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+        // Line breaks
+        .replace(/\n/g, '<br>')
+        // Code
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+// Add event listener for info modal
+document.addEventListener('DOMContentLoaded', function() {
+    const infoModal = document.getElementById('infoModal');
+    if (infoModal) {
+        infoModal.addEventListener('show.bs.modal', function() {
+            loadInfoPanel();
+        });
+    }
+});
+
+// Loading spinner utility
+class LoadingSpinner {
+    constructor() {
+        this.spinner = document.getElementById('globalLoadingSpinner');
+        this.message = document.getElementById('loadingMessage');
+    }
+
+    show(message = 'Loading...') {
+        if (this.spinner) {
+            this.message.textContent = message;
+            this.spinner.classList.add('show');
+            // Prevent body scroll
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    hide() {
+        if (this.spinner) {
+            this.spinner.classList.remove('show');
+            // Restore body scroll
+            document.body.style.overflow = '';
+        }
+    }
+}
+
+// Initialize global spinner
+const spinner = new LoadingSpinner();
+
+// Form submission handlers
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle search form submissions
+    const searchForms = document.querySelectorAll('form[action*="search"]');
+    searchForms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            spinner.show('Searching...');
+        });
+    });
+
+    // Handle navigation clicks
+    const navLinks = document.querySelectorAll('a[href]:not([target="_blank"])');
+    navLinks.forEach(link => {
+        if (link.getAttribute('href') && !link.getAttribute('href').startsWith('#')) {
+            link.addEventListener('click', function(e) {
+                // Don't show spinner for same-page anchors
+                if (!this.getAttribute('href').startsWith('#')) {
+                    spinner.show('Loading page...');
+                }
+            });
+        }
+    });
+
+    // Handle manage page item clicks
+    const manageItems = document.querySelectorAll('.media-item, .result-item');
+    manageItems.forEach(item => {
+        item.addEventListener('click', function() {
+            spinner.show('Loading details...');
+        });
+    });
+
+    // Hide spinner when page is fully loaded
+    window.addEventListener('load', () => {
+        setTimeout(() => spinner.hide(), 500);
+    });
+
+    // Also hide spinner if there's an error
+    window.addEventListener('error', () => spinner.hide());
+});
+
+// Export for use in other scripts
+window.spinner = spinner;

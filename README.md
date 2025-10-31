@@ -3,8 +3,29 @@ A lightweight Flask web interface to search and add movies/TV shows to Radarr/So
 
 ![Main screen](/static/images/Screenshot1.png) ![Unified media search](/static/images/Screenshot2.png) ![Movie result](/static/images/Screenshot3.png)
 ![TV Show result](/static/images/Screenshot4.png) ![Media Manager](/static/images/Screenshot5.png) ![Manage Movie](/static/images/Screenshot4.png) ![Manage TV Show](/static/images/Screenshot5.png) 
+![Server welcome screen](/static/images/welcome.png)
 
 ---
+## [1.0.7] - 2025-10-30
+### Removed
+- Dumped localhost.run reverse tunnelling
+- Removed Debug API sandbox
+- Removed log viewer (to reinstate when working properly)
+
+### Added
+- Added Pinggy Pro support - requires manual editing of the .env for now. Will link controls to the settings panel in future.
+- Added new in-app information screen to display version, recent changes, and the various addresses
+- Added QR code of the public URL to quickly get access on your mobile
+- New screenshot added to README.md
+
+### Updated
+- Demo_env has new fields:  
+    TUNNEL_ENABLED=false
+    PINGGY_AUTH_TOKEN=
+    PINGGY_RESERVED_SUBDOMAIN=
+
+### Known issues
+- I've broken the settings page so it doesnt work properly. This will be fixed in future, but for now stick to editing the .env files to change settings.
 
 ## 🚀 Version 1.0.5 Highlights
 

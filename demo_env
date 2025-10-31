@@ -1,5 +1,5 @@
 # =========================================
-# Addarr v1.0.5 - Environment Configuration
+# Addarr v1.0.7 - Environment Configuration
 # =========================================
 
 # === RADARR SETTINGS ===
@@ -32,11 +32,6 @@ LAST_CHECKED=0
 UPDATE_NOTIFICATION=true
 ENABLE_AUTO_UPDATE=true
 
-# === TUNNEL SETTINGS (localhost.run) ===
-PUBLIC_KEY=
-TUNNEL_SSH_KEY=
-TUNNEL_HOSTNAME=
-
 # === FLASK APP SETTINGS ===
 APP_VERSION=1.0.5
 FLASK_DEBUG=false
@@ -45,3 +40,8 @@ LATEST_VERSION=
 
 # === LOGGING ===
 LOG_LEVEL=INFO
+
+# === TUNNEL SETTINGS ===
+TUNNEL_ENABLED=false
+PINGGY_AUTH_TOKEN=
+PINGGY_RESERVED_SUBDOMAIN=

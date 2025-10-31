@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.0.7] - 2025-10-30
+### Removed
+- Dumped localhost.run reverse tunnelling
+- Removed Debug API sandbox
+- Removed log viewer (to reinstate when working properly)
+
+### Added
+- Added Pinggy Pro support - requires manual editing of the .env for now. Will link controls to the settings panel in future.
+- Added new in-app information screen to display version, recent changes, and the various addresses
+- Added QR code of the public URL to quickly get access on your mobile
+- New screenshot added to README.md
+
+### Updated
+- Demo_env has new fields:  
+    TUNNEL_ENABLED=false
+    PINGGY_AUTH_TOKEN=
+    PINGGY_RESERVED_SUBDOMAIN=
+
+### Known issues
+- I've broken the settings page so it doesnt work properly. This will be fixed in future, but for now stick to editing the .env files to change settings.
+
+## [1.0.6] - 2025-10-28
+### Changed
+- Refactor tunnel management and logging configuration for improved clarity and performance
 
 ## [1.0.5] - 2025-10-26
 ### Added

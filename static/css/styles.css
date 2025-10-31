@@ -1275,3 +1275,222 @@ input:checked + .toggle-slider:before {
 body.modal-open .settings-panel {
     display: none !important;
 }
+/* Info Panel Styles */
+.info-modal .modal-content {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    border: 1px solid var(--accent-green);
+}
+
+.info-modal .modal-header {
+    border-bottom: 1px solid var(--accent-green);
+    background: rgba(94, 214, 64, 0.1);
+}
+
+.info-modal .modal-footer {
+    border-top: 1px solid var(--accent-green);
+    background: rgba(94, 214, 64, 0.05);
+}
+
+.text-radarr {
+    color: var(--accent-green) !important;
+}
+
+.bg-radarr {
+    background-color: var(--accent-green) !important;
+    color: #111 !important;
+}
+
+.changelog-content {
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.changelog-content h2, 
+.changelog-content h3, 
+.changelog-content h4 {
+    color: var(--accent-green);
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.changelog-content h2 {
+    font-size: 1.3rem;
+    border-bottom: 1px solid var(--accent-green);
+    padding-bottom: 0.2rem;
+}
+
+.changelog-content h3 {
+    font-size: 1.1rem;
+}
+
+.changelog-content h4 {
+    font-size: 1rem;
+}
+
+.changelog-content ul {
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.changelog-content li {
+    margin-bottom: 0.25rem;
+}
+
+.changelog-content code {
+    background-color: rgba(94, 214, 64, 0.1);
+    color: var(--accent-green);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.25rem;
+    font-family: 'Courier New', monospace;
+}
+
+.changelog-content a {
+    color: var(--accent-green);
+    text-decoration: none;
+}
+
+.changelog-content a:hover {
+    text-decoration: underline;
+}
+
+/* Address cards */
+.card.bg-dark.border-secondary {
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.card.bg-dark.border-secondary:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-green) !important;
+}
+
+.card.bg-dark.border-secondary .card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .changelog-content {
+        max-height: 200px;
+        font-size: 0.85rem;
+    }
+    
+    .info-modal .modal-dialog {
+        margin: 0.5rem;
+    }
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+
+.spinner-container {
+    background: #2c3e50;
+    padding: 2rem;
+    border-radius: 10px;
+    text-align: center;
+    color: white;
+}
+
+.loading-spinner.show {
+    display: flex;
+}
+
+/* Enhanced spinner animation */
+.spinner-radarr {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.3em;
+    color: #35a7e9;
+}
+
+.spinner-radarr.small {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-width: 0.2em;
+}
+
+/* Changelog content styling */
+.changelog-content {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 5px;
+    font-size: 0.9rem;
+}
+
+.changelog-content h1,
+.changelog-content h2,
+.changelog-content h3,
+.changelog-content h4,
+.changelog-content h5 {
+    color: #35a7e9;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.changelog-content ul {
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.changelog-content li {
+    margin-bottom: 0.25rem;
+}
+
+.changelog-content .indent-1 { padding-left: 1rem; }
+.changelog-content .indent-2 { padding-left: 2rem; }
+.changelog-content .indent-3 { padding-left: 3rem; }
+
+.changelog-content .link-text {
+    color: #35a7e9;
+    font-weight: 500;
+}
+
+/* Config panel fixes */
+.config-panel {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 400px;
+    height: 100vh;
+    background: #2c3e50;
+    z-index: 1000;
+    transition: right 0.3s ease;
+    overflow-y: auto;
+}
+
+.config-panel.open {
+    display: block;
+    right: 0;
+}
+
+.config-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+.config-overlay.open {
+    display: block;
+}
