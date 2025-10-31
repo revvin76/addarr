@@ -22,9 +22,6 @@ import atexit
 import re
 
 # Global variables
-tunnel_process = None
-tunnel_thread = None
-tunnel_running = False
 shutdown_event = False
 app = Flask(__name__)
 
