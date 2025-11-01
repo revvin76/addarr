@@ -407,36 +407,48 @@ def update_checker():
                     update_info = check_github_for_updates()
                     if update_info.get('update_available'):
                         latest_version = update_info['latest_version']
+                        current_version = CONFIG['app']['version']
                         
-                        # Check if this update is already downloaded
-                        existing_updates = get_downloaded_updates()
-                        already_downloaded = any(update['version'] == latest_version for update in existing_updates)
-                        
-                        if not already_downloaded:
-                            if CONFIG['app']['debug']:
-                                logging.info(f"📦 Auto-check: Update available: {latest_version}")
-                            # Auto-download the update
-                            download_result = download_update()
-                            if download_result.get('success'):
-                                if CONFIG['app']['debug']:
+                        if latest_version > current_version:
+                            logging.info(f"📦 Auto-check: Update available: {latest_version}")
+                            
+                            # Check if this update is already downloaded
+                            existing_updates = get_downloaded_updates()
+                            already_downloaded = any(update['version'] == latest_version for update in existing_updates)
+                            
+                            if not already_downloaded:
+                                # AUTO-DOWNLOAD the update
+                                download_result = download_update()
+                                if download_result.get('success'):
                                     logging.info(f"✅ Auto-downloaded update: {download_result['version']}")
+                                    
+                                    # AUTO-APPLY the update
+                                    apply_result = apply_update(download_result['version'])
+                                    if apply_result.get('success'):
+                                        logging.info(f"🚀 Auto-applied update: {download_result['version']}")
+                                    else:
+                                        logging.error(f"❌ Auto-apply failed: {apply_result.get('error')}")
+                                else:
+                                    logging.error(f"❌ Auto-download failed: {download_result.get('error')}")
                             else:
-                                logging.error(f"❌ Auto-download failed: {download_result.get('error')}")
-                        else:
-                            if CONFIG['app']['debug']:
-                                logging.info(f"📦 Auto-check: Update {latest_version} already downloaded")
+                                logging.info(f"📦 Auto-check: Update {latest_version} already downloaded, applying...")
+                                # AUTO-APPLY the already downloaded update
+                                apply_result = apply_update(latest_version)
+                                if apply_result.get('success'):
+                                    logging.info(f"🚀 Auto-applied existing update: {latest_version}")
+                                else:
+                                    logging.error(f"❌ Auto-apply failed: {apply_result.get('error')}")
                     
                     # Update last_checked for next automated check
                     CONFIG['update']['last_checked'] = current_time
                     set_env('LAST_CHECKED', str(current_time))
                 
             # Sleep for 1 hour before checking again
-            time.sleep(3600)
+            time.sleep(CONFIG['update']['check_interval'])
             
         except Exception as e:
             logging.error(f"❌ Automated update checker error: {str(e)}")
-            time.sleep(3600)
-
+            time.sleep(CONFIG['update']['check_interval'])
 # Start the automated update checker thread (only for continuous operation)
 update_thread = threading.Thread(target=update_checker, daemon=True)
 update_thread.start()
@@ -472,8 +484,6 @@ def perform_initial_update_check():
                 else:
                     logging.error(f"❌ Failed to apply existing update: {apply_result.get('error')}")
                     # Continue to check for newer updates even if this one failed
-            else:
-                logging.info(f"✅ Already on latest version {current_version}, no downloaded updates to apply")
         
         # SECOND: Check GitHub for new updates
         logging.info("Checking GitHub for new updates...")
@@ -487,15 +497,17 @@ def perform_initial_update_check():
                 logging.info(f"📦 New update available: {latest_version} (current: {current_version})")
                 
                 # Check if we already have this specific update downloaded
-                already_downloaded = any(update['version'] == latest_version for update in existing_updates)
+                already_downloaded = any(update['version'] == latest_version for update in (existing_updates or []))
                 
                 if not already_downloaded:
-                    # Download the new update
+                    # AUTO-DOWNLOAD THE UPDATE
+                    logging.info(f"⬇️ Auto-downloading update: {latest_version}")
                     download_result = download_update()
+                    
                     if download_result.get('success'):
                         logging.info(f"✅ Auto-downloaded update: {download_result['version']}")
                         
-                        # Auto-apply the update after download
+                        # AUTO-APPLY THE UPDATE AFTER DOWNLOAD
                         logging.info(f"🔄 Auto-applying update: {download_result['version']}")
                         apply_result = apply_update(download_result['version'])
                         
@@ -507,6 +519,9 @@ def perform_initial_update_check():
                             logging.error(f"❌ Auto-apply failed: {apply_result.get('error')}")
                     else:
                         logging.error(f"❌ Auto-download failed: {download_result.get('error')}")
+                        # Set notification for manual download
+                        set_env('UPDATE_NOTIFICATION', 'true')
+                        set_env('LATEST_VERSION', latest_version)
                 else:
                     # We already have this update downloaded - apply it
                     logging.info(f"📦 Update {latest_version} already downloaded, applying...")
@@ -518,6 +533,9 @@ def perform_initial_update_check():
                         return True
                     else:
                         logging.error(f"❌ Failed to apply downloaded update: {apply_result.get('error')}")
+                        # Set notification for manual intervention
+                        set_env('UPDATE_NOTIFICATION', 'true')
+                        set_env('LATEST_VERSION', latest_version)
             else:
                 logging.info("✅ Already on latest version")
         else:
@@ -533,7 +551,7 @@ def perform_initial_update_check():
     except Exception as e:
         logging.error(f"❌ Initial update check failed: {str(e)}")
         return False
-     
+      
 @debug_log
 def extract_update(version):
     """Extract the downloaded update zip file with detailed logging"""
@@ -898,7 +916,7 @@ def apply_update(version):
         # Update running config with new version
         CONFIG['app']['version'] = version
         logging.info(f"Successfully updated running config to version: {version}")
-                
+
         result = {
             'success': True,
             'message': f'Update {version} applied successfully. Server will restart shortly.',
