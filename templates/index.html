@@ -531,8 +531,10 @@
     </div>
 </div>
 
+<!-- Global Loading Spinner -->
 <div id="globalLoadingSpinner" class="loading-spinner">
     <div class="spinner-container">
+        <button id="forceCloseSpinner" class="btn-close btn-close-white mt-3" style="display: none;"></button>
         <div class="spinner-border spinner-radarr" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
@@ -721,7 +723,7 @@ const forms = document.querySelectorAll('form');
         link.addEventListener('click', function(e) {
             // Don't intercept if it's the same page or has special handlers
             if (this.getAttribute('href') && !this.getAttribute('href').startsWith('javascript')) {
-                spinner.show('Navigating...');
+                spinner.show('Loading...');
             }
         });
     });

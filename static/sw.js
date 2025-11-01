@@ -35,3 +35,23 @@ self.addEventListener('fetch', event => {
   );
 });
 
+// In your service worker, add this message handler
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+});
+
+// Notify clients when new content is available
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        self.clients.matchAll().then((clients) => {
+            clients.forEach((client) => {
+                client.postMessage({
+                    type: 'CONTENT_LOADED',
+                    message: 'New content is available'
+                });
+            });
+        })
+    );
+});

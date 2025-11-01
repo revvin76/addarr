@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.0.8] - 2025-11-01
+### Fixed
+- Loading spinners for page transitions on PWA were not disappearing
+- Fixed auto-update code to apply updates consistently
+
+### Added
+- Automatic env file upgrade. Your env file is now rebuilt using the latest template to ensure you always have the available options
+
+## [1.0.7a] - 2025-10-30
+### Updated
+- README.md updated
+
 ## [1.0.7] - 2025-10-30
 ### Removed
 - Dumped localhost.run reverse tunnelling

@@ -2091,31 +2091,88 @@ class LoadingSpinner {
     constructor() {
         this.spinner = document.getElementById('globalLoadingSpinner');
         this.message = document.getElementById('loadingMessage');
+        this.init();
+    }
+
+    init() {
+        // Create spinner if it doesn't exist
+        if (!this.spinner) {
+            this.createSpinner();
+        }
+        
+        // Set up event listeners for PWA compatibility
+        this.setupEventListeners();
+    }
+
+    createSpinner() {
+        const spinnerHTML = `
+            <div id="globalLoadingSpinner" class="loading-spinner">
+                <div class="spinner-container">
+                    <div class="spinner-border spinner-radarr" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', spinnerHTML);
+        this.spinner = document.getElementById('globalLoadingSpinner');
+        this.message = document.getElementById('loadingMessage');
+    }
+
+    setupEventListeners() {
+        // Multiple ways to detect when page is ready in PWA
+        document.addEventListener('DOMContentLoaded', () => this.hide());
+        window.addEventListener('load', () => this.hide());
+        
+        // For single page app behavior in PWA
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                // Page was restored from cache (PWA behavior)
+                this.hide();
+            }
+        });
+
+        // Safety timeout - always hide after 15 seconds max
+        setTimeout(() => this.hide(), 15000);
     }
 
     show(message = 'Loading...') {
-        if (this.spinner) {
+        if (this.spinner && this.message) {
             this.message.textContent = message;
             this.spinner.classList.add('show');
-            // Prevent body scroll
             document.body.style.overflow = 'hidden';
+            
+            // Auto-hide safety for PWA (in case page doesn't trigger load events)
+            setTimeout(() => {
+                if (this.spinner.classList.contains('show')) {
+                    console.warn('Loading spinner timeout - forcing hide');
+                    this.hide();
+                }
+            }, 10000); // 10 second safety timeout
         }
     }
 
     hide() {
         if (this.spinner) {
             this.spinner.classList.remove('show');
-            // Restore body scroll
             document.body.style.overflow = '';
         }
     }
 }
 
-// Initialize global spinner
-const spinner = new LoadingSpinner();
-
 // Form submission handlers
 document.addEventListener('DOMContentLoaded', function() {
+
+    window.spinner = new LoadingSpinner();
+    
+    // Set up navigation and form handlers
+    setupNavigationHandlers();
+    
+    // Initial hide to ensure it's not stuck
+    setTimeout(() => window.spinner.hide(), 1000);
+
+
     // Handle search form submissions
     const searchForms = document.querySelectorAll('form[action*="search"]');
     searchForms.forEach(form => {
@@ -2154,5 +2211,125 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('error', () => spinner.hide());
 });
 
-// Export for use in other scripts
-window.spinner = spinner;
+function setupNavigationHandlers() {
+    const spinner = window.spinner;
+    
+    // Handle form submissions
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const action = this.getAttribute('action') || '';
+            let message = 'Processing...';
+            
+            if (action.includes('search')) {
+                message = 'Searching...';
+            }
+            
+            spinner.show(message);
+        });
+    });
+
+    // Handle navigation clicks - but only for same-origin links
+    const links = document.querySelectorAll('a[href]:not([target="_blank"])');
+    links.forEach(link => {
+        const href = link.getAttribute('href');
+        
+        // Only handle links that navigate to new pages (not anchors or javascript)
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+            link.addEventListener('click', function(e) {
+                // Don't intercept if it's the same page or has special handlers
+                if (this.getAttribute('href') !== window.location.pathname) {
+                    spinner.show('Loading...');
+                    
+                    // For PWA, also set up a timeout to hide if navigation doesn't happen
+                    setTimeout(() => {
+                        // If we're still on the same page after 2 seconds, hide spinner
+                        if (window.location.pathname === new URL(this.href, window.location.origin).pathname) {
+                            spinner.hide();
+                        }
+                    }, 2000);
+                }
+            });
+        }
+    });
+
+    // Handle manage page item clicks
+    const manageItems = document.querySelectorAll('.media-item, .result-item, .search-result-card');
+    manageItems.forEach(item => {
+        item.addEventListener('click', function() {
+            spinner.show('Loading details...');
+            
+            // Safety timeout for modal loads
+            setTimeout(() => spinner.hide(), 5000);
+        });
+    });
+
+    // Listen for modal events to hide spinner when modals open
+    document.addEventListener('show.bs.modal', () => {
+        spinner.hide();
+    });
+
+    // Listen for AJAX completion (if using fetch/XHR)
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const promise = originalFetch.apply(this, args);
+        promise.finally(() => {
+            setTimeout(() => spinner.hide(), 100);
+        });
+        return promise;
+    };
+}
+
+// Make spinner available globally
+window.LoadingSpinner = LoadingSpinner;
+
+class PWALoadingHelper {
+    constructor() {
+        this.setupPWAEvents();
+    }
+
+    setupPWAEvents() {
+        // Listen for service worker messages
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'CONTENT_LOADED') {
+                    window.spinner.hide();
+                }
+            });
+        }
+
+        // Handle beforeunload for page transitions
+        window.addEventListener('beforeunload', () => {
+            window.spinner.show('Loading...');
+        });
+
+        // Handle page restoration from cache (PWA behavior)
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                // Page was restored from bfcache
+                setTimeout(() => window.spinner.hide(), 100);
+            }
+        });
+
+        // Add manual close button as fallback
+        const forceCloseBtn = document.getElementById('forceCloseSpinner');
+        if (forceCloseBtn) {
+            forceCloseBtn.addEventListener('click', () => {
+                window.spinner.hide();
+            });
+            
+            // Show close button after 8 seconds if spinner is still visible
+            setInterval(() => {
+                const spinner = document.getElementById('globalLoadingSpinner');
+                if (spinner && spinner.classList.contains('show')) {
+                    forceCloseBtn.style.display = 'block';
+                }
+            }, 8000);
+        }
+    }
+}
+
+// Initialize PWA helper
+document.addEventListener('DOMContentLoaded', function() {
+    window.pwaHelper = new PWALoadingHelper();
+});

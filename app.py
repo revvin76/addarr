@@ -17,6 +17,7 @@ import atexit
 import re
 import io
 import logging
+import shutil
 
 try:
     import pinggy
@@ -89,6 +90,7 @@ CONFIG = {
         'github_repo':  os.getenv('GITHUB_REPO', 'revvin76/addarr'),
         'check_interval':  os.getenv('CHECK_INTERVAL', '3600'),
         'last_checked':  os.getenv('LAST_CHECKED', '0'),
+        'enabled': os.getenv('ENABLE_AUTO_UPDATE', 'false').lower() == 'true',
         'updates_folder':  os.getenv('UPDATES_FOLDER', ''),
     },
     'tunnel': {
@@ -377,7 +379,7 @@ def get_media_details():
     
 @debug_log
 def update_checker():
-    """Background thread to check for updates periodically"""
+    """Background thread to check for updates periodically (respects interval)"""
     update_lock = threading.Lock()
     
     while True:
@@ -400,7 +402,7 @@ def update_checker():
                 
                 if current_time - last_checked >= check_interval:
                     if CONFIG['app']['debug']:
-                        logging.info("Checking for updates...")
+                        logging.info("🔄 Automated update check running...")
                     
                     update_info = check_github_for_updates()
                     if update_info.get('update_available'):
@@ -412,40 +414,126 @@ def update_checker():
                         
                         if not already_downloaded:
                             if CONFIG['app']['debug']:
-                                logging.info(f"Update available: {latest_version}")
+                                logging.info(f"📦 Auto-check: Update available: {latest_version}")
                             # Auto-download the update
                             download_result = download_update()
                             if download_result.get('success'):
                                 if CONFIG['app']['debug']:
-                                    logging.info(f"Auto-downloaded update: {download_result['version']}")
-                                
-                                # Auto-apply the update after download
-                                apply_result = apply_update(download_result['version'])
-                                if apply_result.get('success'):
-                                    if CONFIG['app']['debug']:
-                                        logging.info(f"Auto-applied update: {download_result['version']}")
-                                else:
-                                    logging.error(f"Auto-apply failed: {apply_result.get('error')}")
+                                    logging.info(f"✅ Auto-downloaded update: {download_result['version']}")
                             else:
-                                logging.error(f"Auto-download failed: {download_result.get('error')}")
+                                logging.error(f"❌ Auto-download failed: {download_result.get('error')}")
                         else:
                             if CONFIG['app']['debug']:
-                                logging.info(f"Update {latest_version} already downloaded, skipping download")
+                                logging.info(f"📦 Auto-check: Update {latest_version} already downloaded")
                     
-                    # Update last_checked as float
+                    # Update last_checked for next automated check
                     CONFIG['update']['last_checked'] = current_time
-                    
+                    set_env('LAST_CHECKED', str(current_time))
+                
             # Sleep for 1 hour before checking again
             time.sleep(3600)
             
         except Exception as e:
-            logging.error(f"Update checker error: {str(e)}")
+            logging.error(f"❌ Automated update checker error: {str(e)}")
             time.sleep(3600)
 
-# Start update checker thread
+# Start the automated update checker thread (only for continuous operation)
 update_thread = threading.Thread(target=update_checker, daemon=True)
 update_thread.start()
 
+@debug_log
+def perform_initial_update_check():
+    """Blocking initial update check that always runs on startup - only in main process"""
+    # Skip if this is the Werkzeug reloader process
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        logging.info("🔄 Skipping update check in Werkzeug reloader process")
+        return False
+        
+    logging.info("🔍 Performing initial update check...")
+    
+    try:
+        # FIRST: Check if we have any downloaded updates that need to be applied
+        existing_updates = get_downloaded_updates()
+        if existing_updates:
+            latest_downloaded = existing_updates[0]  # Already sorted by version, newest first
+            latest_version = latest_downloaded['version']
+            current_version = CONFIG['app']['version']
+            
+            # If the downloaded version is newer than current version, apply it
+            if latest_version > current_version:
+                logging.info(f"📦 Found downloaded update {latest_version} (current: {current_version})")
+                logging.info(f"🔄 Attempting to apply existing update: {latest_version}")
+                
+                apply_result = apply_update(latest_version)
+                if apply_result.get('success'):
+                    logging.info(f"🚀 Successfully applied existing update: {latest_version}")
+                    logging.info("🔄 Application will restart shortly...")
+                    return True
+                else:
+                    logging.error(f"❌ Failed to apply existing update: {apply_result.get('error')}")
+                    # Continue to check for newer updates even if this one failed
+            else:
+                logging.info(f"✅ Already on latest version {current_version}, no downloaded updates to apply")
+        
+        # SECOND: Check GitHub for new updates
+        logging.info("Checking GitHub for new updates...")
+        update_info = check_github_for_updates()
+        
+        if update_info.get('update_available'):
+            latest_version = update_info['latest_version']
+            current_version = CONFIG['app']['version']
+            
+            if latest_version > current_version:
+                logging.info(f"📦 New update available: {latest_version} (current: {current_version})")
+                
+                # Check if we already have this specific update downloaded
+                already_downloaded = any(update['version'] == latest_version for update in existing_updates)
+                
+                if not already_downloaded:
+                    # Download the new update
+                    download_result = download_update()
+                    if download_result.get('success'):
+                        logging.info(f"✅ Auto-downloaded update: {download_result['version']}")
+                        
+                        # Auto-apply the update after download
+                        logging.info(f"🔄 Auto-applying update: {download_result['version']}")
+                        apply_result = apply_update(download_result['version'])
+                        
+                        if apply_result.get('success'):
+                            logging.info(f"🚀 Successfully applied new update: {download_result['version']}")
+                            logging.info("🔄 Application will restart shortly...")
+                            return True
+                        else:
+                            logging.error(f"❌ Auto-apply failed: {apply_result.get('error')}")
+                    else:
+                        logging.error(f"❌ Auto-download failed: {download_result.get('error')}")
+                else:
+                    # We already have this update downloaded - apply it
+                    logging.info(f"📦 Update {latest_version} already downloaded, applying...")
+                    apply_result = apply_update(latest_version)
+                    
+                    if apply_result.get('success'):
+                        logging.info(f"🚀 Successfully applied downloaded update: {latest_version}")
+                        logging.info("🔄 Application will restart shortly...")
+                        return True
+                    else:
+                        logging.error(f"❌ Failed to apply downloaded update: {apply_result.get('error')}")
+            else:
+                logging.info("✅ Already on latest version")
+        else:
+            logging.info("✅ No new updates available")
+        
+        # Update last_checked timestamp for the next automated check
+        current_time = time.time()
+        CONFIG['update']['last_checked'] = current_time
+        set_env('LAST_CHECKED', str(current_time))
+        
+        return False  # No restart needed
+            
+    except Exception as e:
+        logging.error(f"❌ Initial update check failed: {str(e)}")
+        return False
+     
 @debug_log
 def extract_update(version):
     """Extract the downloaded update zip file with detailed logging"""
@@ -498,6 +586,172 @@ def extract_update(version):
         logging.error(f"Error extracting update: {str(e)}")
         logging.error(traceback.format_exc())
         return {'success': False, 'error': str(e)}
+
+@debug_log
+def update_env_file_from_demo(extract_path, current_dir):
+    """Update .env file with existing values while preserving new structure from demo_env"""
+    try:
+        logging.info("🔄 Starting .env file update process...")
+        
+        # Make sure shutil is available
+        import shutil  # ADD THIS HERE TOO FOR SAFETY
+        
+        # Paths to the files
+        existing_env_path = os.path.join(current_dir, '.env')
+        demo_env_path = find_demo_env_file(extract_path)
+        
+        if not demo_env_path:
+            logging.error("❌ demo_env file not found in update")
+            return False
+        
+        if not os.path.exists(existing_env_path):
+            logging.error("❌ Existing .env file not found")
+            return False
+        
+        # Read and parse both files
+        existing_env = parse_env_file(existing_env_path)
+        demo_env_content, demo_env_lines = read_demo_env_file(demo_env_path)
+        
+        if not demo_env_content:
+            logging.error("❌ Failed to read demo_env file")
+            return False
+        
+        # Create updated content
+        updated_content, unknown_settings = create_updated_env_content(
+            demo_env_content, demo_env_lines, existing_env
+        )
+        
+        # Backup the original .env file
+        backup_path = existing_env_path + '.backup'
+        shutil.copy2(existing_env_path, backup_path)
+        logging.info(f"📁 Backed up .env to {backup_path}")
+        
+        # Write the updated .env file
+        with open(existing_env_path, 'w', encoding='utf-8') as f:
+            f.write(updated_content)
+        
+        logging.info("✅ Successfully updated .env file")
+        
+        # Log any unknown settings that were preserved
+        if unknown_settings:
+            logging.info(f"📝 Preserved {len(unknown_settings)} unknown settings:")
+            for key in unknown_settings:
+                logging.info(f"   - {key}")
+        
+        return True
+        
+    except Exception as e:
+        logging.error(f"❌ Error updating .env file: {str(e)}")
+        logging.error(traceback.format_exc())
+        return False
+    
+@debug_log
+def find_demo_env_file(extract_path):
+    """Find the demo_env file in the extracted update"""
+    possible_names = ['demo_env', 'demo_env.txt', 'env.example', '.env.example']
+    
+    for root, dirs, files in os.walk(extract_path):
+        for file in files:
+            if file.lower() in possible_names:
+                return os.path.join(root, file)
+    
+    # Also check for files starting with "demo_env"
+    for root, dirs, files in os.walk(extract_path):
+        for file in files:
+            if file.lower().startswith('demo_env'):
+                return os.path.join(root, file)
+    
+    return None
+
+@debug_log
+def parse_env_file(env_path):
+    """Parse .env file into a dictionary"""
+    env_dict = {}
+    try:
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                # Skip empty lines and comments
+                if not line or line.startswith('#'):
+                    continue
+                # Parse key=value pairs
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    env_dict[key.strip()] = value.strip()
+    except Exception as e:
+        logging.error(f"Error parsing env file {env_path}: {str(e)}")
+    return env_dict
+
+@debug_log
+def read_demo_env_file(demo_env_path):
+    """Read demo_env file and return content and structured lines"""
+    try:
+        with open(demo_env_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Parse lines while preserving structure
+        lines = []
+        for line in content.splitlines():
+            lines.append({
+                'original': line,
+                'is_comment': line.strip().startswith('#'),
+                'is_empty': not line.strip(),
+                'is_setting': '=' in line and not line.strip().startswith('#')
+            })
+        
+        return content, lines
+    except Exception as e:
+        logging.error(f"Error reading demo_env file: {str(e)}")
+        return None, []
+
+@debug_log
+def create_updated_env_content(demo_env_content, demo_env_lines, existing_env):
+    """Create updated .env content by merging existing values into demo_env structure"""
+    updated_lines = []
+    used_keys = set()
+    unknown_settings = {}
+    
+    # First, process all demo_env lines
+    for line_info in demo_env_lines:
+        line = line_info['original']
+        
+        if line_info['is_setting'] and not line_info['is_comment']:
+            # This is a setting line - extract key and replace value if it exists
+            key = line.split('=', 1)[0].strip()
+            
+            if key in existing_env:
+                # Replace with existing value
+                new_line = f"{key}={existing_env[key]}"
+                updated_lines.append(new_line)
+                used_keys.add(key)
+                logging.debug(f"🔧 Updated setting: {key}")
+            else:
+                # Keep the demo value
+                updated_lines.append(line)
+                logging.debug(f"📋 Kept demo setting: {key}")
+        else:
+            # Keep comments and empty lines as-is
+            updated_lines.append(line)
+    
+    # Now find any existing settings that weren't in demo_env
+    for key, value in existing_env.items():
+        if key not in used_keys:
+            unknown_settings[key] = value
+    
+    # Add unknown settings at the end with a header
+    if unknown_settings:
+        updated_lines.append('')
+        updated_lines.append('# =========================================')
+        updated_lines.append('# UNKNOWN SETTINGS (from previous version)')
+        updated_lines.append('# These settings were not found in the new version')
+        updated_lines.append('# but have been preserved from your existing configuration')
+        updated_lines.append('# =========================================')
+        updated_lines.append('')
+        
+        for key, value in unknown_settings.items():
+            updated_lines.append(f"{key}={value}")
+    
+    return '\n'.join(updated_lines), unknown_settings
     
 @debug_log
 def apply_update(version):
@@ -512,6 +766,15 @@ def apply_update(version):
             return extract_result
         
         extract_path = extract_result['extract_path']
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # UPDATE: Update .env file first, before copying other files
+        logging.info("🔄 Updating .env file with new version...")
+        env_update_result = update_env_file_from_demo(extract_path, current_dir)
+        if not env_update_result:
+            logging.warning("⚠️  .env file update failed, but continuing with update")
+        else:
+            logging.info("✅ .env file updated successfully")
         
         # Find the actual application files in the extracted directory
         extracted_items = os.listdir(extract_path)
@@ -531,9 +794,6 @@ def apply_update(version):
                 break
         
         logging.info(f"Source directory for update: {source_dir}")
-        
-        # Get current application directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
         logging.info(f"Target application directory: {current_dir}")
         
         # Verify source directory exists and has files
@@ -556,7 +816,7 @@ def apply_update(version):
         exclude_files = {
             '.env', 'addarr.log', 'updates', '__pycache__', '.git',
             'instance', 'venv', 'node_modules', '.vscode', '.idea',
-            'last_ip.txt'
+            'last_ip.txt', 'demo_env'  # ADDED: Exclude demo_env since we already processed it
         }
         
         exclude_extensions = {'.pyc', '.tmp', '.log', '.db'}
@@ -619,32 +879,33 @@ def apply_update(version):
                 'error': f'Update partially applied with {len(errors)} errors',
                 'files_copied': files_copied,
                 'files_skipped': files_skipped,
-                'errors': errors
+                'errors': errors,
+                'env_updated': env_update_result
             }
         
         logging.info(f"Update file copy completed: {files_copied} files copied, {files_skipped} files skipped")
         
-        # Update version in environment and config
-        logging.info(f"Updating version from {CONFIG['app']['version']} to {version}")
+        # Update version in environment and config (this should now reflect the new version from demo_env)
+        current_version = CONFIG['app']['version']
+        logging.info(f"Previous version: {current_version}, New version: {version}")
         
-        version_result = set_env('APP_VERSION', version)
-        if not version_result:
-            logging.error("Failed to update APP_VERSION in .env")
+        # Also update the version in .env file explicitly
+        set_env('APP_VERSION', version)
         
-        set_env('UPDATE_APPLIED', 'true')
-        set_env('UPDATE_APPLIED_VERSION', version)
-        set_env('UPDATE_NOTIFICATION', 'false')  # Clear update notification
+        # Reload environment to get any new settings
+        load_dotenv()  # Reload to get updated .env values
         
-        # Update running config
+        # Update running config with new version
         CONFIG['app']['version'] = version
         logging.info(f"Successfully updated running config to version: {version}")
-        
+                
         result = {
             'success': True,
             'message': f'Update {version} applied successfully. Server will restart shortly.',
             'files_copied': files_copied,
             'files_skipped': files_skipped,
-            'version': version
+            'version': version,
+            'env_updated': env_update_result
         }
         
         logging.info("Scheduling server restart...")
@@ -669,11 +930,37 @@ def apply_update(version):
         return {'success': False, 'error': str(e)}
     
 @debug_log
+def restore_env_backup_if_needed():
+    """Restore .env backup if the update failed and backup exists"""
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        env_path = os.path.join(current_dir, '.env')
+        backup_path = env_path + '.backup'
+        
+        if os.path.exists(backup_path):
+            # Check if we need to restore (if .env doesn't exist or is empty)
+            if not os.path.exists(env_path) or os.path.getsize(env_path) == 0:
+                shutil.copy2(backup_path, env_path)
+                logging.info("✅ Restored .env from backup due to update failure")
+                return True
+            else:
+                # Remove the backup since update was successful
+                os.remove(backup_path)
+                logging.info("✅ Update successful, removed .env backup")
+        return False
+    except Exception as e:
+        logging.error(f"Error handling .env backup: {str(e)}")
+        return False
+        
+@debug_log
 def restart_application():
     """Restart the application to apply changes"""
     try:
         logging.info("RESTARTING APPLICATION...")
         print("RESTARTING APPLICATION...")
+        
+        # Check if we need to restore .env backup
+        restore_env_backup_if_needed()
         
         # Import required modules here to avoid circular imports
         import sys
@@ -787,6 +1074,15 @@ required_env = ['RADARR_URL', 'RADARR_API_KEY', 'SONARR_URL', 'SONARR_API_KEY']
 missing = [key for key in required_env if not os.getenv(key)]
 if missing:
     raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
+
+@app.route('/api/pwa/health')
+def pwa_health():
+    """Health check endpoint for PWA"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'version': CONFIG['app']['version']
+    })
 
 #################################### --- PINGGY TUNNEL START --- ####################################
 def start_pinggy_tunnel():
@@ -1958,28 +2254,29 @@ def delete_episode(episode_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-if CONFIG['app']['debug']:
-    logging.info("Performing initial update check...")
-initial_update_info = check_github_for_updates()
+### OLD AUTO UPDATE CHECKING - DISABLED FOR NOW ###
+# if CONFIG['app']['debug']:
+#     logging.info("Performing initial update check...")
+# initial_update_info = check_github_for_updates()
 
-if initial_update_info.get('update_available'):
-    latest_version = initial_update_info['latest_version']
+# if initial_update_info.get('update_available'):
+#     latest_version = initial_update_info['latest_version']
     
-    # Check if we already have this update downloaded
-    existing_updates = get_downloaded_updates()
-    already_downloaded = any(update['version'] == latest_version for update in existing_updates)
+#     # Check if we already have this update downloaded
+#     existing_updates = get_downloaded_updates()
+#     already_downloaded = any(update['version'] == latest_version for update in existing_updates)
     
-    if not already_downloaded:
-        if CONFIG['app']['debug']:
-            logging.info(f"Initial check: Update available - {latest_version}")
-        # Don't auto-download on initial check, just notify
-        set_env('UPDATE_NOTIFICATION', 'true')
-        set_env('LATEST_VERSION', latest_version)
-    else:
-        if CONFIG['app']['debug']:
-            logging.info(f"Initial check: Update {latest_version} already downloaded")
+#     if not already_downloaded:
+#         if CONFIG['app']['debug']:
+#             logging.info(f"Initial check: Update available - {latest_version}")
+#         # Don't auto-download on initial check, just notify
+#         set_env('UPDATE_NOTIFICATION', 'true')
+#         set_env('LATEST_VERSION', latest_version)
+#     else:
+#         if CONFIG['app']['debug']:
+#             logging.info(f"Initial check: Update {latest_version} already downloaded")
 
-CONFIG['update']['last_checked'] = time.time()
+# CONFIG['update']['last_checked'] = time.time()
 
 @app.route('/')
 @debug_log
@@ -2036,18 +2333,35 @@ if __name__ == '__main__':
     from colorama import init
     init()
 
-    # Start DuckDNS if enabled
-    if CONFIG['duckdns']['enabled']:
-        try:
-            duckdns_thread = threading.Thread(
-                target=lambda: update_duckdns_if_needed(),
-                daemon=True,
-                name="DuckDNSUpdater"
-            )
-            duckdns_thread.start()
-            logging.info("DuckDNS update thread started")
-        except Exception as e:
-            logging.error(f"Failed to start DuckDNS thread: {str(e)}")
+    if CONFIG['update']['enabled']:
+        restart_needed = perform_initial_update_check()
+
+        if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+            # BLOCKING UPDATE CHECK - runs first before anything else
+            restart_needed = perform_initial_update_check()
+            
+            # If an update was applied and restart is needed, we should exit here
+            if restart_needed:
+                logging.info("🔄 Update applied, waiting for restart...")
+                # Give a moment for logs to flush
+                time.sleep(2)
+                logging.info("🚀 Exiting main process to allow restart...")
+                # Exit completely to allow the new process to take over
+                sys.exit(0)
+
+        # Only continue if no restart is needed
+        # Start DuckDNS if enabled
+        if CONFIG['duckdns']['enabled']:
+            try:
+                duckdns_thread = threading.Thread(
+                    target=lambda: update_duckdns_if_needed(),
+                    daemon=True,
+                    name="DuckDNSUpdater"
+                )
+                duckdns_thread.start()
+                logging.info("DuckDNS update thread started")
+            except Exception as e:
+                logging.error(f"Failed to start DuckDNS thread: {str(e)}")
 
     # Print welcome message in main process only
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':

@@ -131,14 +131,17 @@
             <span class="visually-hidden">Loading...</span>
         </div>
     </div>
-    <div id="globalLoadingSpinner" class="loading-spinner">
-        <div class="spinner-container">
-            <div class="spinner-border spinner-radarr" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
+<!-- Global Loading Spinner -->
+<div id="globalLoadingSpinner" class="loading-spinner">
+    <div class="spinner-container">
+        <button id="forceCloseSpinner" class="btn-close btn-close-white mt-3" style="display: none;"></button>
+        <div class="spinner-border spinner-radarr" role="status">
+            <span class="visually-hidden">Loading...</span>
         </div>
-    </div>    
+        <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
+    </div>
+</div>
+   
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>    

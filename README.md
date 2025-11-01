@@ -3,8 +3,8 @@ A lightweight Flask web interface to search and add movies/TV shows to Radarr/So
 
 ![Main screen](/static/images/Screenshot1.png) ![Unified media search](/static/images/Screenshot2.png) ![Movie result](/static/images/Screenshot3.png)
 ![TV Show result](/static/images/Screenshot4.png) ![Media Manager](/static/images/Screenshot5.png) ![Manage Movie](/static/images/Screenshot4.png) ![Manage TV Show](/static/images/Screenshot5.png) 
-
 ![Server welcome screen](/static/images/welcome.png)
+
 ---
 ## [1.0.7] - 2025-10-30
 ### Removed
