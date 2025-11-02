@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.0.9] - 2025-10-30
+### Updated
+- Manage media page now just has a small home icon to navigate back to the main page
+- Updated PWA Splash screen
+- Restyled config panel to match the info panel
+
+### Fixed
+- Info page recent changes to show whole recently changed section
+- After clicking "Show downloaded updates", modal now disappears
+- Radio buttons on config page were not displaying correctly
+
+### Known issues
+- Configuration does not save correctly! Manually edit the .env file for now.
+
+## [1.0.8a] - 2025-10-30
+### Fixed
+- Issue with update interval
+
 ## [1.0.8] - 2025-11-01
 ### Fixed
 - Loading spinners for page transitions on PWA were not disappearing

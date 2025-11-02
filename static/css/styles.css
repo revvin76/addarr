@@ -1560,3 +1560,42 @@ body.spinner-active {
     width: 100%;
     height: 100%;
 }
+
+/* Dark theme form controls */
+.form-control.bg-dark {
+    background-color: #2d3748 !important;
+    border-color: #4a5568;
+    color: #fff;
+}
+
+.form-control.bg-dark:focus {
+    background-color: #2d3748;
+    border-color: #63b3ed;
+    color: #fff;
+    box-shadow: 0 0 0 0.2rem rgba(99, 179, 237, 0.25);
+}
+
+.form-select.bg-dark {
+    background-color: #2d3748 !important;
+    border-color: #4a5568;
+    color: #fff;
+}
+
+.form-select.bg-dark:focus {
+    border-color: #63b3ed;
+    box-shadow: 0 0 0 0.2rem rgba(99, 179, 237, 0.25);
+}
+
+/* Ensure proper contrast for form labels */
+.form-label {
+    color: #e2e8f0;
+    font-weight: 500;
+}
+
+/* Style for code elements in modals */
+.modal-content code {
+    background-color: #2d3748;
+    color: #63b3ed;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+}

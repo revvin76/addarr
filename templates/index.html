@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>addarr</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/styles.css" rel="stylesheet">
     <link rel="icon" type="image/png" href="/static/images/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
@@ -31,21 +31,12 @@
             
             <div class="d-flex gap-2">
                 <a href="/manage" class="btn btn-outline-radarr me-2"><i class="fas fa-film"></i></a>
-                <!-- <button id="logToggle" class="btn btn-outline-radarr">
-                    <i class="fas fa-list-check"></i>
-                </button> -->
-                <!-- <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="collapse" data-bs-target="#configPanel">
-                    <i class="fas fa-cog"></i>
-                </button> -->
-                <button id="configToggle" class="btn btn-outline-radarr">
+                <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#configModal">
                     <i class="fas fa-cog"></i>
                 </button>                
                 <button id="infoToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#infoModal">
                     <i class="fas fa-info-circle"></i>
                 </button>
-                <!-- <button id="debugToggle" class="btn btn-outline-radarr">
-                    <i class="fas fa-bug"></i>
-                </button> -->
             </div>
         </div>
     </div>
@@ -81,131 +72,331 @@
 <div class="config-overlay" id="configOverlay"></div>
 <div class="config-overlay" id="debugOverlay"></div>
 
-<div class="config-panel" id="configPanel">
-    <div class="config-header">
-        <h3>Configuration</h3>
-        <button class="btn btn-sm btn-outline-radarr" id="closeConfig">&times;</button>
+<!-- Config Panel -->
+<div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="configModalLabel">
+                    <i class="fas fa-cog me-2"></i>Configuration
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form class="config-form" id="configForm">
+                    <!-- Radarr Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-radarr mb-3">
+                            <i class="fas fa-film me-2"></i>Radarr Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="radarrUrl" class="form-label">Radarr URL</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                            id="radarrUrl" name="RADARR_URL" value="{{ config.radarr.url }}">                                               
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="radarrApiKey" class="form-label">API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                               id="radarrApiKey" name="RADARR_API_KEY" value="{{ config.radarr.api_key}}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="radarrRootFolder" class="form-label">Root Folder</label>
+                                        <select class="form-control bg-dark text-light border-secondary" 
+                                                id="radarrRootFolder" name="RADARR_ROOT_FOLDER">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="radarrQualityProfile" class="form-label">Quality Profile</label>
+                                        <select class="form-control bg-dark text-light border-secondary" 
+                                                id="radarrQualityProfile" name="RADARR_QUALITY_PROFILE">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-radarr w-100 test-connection" 
+                                                id="testRadarr">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sonarr Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-sonarr mb-3">
+                            <i class="fas fa-tv me-2"></i>Sonarr Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="sonarrUrl" class="form-label">Sonarr URL</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                               id="sonarrUrl" name="SONARR_URL" value="{{ config.sonarr.url}}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="sonarrApiKey" class="form-label">API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                               id="sonarrApiKey" name="SONARR_API_KEY" value="{{ config.sonarr.api_key}}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="sonarrRootFolder" class="form-label">Root Folder</label>
+                                        <select class="form-control bg-dark text-light border-secondary" 
+                                                id="sonarrRootFolder" name="SONARR_ROOT_FOLDER">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="sonarrQualityProfile" class="form-label">Quality Profile</label>
+                                        <select class="form-control bg-dark text-light border-secondary" 
+                                                id="sonarrQualityProfile" name="SONARR_QUALITY_PROFILE">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="sonarrLanguageProfile" class="form-label">Language Profile</label>
+                                        <select class="form-control bg-dark text-light border-secondary" 
+                                                id="sonarrLanguageProfile" name="SONARR_LANGUAGE_PROFILE">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-sonarr w-100 test-connection" 
+                                                id="testSonarr">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DuckDNS Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-warning mb-3">
+                            <i class="fas fa-globe me-2"></i>DuckDNS Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="duckdnsEnabled" 
+                                                   name="DUCKDNS_ENABLED" {% if config.duckdns.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="duckdnsEnabled">
+                                                Enable DuckDNS
+                                            </label>
+                                        </div>                                    
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="duckdnsDomain" class="form-label">Domain</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                               id="duckdnsDomain" name="DUCKDNS_DOMAIN" 
+                                               value="{{ config.duckdns.domain}}"
+                                               placeholder="yourdomain (without .duckdns.org)">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="duckdnsToken" class="form-label">Token</label>
+                                        <input type="password" class="form-control bg-dark text-light border-secondary" 
+                                               id="duckdnsToken" name="DUCKDNS_TOKEN" 
+                                               value="{{ config.duckdns.token}}">
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-warning w-100" id="testDuckDNS">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TMDB Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-info mb-3">
+                            <i class="fas fa-database me-2"></i>TMDB Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="tmdbKey" class="form-label">TMDB API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                            id="tmdbKey" name="TMDB_KEY" value="{{ config.tmdb.key }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="tmdbToken" class="form-label">TMDB Token</label>
+                                        <input type="password" class="form-control bg-dark text-light border-secondary" 
+                                            id="tmdbToken" name="TMDB_TOKEN" value="{{ config.tmdb.token }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Auto-Updater Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-warning mb-3">
+                            <i class="fas fa-sync-alt me-2"></i>Auto-Updater Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="githubRepo" class="form-label">GitHub Repository</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                            id="githubRepo" name="GITHUB_REPO" value="{{ config.update.github_repo }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="updatesFolder" class="form-label">Updates Folder</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                            id="updatesFolder" name="UPDATES_FOLDER" value="{{ config.update.updates_folder }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="checkInterval" class="form-label">Check Interval (seconds)</label>
+                                        <input type="number" class="form-control bg-dark text-light border-secondary" 
+                                            id="checkInterval" name="CHECK_INTERVAL" 
+                                            value="{{ config.update.check_interval }}" 
+                                            placeholder="3600" 
+                                            min="300" max="86400">
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="enableAutoUpdate" 
+                                                name="ENABLE_AUTO_UPDATE" {% if config.update.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="enableAutoUpdate">
+                                                Enable Auto Update
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tunnel Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-primary mb-3">
+                            <i class="fas fa-cloud me-2"></i>Tunnel Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="tunnelEnabled" 
+                                                name="TUNNEL_ENABLED" {% if config.tunnel.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="tunnelEnabled">
+                                                Enable Pinggy Tunnel
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="pinggyAuthToken" class="form-label">Pinggy Auth Token</label>
+                                        <input type="password" class="form-control bg-dark text-light border-secondary" 
+                                            id="pinggyAuthToken" name="PINGGY_AUTH_TOKEN" value="{{ config.tunnel.auth_token }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="pinggyReservedSubdomain" class="form-label">Reserved Subdomain</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                            id="pinggyReservedSubdomain" name="PINGGY_RESERVED_SUBDOMAIN" value="{{ config.tunnel.reserved_subdomain }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Logging Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-secondary mb-3">
+                            <i class="fas fa-list-alt me-2"></i>Logging Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="logLevel" class="form-label">Log Level</label>
+                                        <select class="form-control bg-dark text-light border-secondary" 
+                                                id="logLevel" name="LOG_LEVEL">
+                                            <option value="DEBUG" {% if log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                                            <option value="INFO" {% if log_level == 'INFO' %}selected{% endif %}>INFO</option>
+                                            <option value="WARNING" {% if log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+                                            <option value="ERROR" {% if log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Application Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-info mb-3">
+                            <i class="fas fa-sliders-h me-2"></i>Application Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="debugEnabled" 
+                                           name="FLASK_DEBUG" {% if config.app.debug %}checked{% endif %}>
+                                    <label class="form-check-label" for="debugEnabled">
+                                        Enable Debug Mode
+                                    </label>
+                                </div>                              
+                                <small class="text-muted">When enabled, detailed logs will be recorded</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Version Information -->
+                    <div class="mb-4">
+                        <h5 class="text-success mb-3">
+                            <i class="fas fa-code-branch me-2"></i>Version Information
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="version-info text-center mb-3">
+                                    <p class="mb-2">Current Version: <code class="text-success">{{ config.app.version}}</code></p>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-outline-success w-100" id="checkUpdateBtn">
+                                            <i class="fas fa-sync-alt me-2"></i>Check Updates
+                                        </button>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-outline-primary w-100" id="downloadUpdateBtn" style="display: none;">
+                                            <i class="fas fa-download me-2"></i>Download
+                                        </button>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-outline-info w-100" id="listUpdatesBtn">
+                                            <i class="fas fa-list me-2"></i>View Updates
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Cancel
+                </button>
+                <button type="submit" form="configForm" class="btn btn-radarr">
+                    <i class="fas fa-save me-2"></i>Save Configuration
+                </button>
+            </div>
+        </div>
     </div>
-    
-    <form class="config-form" id="configForm">
-        <div class="config-section">
-            <h4>Radarr Settings</h4>
-            <div class="form-group">
-                <label for="radarrUrl">Radarr URL</label>
-                <input type="text" class="form-control" id="radarrUrl" name="RADARR_URL" value="{{ radarr_url }}">
-            </div>
-            <div class="form-group">
-                <label for="radarrApiKey">API Key</label>
-                <input type="text" class="form-control" id="radarrApiKey" name="RADARR_API_KEY" value="{{ radarr_api_key }}">
-            </div>
-            <div class="form-group">
-                <label for="radarrRootFolder">Root Folder</label>
-                <select class="form-control" id="radarrRootFolder" name="RADARR_ROOT_FOLDER">
-                    <!-- Populated dynamically -->
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="radarrQualityProfile">Quality Profile</label>
-                <select class="form-control" id="radarrQualityProfile" name="RADARR_QUALITY_PROFILE">
-                    <!-- Populated dynamically -->
-                </select>
-            </div>
-            <button type="button" class="btn btn-outline-radarr test-connection" id="testRadarr">Test Connection</button>
-        </div>
-        
-        <div class="config-section">
-            <h4>Sonarr Settings</h4>
-            <div class="form-group">
-                <label for="sonarrUrl">Sonarr URL</label>
-                <input type="text" class="form-control" id="sonarrUrl" name="SONARR_URL" value="{{ config['sonarr']['url'] }}">
-            </div>
-            <div class="form-group">
-                <label for="sonarrApiKey">API Key</label>
-                <input type="text" class="form-control" id="sonarrApiKey" name="SONARR_API_KEY" value="{{ config['sonarr']['api_key'] }}">
-            </div>
-            <div class="form-group">
-                <label for="sonarrRootFolder">Root Folder</label>
-                <select class="form-control" id="sonarrRootFolder" name="SONARR_ROOT_FOLDER">
-                    <!-- Populated dynamically -->
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="sonarrQualityProfile">Quality Profile</label>
-                <select class="form-control" id="sonarrQualityProfile" name="SONARR_QUALITY_PROFILE">
-                    <!-- Populated dynamically -->
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="sonarrLanguageProfile">Language Profile</label>
-                <select class="form-control" id="sonarrLanguageProfile" name="SONARR_LANGUAGE_PROFILE">
-                    <!-- Populated dynamically -->
-                </select>
-            </div>
-            <button type="button" class="btn btn-outline-radarr test-connection" id="testSonarr">Test Connection</button>
-        </div>
-
-        <div class="config-section">
-            <h4>DuckDNS Settings</h4>
-            <div class="form-group form-switch">
-                <label class="form-check-label" for="duckdnsEnabled">
-                    Enable DuckDNS
-                </label>
-                <div class="toggle-switch">
-                    <input type="checkbox" class="form-check-input" id="duckdnsEnabled" name="DUCKDNS_ENABLED" 
-                        {% if duckdns_enabled %}checked{% endif %}>
-                    <span class="toggle-slider"></span>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="duckdnsDomain">Domain (without .duckdns.org)</label>
-                <input type="text" class="form-control" id="duckdnsDomain" name="DUCKDNS_DOMAIN" 
-                    value="{{ config['duckdns']['domain'] }}">
-            </div>
-            <div class="form-group">
-                <label for="duckdnsToken">Token</label>
-                <input type="password" class="form-control" id="duckdnsToken" name="DUCKDNS_TOKEN" 
-                    value="{{ config['duckdns']['token'] }}">
-            </div>
-            <button type="button" class="btn btn-outline-radarr" id="testDuckDNS">Test Connection</button>
-        </div>
-
-        <div class="config-section">
-            <h4>Application Settings</h4>
-            <div class="form-group form-switch">
-                <label class="form-check-label" for="debugEnabled">
-                    Enable Debug Mode
-                </label>
-                <div class="toggle-switch">
-                    <input type="checkbox" class="form-check-input" id="debugEnabled" name="FLASK_DEBUG"
-                        {% if config.get('FLASK_DEBUG', '0') == '1' %}checked{% endif %}>
-                    <span class="toggle-slider"></span>
-                </div>
-            </div>
-            <small>When enabled, detailed logs will be recorded</small>
-        </div>
-
-        <div class="config-section">
-            <h4>Version Information</h4>
-            <div class="version-info">
-                <div class="version-row">
-                    <p>Current Version: <code>{{ config['app']['version'] }}</code></p>
-                </div>
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-outline-radarr" id="checkUpdateBtn">
-                        <i class="fas fa-sync-alt me-2"></i>Check for Updates
-                    </button>
-                    <button type="button" class="btn btn-outline-radarr" id="downloadUpdateBtn" style="display: none;">
-                        <i class="fas fa-download me-2"></i>Download Update
-                    </button>
-                    <button type="button" class="btn btn-outline-info" id="listUpdatesBtn">
-                        <i class="fas fa-list me-2"></i>View Downloaded Updates
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <button type="submit" class="btn btn-radarr save-config">Save Configuration</button>
-    </form>
 </div>
 
 <div id="logPanel" class="config-panel">
@@ -339,7 +530,7 @@
                                 <div class="col-md-10">
                                     <label for="url" class="form-label">API URL</label>
                                     <div class="input-group api-url-input-group">
-                                        <span class="input-group-text" id="baseUrl">{{ config['radarr']['url'] if service == 'radarr' else config['sonarr']['url'] }}/api/v3</span>
+                                        <span class="input-group-text" id="baseUrl">{{ config.radarr.url if service == 'radarr' else config.sonarr.url}}/api/v3</span>
                                         <input type="text" id="url" name="url" class="form-control" required>
                                     </div>
                                 </div>
@@ -348,7 +539,7 @@
                             <div class="mb-3">
                                 <label for="api_key" class="form-label">API Key</label>
                                 <input type="text" id="api_key" name="api_key" class="form-control" 
-                                    value="{{ config['radarr']['api_key'] if service == 'radarr' else config['sonarr']['api_key'] }}" required>
+                                    value="{{ config.radarr.api_key if service == 'radarr' else config.sonarr.api_key}}" required>
                             </div>
                             
                             <ul class="nav nav-pills mb-2" id="payloadTabs" role="tablist">
@@ -435,7 +626,7 @@
                     <img src="/static/images/logo.png" alt="Addarr Logo" height="80" class="mb-3">
                     <p class="text-muted">Media Management System</p>
                     <div class="d-flex justify-content-center gap-3">
-                        <span class="badge bg-radarr">Version: <span id="infoVersion">{{ config['app']['version'] }}</span></span>
+                        <span class="badge bg-radarr">Version: <span id="infoVersion">{{ config.app.version}}</span></span>
                         <span class="badge bg-secondary">Last Updated: <span id="infoLastUpdated">Loading...</span></span>
                     </div>
                 </div>
@@ -448,44 +639,44 @@
                         <i class="fas fa-network-wired me-2"></i>Access URLs
                     </h5>
                     <div class="row g-2">
-                        <div class="col-md-6">
+                        <!-- <div class="col-md-6">
                             <div class="card bg-dark border-secondary">
                                 <div class="card-body">
                                     <h6 class="card-title">
                                         <i class="fas fa-desktop me-2"></i>Local Access
                                     </h6>
-                                    <code class="text-wrap d-block">http://127.0.0.1:{{ config['app']['port'] }}</code>
+                                    <code class="text-wrap d-block">http://127.0.0.1:{{ config.app.port}}</code>
                                 </div>
                             </div>
-                        </div>
+                        </div> -->
                         <div class="col-md-6">
                             <div class="card bg-dark border-secondary">
                                 <div class="card-body">
                                     <h6 class="card-title">
-                                        <i class="fas fa-wifi me-2"></i>Network Access
+                                        <i class="fas fa-wifi me-2"></i>Internal Address
                                     </h6>
                                     <code class="text-wrap d-block" id="networkAddress">Loading...</code>
                                 </div>
                             </div>
                         </div>
-                        {% if config['duckdns']['enabled'] and config['duckdns']['domain'] %}
+                        {% if config.duckdns.enabled and config.duckdns.domain %}
                         <div class="col-md-6">
                             <div class="card bg-dark border-secondary">
                                 <div class="card-body">
                                     <h6 class="card-title">
-                                        <i class="fas fa-globe me-2"></i>DuckDNS
+                                        <i class="fas fa-globe me-2"></i>DuckDNS Address
                                     </h6>
-                                    <code class="text-wrap d-block">http://{{ config['duckdns']['domain'] }}.duckdns.org:{{ config['app']['port'] }}</code>
+                                    <code class="text-wrap d-block">http://{{ config.duckdns.domain}}.duckdns.org:{{ config.app.port}}</code>
                                 </div>
                             </div>
                         </div>
                         {% endif %}
-                        {% if config['tunnel']['enabled'] %}
+                        {% if config.tunnel.enabled %}
                         <div class="col-md-6">
                             <div class="card bg-dark border-secondary">
                                 <div class="card-body">
                                     <h6 class="card-title">
-                                        <i class="fas fa-cloud me-2"></i>Tunnel
+                                        <i class="fas fa-cloud me-2"></i>Tunnel Address
                                     </h6>
                                     <code class="text-wrap d-block" id="tunnelAddress">Loading...</code>
                                 </div>
@@ -514,7 +705,7 @@
                     </div>
                     <div class="text-end mt-2">
                         <small class="text-muted">
-                            <a href="https://github.com/{{ config['update']['github_repo'] }}/blob/main/CHANGELOG.md" 
+                            <a href="https://github.com/{{ config.update.github_repo}}/blob/main/CHANGELOG.md" 
                                target="_blank" class="text-radarr">
                                 View Full Changelog
                             </a>
@@ -561,7 +752,7 @@
                         const option = document.createElement('option');
                         option.value = folder.path;
                         option.textContent = folder.path;
-                        if (folder.path === "{{ config['radarr']['root_folder'] }}") {
+                        if (folder.path === "{{ config.radarr.root_folder}}") {
                             option.selected = true;
                         }
                         select.appendChild(option);
@@ -579,7 +770,7 @@
                         const option = document.createElement('option');
                         option.value = profile.id;
                         option.textContent = profile.name;
-                        if (profile.id === {{ config['radarr']['quality_profile_id'] }}) {
+                        if (profile.id === {{ config.radarr.quality_profile_id}}) {
                             option.selected = true;
                         }
                         select.appendChild(option);
@@ -605,7 +796,7 @@
                     const option = document.createElement('option');
                     option.value = folder.path;
                     option.textContent = folder.path;
-                    if (folder.path === "{{ config['sonarr']['root_folder'] }}") {
+                    if (folder.path === "{{ config.sonarr.root_folder}}") {
                         option.selected = true;
                     }
                     select.appendChild(option);
@@ -623,7 +814,7 @@
                     const option = document.createElement('option');
                     option.value = profile.id;
                     option.textContent = profile.name;
-                    if (profile.id === {{ config['sonarr']['quality_profile_id'] }}) {
+                    if (profile.id === {{ config.sonarr.quality_profile_id}}) {
                         option.selected = true;
                     }
                     select.appendChild(option);
@@ -641,7 +832,7 @@
                     const option = document.createElement('option');
                     option.value = profile.id;
                     option.textContent = profile.name;
-                    if (profile.id === {{ config['sonarr']['language_profile_id'] }}) {
+                    if (profile.id === {{ config.sonarr.language_profile_id}}) {
                         option.selected = true;
                     }
                     select.appendChild(option);
@@ -671,7 +862,7 @@
     });
 
 // Load settings on panel open
-document.getElementById('configPanel').addEventListener('show.bs.collapse', function() {
+document.getElementById('configModal').addEventListener('show.bs.collapse', function() {
     // Load configuration data
     loadConfigurationData();
 });
@@ -684,13 +875,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Config panel toggle
     const configToggle = document.getElementById('configToggle');
-    const configPanel = document.getElementById('configPanel');
+    // const configModal = document.getElementById('configModal');
     const configOverlay = document.getElementById('configOverlay');
     const closeConfig = document.getElementById('closeConfig');
     
-    if (configToggle && configPanel) {
+    if (configToggle && configModal) {
         configToggle.addEventListener('click', function() {
-            configPanel.classList.add('open');
+            configModal.classList.add('open');
             configOverlay.classList.add('open');
             loadConfigurationData();
         });
@@ -698,14 +889,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (closeConfig) {
         closeConfig.addEventListener('click', function() {
-            configPanel.classList.remove('open');
+            configModal.classList.remove('open');
             configOverlay.classList.remove('open');
         });
     }
     
     if (configOverlay) {
         configOverlay.addEventListener('click', function() {
-            configPanel.classList.remove('open');
+            configModal.classList.remove('open');
             configOverlay.classList.remove('open');
         });
     }
@@ -744,9 +935,33 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
     
     const formData = new FormData(this);
     const config = {};
-    formData.forEach((value, key) => {
-        config[key] = value;
+    
+    // Convert FormData to object - this properly handles checkboxes
+    for (let [key, value] of formData.entries()) {
+        // For checkboxes, FormData only includes them when checked
+        // So we need to handle them specially
+        if (this.elements[key] && this.elements[key].type === 'checkbox') {
+            config[key] = this.elements[key].checked;
+        } else {
+            config[key] = value;
+        }
+    }
+    
+    // Handle checkboxes that might be unchecked (not in FormData)
+    const checkboxes = this.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        if (!formData.has(checkbox.name)) {
+            config[checkbox.name] = false;
+        }
     });
+    
+    console.log('Saving config:', config);
+    
+    // Show loading state
+    const submitButton = this.querySelector('button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+    submitButton.disabled = true;
     
     fetch('/save_config', {
         method: 'POST',
@@ -759,7 +974,6 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
     .then(data => {
         if (data.success) {
             alert('Configuration saved successfully!');
-            // Reload the page to apply changes
             window.location.reload();
         } else {
             alert('Error saving configuration: ' + data.error);
@@ -768,10 +982,12 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
     .catch(error => {
         console.error('Error:', error);
         alert('Error saving configuration');
+    })
+    .finally(() => {
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
     });
 });
-
-
 let activeApp = '';  // Will be set by tab click
 
 let moviesTab = document.getElementById('moviesTab');
@@ -789,7 +1005,7 @@ if (tvTab)  {
     });
 };
 function handleEndpointClick(endpoint) {
-    const baseUrl = activeApp === 'radarr' ? '{{ config['radarr']['quality_profile_id'] }}' : '{{ config['sonarr']['url'] }}';
+    const baseUrl = activeApp === 'radarr' ? '{{ config.radarr.quality_profile_id}}' : '{{ config.sonarr.url}}';
     const fullUrl = `${baseUrl}/api/v3/${endpoint}`;
     document.getElementById('requestUrl').value = fullUrl;
 
@@ -819,8 +1035,8 @@ document.querySelectorAll('.api-endpoint').forEach(endpoint => {
         const method = this.dataset.method;
         const path = this.dataset.path;
 
-        const baseUrl = activeApp === 'radarr' ? "{{ config['radarr']['url'] }}" : "{{ config['sonarr']['url'] }}";
-        const apiKey = activeApp === 'radarr' ? "{{ config['radarr']['api_key'] }}" : "{{ config['sonarr']['api_key'] }}";
+        const baseUrl = activeApp === 'radarr' ? "{{ config.radarr.url}}" : "{{ config.sonarr.url}}";
+        const apiKey = activeApp === 'radarr' ? "{{ config.radarr.api_key}}" : "{{ config.sonarr.api_key}}";
 
         // Set form fields
         document.getElementById('method').value = method;
@@ -918,7 +1134,7 @@ document.getElementById('testDuckDNS').addEventListener('click', function() {
 });
 </script>
     <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>    
 
 </body>

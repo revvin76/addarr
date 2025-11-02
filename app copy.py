@@ -67,7 +67,7 @@ CONFIG = {
         'url': os.getenv('RADARR_URL'),
         'api_key': os.getenv('RADARR_API_KEY'),
         'root_folder': os.getenv('RADARR_ROOT_FOLDER'),
-        'quality_profile_id': os.getenv('RADARR_QUALITY_PROFILE')
+        'quality_profile_id':  os.getenv('RADARR_QUALITY_PROFILE')
     },
     'sonarr': {
         'url': os.getenv('SONARR_URL'),
@@ -76,15 +76,10 @@ CONFIG = {
         'quality_profile_id': os.getenv('SONARR_QUALITY_PROFILE'),  
         'language_profile_id': os.getenv('SONARR_LANGUAGE_PROFILE')   
     },
-    'tmdb': {
-        'key': os.getenv('TMDB_KEY', ''),
-        'token': os.getenv('TMDB_TOKEN', '')
-    },
     'app': {
         'debug': os.getenv('FLASK_DEBUG', 'false').lower() == 'true',
         'version': os.getenv('APP_VERSION', '1.0.0'),
-        'port': os.getenv('SERVER_PORT', '5000'),
-        'log_level': os.getenv('LOG_LEVEL', 'INFO')
+        'port' : os.getenv('SERVER_PORT', 5000)
     },
     'duckdns': {
         'domain': os.getenv('DUCKDNS_DOMAIN', ''),
@@ -92,20 +87,14 @@ CONFIG = {
         'enabled': os.getenv('DUCKDNS_ENABLED', 'false').lower() == 'true'
     },
     'update': {
-        'github_repo': os.getenv('GITHUB_REPO', 'revvin76/addarr'),
-        'check_interval': os.getenv('CHECK_INTERVAL', '3600'),
-        'last_checked': os.getenv('LAST_CHECKED', '0'),
+        'github_repo':  os.getenv('GITHUB_REPO', 'revvin76/addarr'),
+        'check_interval':  os.getenv('CHECK_INTERVAL', '3600'),
+        'last_checked':  os.getenv('LAST_CHECKED', '0'),
         'enabled': os.getenv('ENABLE_AUTO_UPDATE', 'false').lower() == 'true',
-        'updates_folder': os.getenv('UPDATES_FOLDER', 'updates'),
-        'notification': os.getenv('UPDATE_NOTIFICATION', 'false').lower() == 'true',
-        'latest_version': os.getenv('LATEST_VERSION', ''),
-        'applied': os.getenv('UPDATE_APPLIED', 'false').lower() == 'true',
-        'applied_version': os.getenv('UPDATE_APPLIED_VERSION', '')
+        'updates_folder':  os.getenv('UPDATES_FOLDER', ''),
     },
     'tunnel': {
-        'enabled': os.getenv('TUNNEL_ENABLED', 'false').lower() == 'true',
-        'auth_token': os.getenv('PINGGY_AUTH_TOKEN', ''),
-        'reserved_subdomain': os.getenv('PINGGY_RESERVED_SUBDOMAIN', '')
+        'enabled':  os.getenv('TUNNEL_ENABLED', 'false').lower() == 'true',
     }
 }
 
@@ -1072,10 +1061,12 @@ def save_config():
             
             # === TMDB SETTINGS ===
             elif key == 'TMDB_KEY':
-                CONFIG['tmdb']['key'] = value
+                # TMDB settings aren't in CONFIG by default, but we'll set env var
+                pass
             elif key == 'TMDB_TOKEN':
-                CONFIG['tmdb']['token'] = value
-           
+                # TMDB settings aren't in CONFIG by default, but we'll set env var
+                pass
+            
             # === DUCKDNS SETTINGS ===
             elif key == 'DUCKDNS_ENABLED':
                 CONFIG['duckdns']['enabled'] = value
@@ -1093,6 +1084,9 @@ def save_config():
                 CONFIG['update']['check_interval'] = value
             elif key == 'LAST_CHECKED':
                 CONFIG['update']['last_checked'] = value
+            elif key == 'UPDATE_NOTIFICATION':
+                # This is handled by environment variable only
+                pass
             elif key == 'ENABLE_AUTO_UPDATE':
                 CONFIG['update']['enabled'] = value
             
@@ -1103,20 +1097,33 @@ def save_config():
                 CONFIG['app']['debug'] = value
             elif key == 'SERVER_PORT':
                 CONFIG['app']['port'] = int(value) if value else 5000
+            elif key == 'LATEST_VERSION':
+                # This is handled by environment variable only
+                pass
             
             # === LOGGING ===
             elif key == 'LOG_LEVEL':
-                CONFIG['app']['log_level'] = value
+                # Update logging level if needed
                 logging.getLogger().setLevel(getattr(logging, value.upper()))
             
             # === TUNNEL SETTINGS ===
             elif key == 'TUNNEL_ENABLED':
                 CONFIG['tunnel']['enabled'] = value
             elif key == 'PINGGY_AUTH_TOKEN':
-                CONFIG['tunnel']['auth_token'] = value
+                # Tunnel settings aren't in CONFIG by default, but we'll set env var
+                pass
             elif key == 'PINGGY_RESERVED_SUBDOMAIN':
-                CONFIG['tunnel']['reserved_subdomain'] = value
-
+                # Tunnel settings aren't in CONFIG by default, but we'll set env var
+                pass
+            
+            # === UPDATE INFO ===
+            elif key == 'UPDATE_APPLIED':
+                # This is handled by environment variable only
+                pass
+            elif key == 'UPDATE_APPLIED_VERSION':
+                # This is handled by environment variable only
+                pass
+        
         return jsonify({'success': True})
     
     except Exception as e:

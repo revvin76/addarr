@@ -1,5 +1,5 @@
 # =========================================
-# Addarr v1.0.8 - Environment Configuration
+# Addarr v1.0.9 - Environment Configuration
 # =========================================
 
 # === RADARR SETTINGS ===
@@ -45,3 +45,7 @@ LOG_LEVEL=INFO
 TUNNEL_ENABLED=false # Set to true to enable Pinggy tunnel
 PINGGY_AUTH_TOKEN= # Set your Pinggy auth token
 PINGGY_RESERVED_SUBDOMAIN= # Set your reserved subdomain
+
+# === UPDATE INFO ===
+UPDATE_APPLIED=
+UPDATE_APPLIED_VERSION=

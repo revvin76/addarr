@@ -1464,10 +1464,9 @@ function showUpdateAppliedNotification(updateData) {
     // Check if Bootstrap is available
     if (typeof bootstrap === 'undefined') {
         console.warn('Bootstrap not available for update notification');
-        // Fallback: show a simple alert
         alert(`Addarr has been updated to version ${updateData.latest_version}! Some changes may require a page refresh.`);
         
-        // Still dismiss the notification
+        // Dismiss the notification
         fetch('/api/update/dismiss', { method: 'POST' })
             .catch(error => console.error('Error dismissing update notification:', error));
         return;
@@ -1476,10 +1475,10 @@ function showUpdateAppliedNotification(updateData) {
     const modalHtml = `
         <div class="modal fade" id="updateAppliedModal" tabindex="-1">
             <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header bg-success text-white">
+                <div class="modal-content bg-dark text-light">
+                    <div class="modal-header border-secondary">
                         <h5 class="modal-title">
-                            <i class="fas fa-check-circle me-2"></i>
+                            <i class="fas fa-check-circle me-2 text-success"></i>
                             Update Applied Successfully
                         </h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -1491,7 +1490,7 @@ function showUpdateAppliedNotification(updateData) {
                         </div>
                         <p class="mb-0">Some changes may require a page refresh to take effect.</p>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer border-secondary">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         <button type="button" class="btn btn-primary" onclick="location.reload()">
                             <i class="fas fa-sync-alt me-1"></i> Refresh Page
@@ -1504,14 +1503,24 @@ function showUpdateAppliedNotification(updateData) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modal = new bootstrap.Modal(document.getElementById('updateAppliedModal'));
+    
+    // Auto-close after 8 seconds if user doesn't interact
+    const autoCloseTimer = setTimeout(() => {
+        const modalInstance = bootstrap.Modal.getInstance(document.getElementById('updateAppliedModal'));
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+    }, 8000);
+    
     modal.show();
     
     // Dismiss the notification so it doesn't show again
     fetch('/api/update/dismiss', { method: 'POST' })
         .catch(error => console.error('Error dismissing update notification:', error));
     
-    // Remove modal from DOM when hidden
+    // Remove modal from DOM when hidden and clear timer
     document.getElementById('updateAppliedModal').addEventListener('hidden.bs.modal', function() {
+        clearTimeout(autoCloseTimer);
         this.remove();
     });
 }
@@ -1545,6 +1554,31 @@ function listDownloadedUpdates() {
         })
         .catch(error => {
             console.error('Error listing updates:', error);
+        });
+}
+
+function cleanupUpdates() {
+    fetch('/api/update/cleanup', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showToast('error', `Cleanup failed: ${data.error}`);
+            } else {
+                showToast('success', `Cleaned up ${data.deleted} old updates, kept ${data.kept}`);
+                // Close the modal after successful cleanup
+                const modal = bootstrap.Modal.getInstance(document.getElementById('updatesListModal'));
+                if (modal) {
+                    modal.hide();
+                }
+                // Refresh the updates list if needed
+                setTimeout(() => {
+                    listDownloadedUpdates();
+                }, 1000);
+            }
+        })
+        .catch(error => {
+            console.error('Error cleaning up updates:', error);
+            showToast('error', 'Cleanup failed');
         });
 }
 
