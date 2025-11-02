@@ -444,11 +444,12 @@ def update_checker():
                     set_env('LAST_CHECKED', str(current_time))
                 
             # Sleep for 1 hour before checking again
-            time.sleep(CONFIG['update']['check_interval'])
+            time.sleep(int(CONFIG['update']['check_interval']))
             
         except Exception as e:
             logging.error(f"❌ Automated update checker error: {str(e)}")
-            time.sleep(CONFIG['update']['check_interval'])
+            time.sleep(int(CONFIG['update']['check_interval']))
+            
 # Start the automated update checker thread (only for continuous operation)
 update_thread = threading.Thread(target=update_checker, daemon=True)
 update_thread.start()
