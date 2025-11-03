@@ -1,65 +1,61 @@
 # Addarr 🎬  
-A lightweight Flask web interface to search and add movies/TV shows to Radarr/Sonarr — now with automatic updates, secure tunnels, and dynamic DNS support.
+A comprehensive Flask-based media management web interface that seamlessly bridges the gap between your media discovery experience and your Radarr/Sonarr automation systems. Addarr transforms how you interact with your media library by providing a unified, intuitive interface for searching, adding, and managing movies and TV shows across all your devices.
 
 ![Main screen](/static/images/Screenshot1.png) ![Unified media search](/static/images/Screenshot2.png) ![Movie result](/static/images/Screenshot3.png)
 ![TV Show result](/static/images/Screenshot4.png) ![Media Manager](/static/images/Screenshot5.png) ![Manage Movie](/static/images/Screenshot4.png) ![Manage TV Show](/static/images/Screenshot5.png) 
 ![Server welcome screen](/static/images/welcome.png)
 
 ---
-## [1.0.7] - 2025-10-30
-### Removed
-- Dumped localhost.run reverse tunnelling
-- Removed Debug API sandbox
-- Removed log viewer (to reinstate when working properly)
 
-### Added
-- Added Pinggy Pro support - requires manual editing of the .env for now. Will link controls to the settings panel in future.
-- Added new in-app information screen to display version, recent changes, and the various addresses
-- Added QR code of the public URL to quickly get access on your mobile
-- New screenshot added to README.md
+## 🎯 What is Addarr?
+Addarr is a self-hosted web application designed to simplify and enhance your media library management experience. It acts as a sophisticated front-end for your existing Radarr and Sonarr instances, providing a unified interface that combines the power of both systems into a single, cohesive experience.
 
-### Updated
-- Demo_env has new fields:  
-    TUNNEL_ENABLED=false
-    PINGGY_AUTH_TOKEN=
-    PINGGY_RESERVED_SUBDOMAIN=
+### The Problem Addarr Solves
+Managing a media library typically involves juggling multiple applications:
 
-### Known issues
-- I've broken the settings page so it doesnt work properly. This will be fixed in future, but for now stick to editing the .env files to change settings.
+-Radarr for movies
+-Sonarr for TV shows
+-Manual searches across different platforms
+-Separate interfaces for discovery vs management
 
-## 🚀 Version 1.0.5 Highlights
+Addarr consolidates this entire workflow into one beautiful, responsive web interface that works perfectly on desktop, tablet, and mobile devices.
 
-### 🧩 New Features
-- **Automated GitHub Update System**
-  - Checks for new releases and downloads updates automatically.
-  - Option to manually trigger updates via API or UI.
-  - Can auto-apply updates and restart the application seamlessly.
-- **Localhost.run Tunnel Integration**
-  - One-click public URL generation for remote access.
-  - Automatic hostname generation and persistence.
-  - SSH key support and live health monitoring.
-- **Enhanced Logging & Debugging**
-  - Full request/response logging.
-  - `/logs` endpoint for viewing live logs.
-  - Rotating log file handling to prevent size bloat.
-- **DuckDNS IP Updater**
-  - Automatically updates DuckDNS domain if IP changes.
-  - Logs updates and previous IPs.
-- **Improved Configuration Handling**
-  - `.env` values are editable and auto-updated when environment changes.
-  - Added safe environment writer with validation.
-- **Update Management APIs**
-  - `/api/update/check` — check GitHub for new releases.
-  - `/api/update/download` — download latest release.
-  - `/api/update/apply/<version>` — apply an update.
-  - `/api/update/apply-latest` — one-click update to newest version.
-  - `/api/update/cleanup` — delete old versions, keeping only the most recent.
-  - `/api/update/list` — list all downloaded updates.
-- **Tunnel Management APIs**
-  - `/api/tunnel/start`, `/api/tunnel/stop`, `/api/tunnel/restart`
-  - `/api/tunnel/status` — live tunnel information.
-  - `/api/tunnel/regenerate-hostname` — generate new tunnel hostname instantly.
-  - `/api/tunnel/set-ssh-key` — assign SSH key and restart tunnel.
+## ✨ Core Features
+### 🔍 Intelligent Media Discovery
+
+- Unified Search Engine: Simultaneously search both Radarr (movies) and Sonarr (TV shows) with a single query
+- Smart Result Blending: Intelligently combines and alternates movie and TV show results for optimal browsing
+- TMDB Integration: Enhanced metadata, high-quality artwork, official trailers, and detailed information from The Movie Database
+- Real-time Availability: Instant visibility into whether media is already in your library or available to add
+
+###🚀 One-Click Media Management
+
+- Streamlined Addition: Add movies and TV shows to your library with a single click
+- Automated Configuration: Automatically applies your preferred quality profiles, root folders, and monitoring settings
+- Bulk Operations: Manage multiple items simultaneously through the comprehensive media manager
+- Library Overview: Complete visibility into your existing media with detailed status information
+
+### 🌐 Advanced Access & Connectivity
+
+- Progressive Web App (PWA): Install as a native-like application on any device with offline capability
+- Secure Tunnel Integration: Built-in Pinggy Pro tunnel support for secure remote access without complex networking
+- Dynamic DNS: DuckDNS integration for persistent domain names pointing to your dynamic home IP
+- Multi-access Support: Simultaneous access via local network, public tunnels, and custom domains
+
+### ⚙️ Enterprise-Grade Management
+
+- Self-Updating System: Automatic GitHub update checks with safe download and installation procedures
+- Web-Based Configuration: Complete configuration management through an intuitive web interface
+- Real-time Monitoring: Connection testing, service health checks, and comprehensive logging
+- Version Control: Track update history and manage multiple downloaded versions
+
+## 🎮 User Experience
+### For Casual Users
+
+- Simple Search: Type what you want to watch and get instant results from both movies and TV shows
+- Visual Library: Browse your existing collection with beautiful posters and clear status indicators
+- One-Click Actions: Add new content or manage existing items with intuitive controls
+- Mobile-Friendly: Perfect experience on smartphones and tablets
 
 ---
 
@@ -88,72 +84,36 @@ git clone https://github.com/revvin76/addarr.git
 cd addarr
 ```
 
-### 2. Create and configure environment
+## 🏁 Getting Started
+Addarr is designed for quick setup and immediate value:
+
 ```bash
+# 1. Clone and setup
+git clone https://github.com/revvin76/addarr.git
+cd addarr
 cp demo_env .env
-```
 
-### 3. Install dependencies
-```bash
+# 2. Edit configuration
+nano .env  # Add your Radarr/Sonarr details
+
+# 3. Install and run
 pip install -r requirements.txt
-```
-
-### 4. Run Addarr
-```bash
 python app.py
 ```
-
-Visit:  
-👉 [http://localhost:5000](http://localhost:5000)
+Within minutes, you'll have a powerful, unified media management interface running and accessible from any device on your network.
 
 ---
 
-## 🧠 API Reference (v1.0.5)
+## 💬 Join the Community
 
-| Endpoint | Method | Description |
-|-----------|---------|-------------|
-| `/api/update/check` | GET | Check for new releases on GitHub |
-| `/api/update/download` | POST | Download the latest available update |
-| `/api/update/apply/<version>` | POST | Apply downloaded update |
-| `/api/update/apply-latest` | POST | Automatically apply the newest update |
-| `/api/update/cleanup` | POST | Clean old updates (keep 3 latest) |
-| `/api/tunnel/start` | POST | Start localhost.run tunnel |
-| `/api/tunnel/stop` | POST | Stop the tunnel |
-| `/api/tunnel/status` | GET | Get tunnel status |
-| `/api/tunnel/regenerate-hostname` | POST | Generate new tunnel hostname |
-| `/api/tunnel/set-ssh-key` | POST | Assign SSH key for secure tunnel |
-| `/api/debug/update-status` | GET | Debug info on update state |
-| `/api/debug/tunnel` | GET | Debug tunnel connectivity |
+- GitHub Repository: github.com/revvin76/addarr
+- Issue Tracking: Report bugs and request features
+- Contributions: Welcome from developers of all skill levels
+- Documentation: Comprehensive setup and usage guides
 
----
-
-## 🧩 Features Summary
-- 🔍 Search movies (Radarr) and TV shows (Sonarr)
-- ➕ One-click add to library
-- 🎬 TMDB trailer and metadata integration
-- 📦 Auto-updater with version control
-- 🌍 Localhost.run tunnel for secure public access
-- 🦆 DuckDNS dynamic IP updater
-- 🧾 Log viewer (`/logs`)
-- 🧠 Debug panel for update/tunnel testing
-- ⚙️ Configuration persistence through `.env`
-
----
-
-## 🧰 Troubleshooting
-
-**❌ Auto-update not working**  
-- Ensure `.env` includes `GITHUB_REPO` and `ENABLE_AUTO_UPDATE=true`
-
-**❌ Tunnel fails to connect**  
-- Check that `ssh` is installed and in PATH  
-- Try clearing `TUNNEL_HOSTNAME` and restarting the app
-
-**❌ DuckDNS not updating**  
-- Verify `DUCKDNS_ENABLED=true`  
-- Check your DuckDNS token and domain name
-
----
-
-## 🧾 License
+## 📄 License
 MIT License © 2025 Revvin76
+
+---
+
+Transform your media management experience today with Addarr - the unified interface for your automated media library ecosystem! 🎉

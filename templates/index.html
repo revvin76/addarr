@@ -47,11 +47,6 @@
             <h3 class="text-light">Welcome to ADDARR</h3>
             <p class="text-light">Search for movies and TV shows to add to your media library.</p>
         </div>
-
-        <button id="install-button" class="btn btn-primary" style="display: none;">
-            Install Addarr
-        </button>
-
         <div class="row justify-content-center">
             <div class="col-md-8 col-lg-6">
                 <form action="/search" method="POST" onsubmit="return validateForm()">
@@ -72,6 +67,12 @@
 <div class="config-overlay" id="configOverlay"></div>
 <div class="config-overlay" id="debugOverlay"></div>
 
+<center>
+    <button id="install-button" class="btn btn-primary" style="display: none;">
+        Install Addarr
+    </button>
+</center>
+
 <!-- Config Panel -->
 <div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -82,8 +83,10 @@
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form class="config-form" id="configForm">
+            
+            <!-- FORM STARTS HERE -->
+            <form class="config-form" id="configForm" method="POST">
+                <div class="modal-body">
                     <!-- Radarr Settings -->
                     <div class="mb-4">
                         <h5 class="text-radarr mb-3">
@@ -95,12 +98,12 @@
                                     <div class="col-md-6">
                                         <label for="radarrUrl" class="form-label">Radarr URL</label>
                                         <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                            id="radarrUrl" name="RADARR_URL" value="{{ config.radarr.url }}">                                               
+                                            id="radarrUrl" name="RADARR_URL" value="{{ config.radarr.url }}">
                                     </div>
                                     <div class="col-md-6">
                                         <label for="radarrApiKey" class="form-label">API Key</label>
                                         <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                               id="radarrApiKey" name="RADARR_API_KEY" value="{{ config.radarr.api_key}}">
+                                               id="radarrApiKey" name="RADARR_API_KEY" value="{{ config.radarr.api_key }}">
                                     </div>
                                     <div class="col-md-6">
                                         <label for="radarrRootFolder" class="form-label">Root Folder</label>
@@ -117,7 +120,7 @@
                                         </select>
                                     </div>
                                     <div class="col-12">
-                                        <button type="button" class="btn btn-outline-radarr w-100 test-connection" 
+                                        <button type="button" class="btn btn-outline-info w-100 test-connection" 
                                                 id="testRadarr">
                                             <i class="fas fa-plug me-2"></i>Test Connection
                                         </button>
@@ -138,12 +141,12 @@
                                     <div class="col-md-6">
                                         <label for="sonarrUrl" class="form-label">Sonarr URL</label>
                                         <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                               id="sonarrUrl" name="SONARR_URL" value="{{ config.sonarr.url}}">
+                                               id="sonarrUrl" name="SONARR_URL" value="{{ config.sonarr.url }}">
                                     </div>
                                     <div class="col-md-6">
                                         <label for="sonarrApiKey" class="form-label">API Key</label>
                                         <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                               id="sonarrApiKey" name="SONARR_API_KEY" value="{{ config.sonarr.api_key}}">
+                                               id="sonarrApiKey" name="SONARR_API_KEY" value="{{ config.sonarr.api_key }}">
                                     </div>
                                     <div class="col-md-6">
                                         <label for="sonarrRootFolder" class="form-label">Root Folder</label>
@@ -167,10 +170,34 @@
                                         </select>
                                     </div>
                                     <div class="col-12">
-                                        <button type="button" class="btn btn-outline-sonarr w-100 test-connection" 
+                                        <button type="button" class="btn btn-outline-info w-100 test-connection" 
                                                 id="testSonarr">
                                             <i class="fas fa-plug me-2"></i>Test Connection
                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TMDB Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-info mb-3">
+                            <i class="fas fa-database me-2"></i>TMDB Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <small class="text-muted">TMDB key required for Movie and TV Show lookups. <a href="https://www.themoviedb.org/settings/api">https://www.themoviedb.org/settings/api</a></small>
+                                    <div class="col-md-6">
+                                        <label for="tmdbKey" class="form-label">TMDB API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                            id="tmdbKey" name="TMDB_KEY" value="{{ config.tmdb.key }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="tmdbToken" class="form-label">TMDB Token</label>
+                                        <input type="password" class="form-control bg-dark text-light border-secondary" 
+                                            id="tmdbToken" name="TMDB_TOKEN" value="{{ config.tmdb.token }}">
                                     </div>
                                 </div>
                             </div>
@@ -188,52 +215,35 @@
                                     <div class="col-12">
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" id="duckdnsEnabled" 
-                                                   name="DUCKDNS_ENABLED" {% if config.duckdns.enabled %}checked{% endif %}>
+                                                name="DUCKDNS_ENABLED" {% if config.duckdns.enabled %}checked{% endif %}>
                                             <label class="form-check-label" for="duckdnsEnabled">
                                                 Enable DuckDNS
                                             </label>
+                                            <small class="text-muted">Use DuckDNS if you want a persistent domain name for your local webserver IP address.</small>
                                         </div>                                    
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="duckdnsDomain" class="form-label">Domain</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                               id="duckdnsDomain" name="DUCKDNS_DOMAIN" 
-                                               value="{{ config.duckdns.domain}}"
-                                               placeholder="yourdomain (without .duckdns.org)">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="duckdnsToken" class="form-label">Token</label>
-                                        <input type="password" class="form-control bg-dark text-light border-secondary" 
-                                               id="duckdnsToken" name="DUCKDNS_TOKEN" 
-                                               value="{{ config.duckdns.token}}">
-                                    </div>
-                                    <div class="col-12">
-                                        <button type="button" class="btn btn-outline-warning w-100" id="testDuckDNS">
-                                            <i class="fas fa-plug me-2"></i>Test Connection
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TMDB Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-info mb-3">
-                            <i class="fas fa-database me-2"></i>TMDB Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="tmdbKey" class="form-label">TMDB API Key</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                            id="tmdbKey" name="TMDB_KEY" value="{{ config.tmdb.key }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="tmdbToken" class="form-label">TMDB Token</label>
-                                        <input type="password" class="form-control bg-dark text-light border-secondary" 
-                                            id="tmdbToken" name="TMDB_TOKEN" value="{{ config.tmdb.token }}">
+                                    <!-- Collapsible content -->
+                                    <div class="col-12 collapsible-content" id="duckdnsContent" {% if not config.duckdns.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="duckdnsDomain" class="form-label">Domain</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                                    id="duckdnsDomain" name="DUCKDNS_DOMAIN" 
+                                                    value="{{ config.duckdns.domain }}"
+                                                    placeholder="yourdomain (without .duckdns.org)">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="duckdnsToken" class="form-label">Token</label>
+                                                <input type="password" class="form-control bg-dark text-light border-secondary" 
+                                                    id="duckdnsToken" name="DUCKDNS_TOKEN" 
+                                                    value="{{ config.duckdns.token }}">
+                                            </div>
+                                            <div class="col-12">
+                                                <button type="button" class="btn btn-outline-info w-100" id="testDuckDNS">
+                                                    <i class="fas fa-plug me-2"></i>Test Connection
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -248,31 +258,37 @@
                         <div class="card bg-dark border-secondary">
                             <div class="card-body">
                                 <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="githubRepo" class="form-label">GitHub Repository</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                            id="githubRepo" name="GITHUB_REPO" value="{{ config.update.github_repo }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="updatesFolder" class="form-label">Updates Folder</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                            id="updatesFolder" name="UPDATES_FOLDER" value="{{ config.update.updates_folder }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="checkInterval" class="form-label">Check Interval (seconds)</label>
-                                        <input type="number" class="form-control bg-dark text-light border-secondary" 
-                                            id="checkInterval" name="CHECK_INTERVAL" 
-                                            value="{{ config.update.check_interval }}" 
-                                            placeholder="3600" 
-                                            min="300" max="86400">
-                                    </div>
                                     <div class="col-12">
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" id="enableAutoUpdate" 
-                                                name="ENABLE_AUTO_UPDATE" {% if config.update.enabled %}checked{% endif %}>
+                                                name="ENABLE_AUTO_UPDATE" {% if config['update']['enabled'] %}checked{% endif %}>
                                             <label class="form-check-label" for="enableAutoUpdate">
                                                 Enable Auto Update
                                             </label>
+                                            <small class="text-muted">Check for new releases automatically</small>
+                                        </div>
+                                    </div>
+                                    <!-- Collapsible content -->
+                                    <div class="col-12 collapsible-content" id="autoUpdateContent" {% if not config['update']['enabled'] %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="githubRepo" class="form-label">GitHub Repository</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                                    id="githubRepo" name="GITHUB_REPO" value="{{ config['update']['github_repo'] }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="updatesFolder" class="form-label">Updates Folder</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                                    id="updatesFolder" name="UPDATES_FOLDER" value="{{ config['update']['updates_folder'] }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="checkInterval" class="form-label">Check Interval (seconds)</label>
+                                                <input type="number" class="form-control bg-dark text-light border-secondary" 
+                                                    id="checkInterval" name="CHECK_INTERVAL" 
+                                                    value="{{ config['update']['check_interval'] or 3600 }}" 
+                                                    placeholder="3600" 
+                                                    min="300" max="86400">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -295,40 +311,23 @@
                                             <label class="form-check-label" for="tunnelEnabled">
                                                 Enable Pinggy Tunnel
                                             </label>
+                                            <small class="text-muted">Sign up to Pinggy Pro for a permanent domain name so you can access Addarr from anywhere.  <a href="https://dashboard.pinggy.io/domains">https://dashboard.pinggy.io/domains</a></small>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="pinggyAuthToken" class="form-label">Pinggy Auth Token</label>
-                                        <input type="password" class="form-control bg-dark text-light border-secondary" 
-                                            id="pinggyAuthToken" name="PINGGY_AUTH_TOKEN" value="{{ config.tunnel.auth_token }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="pinggyReservedSubdomain" class="form-label">Reserved Subdomain</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                            id="pinggyReservedSubdomain" name="PINGGY_RESERVED_SUBDOMAIN" value="{{ config.tunnel.reserved_subdomain }}">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Logging Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-secondary mb-3">
-                            <i class="fas fa-list-alt me-2"></i>Logging Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="logLevel" class="form-label">Log Level</label>
-                                        <select class="form-control bg-dark text-light border-secondary" 
-                                                id="logLevel" name="LOG_LEVEL">
-                                            <option value="DEBUG" {% if log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
-                                            <option value="INFO" {% if log_level == 'INFO' %}selected{% endif %}>INFO</option>
-                                            <option value="WARNING" {% if log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
-                                            <option value="ERROR" {% if log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
-                                        </select>
+                                    <!-- Collapsible content -->
+                                    <div class="col-12 collapsible-content" id="tunnelContent" {% if not config.tunnel.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="pinggyAuthToken" class="form-label">Pinggy Auth Token</label>
+                                                <input type="password" class="form-control bg-dark text-light border-secondary" 
+                                                    id="pinggyAuthToken" name="PINGGY_AUTH_TOKEN" value="{{ config.tunnel.auth_token }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="pinggyReservedSubdomain" class="form-label">Reserved Subdomain</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                                    id="pinggyReservedSubdomain" name="PINGGY_RESERVED_SUBDOMAIN" value="{{ config.tunnel.reserved_subdomain }}">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -342,14 +341,36 @@
                         </h5>
                         <div class="card bg-dark border-secondary">
                             <div class="card-body">
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" id="debugEnabled" 
-                                           name="FLASK_DEBUG" {% if config.app.debug %}checked{% endif %}>
-                                    <label class="form-check-label" for="debugEnabled">
-                                        Enable Debug Mode
-                                    </label>
-                                </div>                              
-                                <small class="text-muted">When enabled, detailed logs will be recorded</small>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="debugEnabled" 
+                                                name="FLASK_DEBUG" {% if config.app.debug %}checked{% endif %}>
+                                            <label class="form-check-label" for="debugEnabled">
+                                                Enable Debug Mode
+                                            </label>
+                                            <small class="text-muted">When enabled, detailed logs will be recorded</small>
+                                        </div>
+                                    </div>
+                                    <!-- Collapsible content -->
+                                    <div class="col-12 collapsible-content" id="debugContent" {% if not config.app.debug %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="logLevel" class="form-label">Log Level</label>
+                                                <select class="form-control bg-dark text-light border-secondary" 
+                                                        id="logLevel" name="LOG_LEVEL">
+                                                    <option value="DEBUG" {% if config.app.log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                                                    <option value="INFO" {% if config.app.log_level == 'INFO' %}selected{% endif %}>INFO</option>
+                                                    <option value="WARNING" {% if config.app.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+                                                    <option value="ERROR" {% if config.app.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                                                </select>
+                                            </div>
+                                            <!-- Add hidden inputs for app settings that aren't in the form but needed -->
+                                            <input type="hidden" name="SERVER_PORT" value="{{ config.app.port }}">
+                                            <input type="hidden" name="APP_VERSION" value="{{ config.app.version }}">
+                                        </div>
+                                    </div>             
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -362,16 +383,16 @@
                         <div class="card bg-dark border-secondary">
                             <div class="card-body">
                                 <div class="version-info text-center mb-3">
-                                    <p class="mb-2">Current Version: <code class="text-success">{{ config.app.version}}</code></p>
+                                    <p class="mb-2">Current Version: <code class="text-success">{{ config.app.version }}</code></p>
                                 </div>
                                 <div class="row g-2">
                                     <div class="col-md-4">
-                                        <button type="button" class="btn btn-outline-success w-100" id="checkUpdateBtn">
+                                        <button type="button" class="btn btn-outline-info w-100" id="checkUpdateBtn">
                                             <i class="fas fa-sync-alt me-2"></i>Check Updates
                                         </button>
                                     </div>
                                     <div class="col-md-4">
-                                        <button type="button" class="btn btn-outline-primary w-100" id="downloadUpdateBtn" style="display: none;">
+                                        <button type="button" class="btn btn-outline-info w-100" id="downloadUpdateBtn" style="display: none;">
                                             <i class="fas fa-download me-2"></i>Download
                                         </button>
                                     </div>
@@ -384,17 +405,20 @@
                             </div>
                         </div>
                     </div>
-
-                </form>
-            </div>
-            <div class="modal-footer border-secondary">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-2"></i>Cancel
-                </button>
-                <button type="submit" form="configForm" class="btn btn-radarr">
-                    <i class="fas fa-save me-2"></i>Save Configuration
-                </button>
-            </div>
+                </div>
+                
+                <!-- Modal Footer - INSIDE THE FORM -->
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </button>
+                    <button id="configSubmitBtn" type="submit" class="btn btn-radarr">
+                        <i class="fas fa-save me-2"></i>Save Configuration
+                    </button>
+                </div>
+            </form>
+            <!-- FORM ENDS HERE -->
+            
         </div>
     </div>
 </div>
@@ -407,7 +431,7 @@
                 <span class="input-group-text">Lines:</span>
                 <input type="number" id="logLines" class="form-control" value="500" min="100" max="10000">
             </div>
-            <button id="refreshLogs" class="btn btn-sm btn-outline-success me-2">
+            <button id="refreshLogs" class="btn btn-sm btn-outline-info me-2">
                 <i class="fas fa-sync-alt"></i>
             </button>
             <button class="btn btn-sm btn-outline-radarr" id="closeLog">&times;</button>
@@ -421,7 +445,7 @@
 <div id="debugPanel" class="config-panel">
     <div class="config-header">
         <h3>Debug APIs</h3>
-        <button class="btn btn-sm btn-outline-radarr" id="closeDebug">&times;</button>
+        <button class="btn btn-sm btn-outline-info" id="closeDebug">&times;</button>
     </div>
 
     <div class="panel-content">
@@ -705,7 +729,7 @@
                     </div>
                     <div class="text-end mt-2">
                         <small class="text-muted">
-                            <a href="https://github.com/{{ config.update.github_repo}}/blob/main/CHANGELOG.md" 
+                            <a href="https://github.com/{{ config.update.github_repo }}/blob/main/CHANGELOG.md" 
                                target="_blank" class="text-radarr">
                                 View Full Changelog
                             </a>
@@ -717,6 +741,18 @@
                 <button type="button" class="btn btn-radarr" data-bs-dismiss="modal">
                     <i class="fas fa-times me-2"></i>Close
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reusable Notification Modal -->
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content" id="notificationContent">
+            <div class="modal-body text-center py-4">
+                <i class="fas fa-check-circle fa-3x mb-3 text-success" id="notificationIcon"></i>
+                <h6 class="mb-0" id="notificationMessage">Saved Successfully!</h6>
             </div>
         </div>
     </div>
@@ -734,6 +770,8 @@
 </div>
 
 <script>
+    console.log({{ config | tojson | safe }});
+
     // Register service worker
             // Fetch Radarr configuration data
         function fetchRadarrData() {
@@ -873,6 +911,45 @@ document.addEventListener('DOMContentLoaded', function() {
         hide: () => console.log('Loading complete')
     };
 
+    // Set up toggle handlers for each collapsible section
+    setupCollapsibleSection('duckdnsEnabled', 'duckdnsContent');
+    setupCollapsibleSection('enableAutoUpdate', 'autoUpdateContent');
+    setupCollapsibleSection('tunnelEnabled', 'tunnelContent');
+    setupCollapsibleSection('debugEnabled', 'debugContent');
+    
+    function setupCollapsibleSection(checkboxId, contentId) {
+        const checkbox = document.getElementById(checkboxId);
+        const content = document.getElementById(contentId);
+        
+        if (checkbox && content) {
+            // Set initial state
+            toggleContent(checkbox, content);
+            
+            // Add event listener
+            checkbox.addEventListener('change', function() {
+                toggleContent(this, content);
+            });
+        }
+    }
+    
+    function toggleContent(checkbox, content) {
+        if (checkbox.checked) {
+            // Show with smooth animation
+            content.style.display = 'block';
+            setTimeout(() => {
+                content.style.opacity = '1';
+                content.style.transform = 'translateY(0)';
+            }, 10);
+        } else {
+            // Hide with smooth animation
+            content.style.opacity = '0';
+            content.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                content.style.display = 'none';
+            }, 300);
+        }
+    }
+
     // Config panel toggle
     const configToggle = document.getElementById('configToggle');
     // const configModal = document.getElementById('configModal');
@@ -929,17 +1006,15 @@ document.getElementById('testSonarr').addEventListener('click', function() {
     testConnection('sonarr');
 });
 
-// Save configuration
+// Save configuration with reusable notification modal
 document.getElementById('configForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const formData = new FormData(this);
     const config = {};
     
-    // Convert FormData to object - this properly handles checkboxes
+    // Convert FormData to object
     for (let [key, value] of formData.entries()) {
-        // For checkboxes, FormData only includes them when checked
-        // So we need to handle them specially
         if (this.elements[key] && this.elements[key].type === 'checkbox') {
             config[key] = this.elements[key].checked;
         } else {
@@ -947,7 +1022,7 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
         }
     }
     
-    // Handle checkboxes that might be unchecked (not in FormData)
+    // Handle unchecked checkboxes
     const checkboxes = this.querySelectorAll('input[type="checkbox"]');
     checkboxes.forEach(checkbox => {
         if (!formData.has(checkbox.name)) {
@@ -955,12 +1030,10 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
         }
     });
     
-    console.log('Saving config:', config);
-    
     // Show loading state
-    const submitButton = this.querySelector('button[type="submit"]');
+    const submitButton = document.getElementById('configSubmitBtn');
     const originalText = submitButton.innerHTML;
-    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Saving...';
     submitButton.disabled = true;
     
     fetch('/save_config', {
@@ -973,21 +1046,57 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Configuration saved successfully!');
-            window.location.reload();
+            // Close config modal
+            const configModal = bootstrap.Modal.getInstance(document.getElementById('configModal'));
+            configModal.hide();
+            
+            // Show success notification
+            showNotification('Saved Successfully!', 'success');
         } else {
-            alert('Error saving configuration: ' + data.error);
+            showNotification('Error: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error saving configuration');
+        showNotification('Error saving configuration', 'error');
     })
     .finally(() => {
+        // Restore button state
         submitButton.innerHTML = originalText;
         submitButton.disabled = false;
     });
 });
+
+// Reusable notification function
+function showNotification(message, type = 'success') {
+    const modal = document.getElementById('notificationModal');
+    const content = document.getElementById('notificationContent');
+    const icon = document.getElementById('notificationIcon');
+    const messageEl = document.getElementById('notificationMessage');
+    
+    // Set styles based on type
+    if (type === 'success') {
+        content.className = 'modal-content bg-success text-white';
+        icon.className = 'fas fa-check-circle fa-3x mb-3 text-white';
+    } else {
+        content.className = 'modal-content bg-danger text-white';
+        icon.className = 'fas fa-exclamation-circle fa-3x mb-3 text-white';
+    }
+    
+    // Set message
+    messageEl.textContent = message;
+    
+    // Show modal
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+    
+    // Auto-hide after 2 seconds for success, 3 for error
+    const hideTime = type === 'success' ? 2000 : 3000;
+    setTimeout(() => {
+        modalInstance.hide();
+    }, hideTime);
+}
+
 let activeApp = '';  // Will be set by tab click
 
 let moviesTab = document.getElementById('moviesTab');
@@ -1023,7 +1132,7 @@ function loadEndpoints(appType) {
 
     endpoints.forEach(ep => {
         const btn = document.createElement('button');
-        btn.className = 'btn btn-outline-primary m-1';
+        btn.className = 'btn btn-outline-info m-1';
         btn.textContent = ep;
         btn.onclick = () => handleEndpointClick(ep);
         container.appendChild(btn);

@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.0.10] - 2025-11-03
+### Fixed
+- Configuration page now saves correctly
+
+### Updated
+- Tidied configuration panel, adding collapsible cards and descriptions
+- Removed alert and replaced with modal box to confirm successful save
+- Moved PWA Install button to bottom centre of main page
+- Updated readme.md with new features and easier installation guide
+
 ## [1.0.9] - 2025-10-30
 ### Updated
 - Manage media page now just has a small home icon to navigate back to the main page
