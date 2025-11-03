@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ---
-## [1.0.10] - 2025-11-03
+## [1.1.0] - 2025-11-03
 ### Fixed
 - Configuration page now saves correctly
 
