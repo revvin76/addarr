@@ -109,6 +109,60 @@ CONFIG = {
     }
 }
 
+def reload_configuration():
+    """Reload configuration from .env file and update CONFIG"""
+    global CONFIG  # Add this line to modify the global CONFIG variable
+    
+    try:
+        # Reload the .env file
+        load_dotenv(override=True)
+        
+        # Update the existing CONFIG dictionary instead of creating a new one
+        CONFIG['radarr']['url'] = os.getenv('RADARR_URL')
+        CONFIG['radarr']['api_key'] = os.getenv('RADARR_API_KEY')
+        CONFIG['radarr']['root_folder'] = os.getenv('RADARR_ROOT_FOLDER')
+        CONFIG['radarr']['quality_profile_id'] = os.getenv('RADARR_QUALITY_PROFILE')
+        
+        CONFIG['sonarr']['url'] = os.getenv('SONARR_URL')
+        CONFIG['sonarr']['api_key'] = os.getenv('SONARR_API_KEY')
+        CONFIG['sonarr']['root_folder'] = os.getenv('SONARR_ROOT_FOLDER')
+        CONFIG['sonarr']['quality_profile_id'] = os.getenv('SONARR_QUALITY_PROFILE')
+        CONFIG['sonarr']['language_profile_id'] = os.getenv('SONARR_LANGUAGE_PROFILE')
+        
+        CONFIG['tmdb']['key'] = os.getenv('TMDB_KEY', '')
+        CONFIG['tmdb']['token'] = os.getenv('TMDB_TOKEN', '')
+        
+        CONFIG['duckdns']['enabled'] = os.getenv('DUCKDNS_ENABLED', 'false').lower() == 'true'
+        CONFIG['duckdns']['domain'] = os.getenv('DUCKDNS_DOMAIN', '')
+        CONFIG['duckdns']['token'] = os.getenv('DUCKDNS_TOKEN', '')
+        
+        CONFIG['tunnel']['enabled'] = os.getenv('TUNNEL_ENABLED', 'false').lower() == 'true'
+        CONFIG['tunnel']['auth_token'] = os.getenv('PINGGY_AUTH_TOKEN', '')
+        CONFIG['tunnel']['reserved_subdomain'] = os.getenv('PINGGY_RESERVED_SUBDOMAIN', '')
+        
+        # App settings
+        CONFIG['app']['debug'] = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
+        CONFIG['app']['version'] = os.getenv('APP_VERSION', '1.0.0')
+        CONFIG['app']['port'] = int(os.getenv('SERVER_PORT', '5000'))
+        CONFIG['app']['log_level'] = os.getenv('LOG_LEVEL', 'INFO')
+        
+        # Update settings
+        CONFIG['update']['github_repo'] = os.getenv('GITHUB_REPO', 'revvin76/addarr')
+        CONFIG['update']['check_interval'] = os.getenv('CHECK_INTERVAL', '3600')
+        CONFIG['update']['last_checked'] = os.getenv('LAST_CHECKED', '0')
+        CONFIG['update']['enabled'] = os.getenv('ENABLE_AUTO_UPDATE', 'false').lower() == 'true'
+        CONFIG['update']['updates_folder'] = os.getenv('UPDATES_FOLDER', 'updates')
+        CONFIG['update']['notification'] = os.getenv('UPDATE_NOTIFICATION', 'false').lower() == 'true'
+        CONFIG['update']['latest_version'] = os.getenv('LATEST_VERSION', '')
+        CONFIG['update']['applied'] = os.getenv('UPDATE_APPLIED', 'false').lower() == 'true'
+        CONFIG['update']['applied_version'] = os.getenv('UPDATE_APPLIED_VERSION', '')
+        
+        logging.info("Configuration reloaded from .env file")
+        return True
+    except Exception as e:
+        logging.error(f"Error reloading configuration: {str(e)}")
+        return False
+    
 def setup_logging():
     log_format = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
     log_file = 'addarr.log'
@@ -257,7 +311,7 @@ def download_update():
     except Exception as e:
         logging.error(f"Error downloading update: {str(e)}")
         return {'success': False, 'error': str(e)}
-    
+   
 @debug_log
 def get_downloaded_updates():
     try:
@@ -1048,81 +1102,162 @@ def save_config():
             set_env(key, value_str)
             
             # Update the running config for specific keys
-            # === RADARR SETTINGS ===
-            if key == 'RADARR_URL':
-                CONFIG['radarr']['url'] = value
-            elif key == 'RADARR_API_KEY':
-                CONFIG['radarr']['api_key'] = value
-            elif key == 'RADARR_ROOT_FOLDER':
-                CONFIG['radarr']['root_folder'] = value
-            elif key == 'RADARR_QUALITY_PROFILE':
-                CONFIG['radarr']['quality_profile_id'] = value
-            
-            # === SONARR SETTINGS ===
-            elif key == 'SONARR_URL':
-                CONFIG['sonarr']['url'] = value
-            elif key == 'SONARR_API_KEY':
-                CONFIG['sonarr']['api_key'] = value
-            elif key == 'SONARR_ROOT_FOLDER':
-                CONFIG['sonarr']['root_folder'] = value
-            elif key == 'SONARR_QUALITY_PROFILE':
-                CONFIG['sonarr']['quality_profile_id'] = value
-            elif key == 'SONARR_LANGUAGE_PROFILE':
-                CONFIG['sonarr']['language_profile_id'] = value
-            
-            # === TMDB SETTINGS ===
-            elif key == 'TMDB_KEY':
-                CONFIG['tmdb']['key'] = value
-            elif key == 'TMDB_TOKEN':
-                CONFIG['tmdb']['token'] = value
-           
-            # === DUCKDNS SETTINGS ===
-            elif key == 'DUCKDNS_ENABLED':
-                CONFIG['duckdns']['enabled'] = value
-            elif key == 'DUCKDNS_DOMAIN':
-                CONFIG['duckdns']['domain'] = value
-            elif key == 'DUCKDNS_TOKEN':
-                CONFIG['duckdns']['token'] = value
-            
-            # === AUTO-UPDATER SETTINGS ===
-            elif key == 'GITHUB_REPO':
-                CONFIG['update']['github_repo'] = value
-            elif key == 'UPDATES_FOLDER':
-                CONFIG['update']['updates_folder'] = value
-            elif key == 'CHECK_INTERVAL':
-                CONFIG['update']['check_interval'] = value
-            elif key == 'LAST_CHECKED':
-                CONFIG['update']['last_checked'] = value
-            elif key == 'ENABLE_AUTO_UPDATE':
-                CONFIG['update']['enabled'] = value
-            
-            # === FLASK APP SETTINGS ===
-            elif key == 'APP_VERSION':
-                CONFIG['app']['version'] = value
-            elif key == 'FLASK_DEBUG':
-                CONFIG['app']['debug'] = value
-            elif key == 'SERVER_PORT':
-                CONFIG['app']['port'] = int(value) if value else 5000
-            
-            # === LOGGING ===
-            elif key == 'LOG_LEVEL':
-                CONFIG['app']['log_level'] = value
-                logging.getLogger().setLevel(getattr(logging, value.upper()))
-            
-            # === TUNNEL SETTINGS ===
-            elif key == 'TUNNEL_ENABLED':
-                CONFIG['tunnel']['enabled'] = value
-            elif key == 'PINGGY_AUTH_TOKEN':
-                CONFIG['tunnel']['auth_token'] = value
-            elif key == 'PINGGY_RESERVED_SUBDOMAIN':
-                CONFIG['tunnel']['reserved_subdomain'] = value
-
+            # ... (your existing config update code remains the same)
+        
+        # Now validate and update service configurations
+        validation_results = []
+        
+        # Validate Radarr configurations
+        if 'RADARR_ROOT_FOLDER' in data:
+            radarr_root_result = validate_radarr_rootfolder(data['RADARR_ROOT_FOLDER'])
+            validation_results.append(radarr_root_result)
+        
+        if 'RADARR_QUALITY_PROFILE' in data:
+            radarr_quality_result = validate_radarr_qualityprofile(data['RADARR_QUALITY_PROFILE'])
+            validation_results.append(radarr_quality_result)
+        
+        # Validate Sonarr configurations
+        if 'SONARR_ROOT_FOLDER' in data:
+            sonarr_root_result = validate_sonarr_rootfolder(data['SONARR_ROOT_FOLDER'])
+            validation_results.append(sonarr_root_result)
+        
+        if 'SONARR_QUALITY_PROFILE' in data:
+            sonarr_quality_result = validate_sonarr_qualityprofile(data['SONARR_QUALITY_PROFILE'])
+            validation_results.append(sonarr_quality_result)
+        
+        if 'SONARR_LANGUAGE_PROFILE' in data:
+            sonarr_language_result = validate_sonarr_languageprofile(data['SONARR_LANGUAGE_PROFILE'])
+            validation_results.append(sonarr_language_result)
+        
+        # Check if any validations failed
+        failed_validations = [result for result in validation_results if not result['success']]
+        
+        if failed_validations:
+            error_messages = [result['error'] for result in failed_validations]
+            return jsonify({
+                'success': False, 
+                'error': 'Service configuration validation failed: ' + '; '.join(error_messages)
+            }), 400
+        
+        reload_configuration()
         return jsonify({'success': True})
     
     except Exception as e:
         logging.error(f"Error saving configuration: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    
+
+# Add validation helper functions
+def validate_radarr_rootfolder(root_folder):
+    """Validate that the root folder exists in Radarr"""
+    try:
+        url = f"{CONFIG['radarr']['url']}/api/v3/rootfolder"
+        response = requests.get(url, params={'apikey': CONFIG['radarr']['api_key']})
+        
+        if response.status_code != 200:
+            return {'success': False, 'error': 'Failed to fetch Radarr root folders'}
+        
+        root_folders = response.json()
+        folder_exists = any(folder['path'] == root_folder for folder in root_folders)
+        
+        if not folder_exists:
+            return {
+                'success': False, 
+                'error': f'Root folder "{root_folder}" not found in Radarr'
+            }
+        
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': f'Radarr root folder validation failed: {str(e)}'}
+
+def validate_radarr_qualityprofile(quality_profile_id):
+    """Validate that the quality profile exists in Radarr"""
+    try:
+        url = f"{CONFIG['radarr']['url']}/api/v3/qualityprofile"
+        response = requests.get(url, params={'apikey': CONFIG['radarr']['api_key']})
+        
+        if response.status_code != 200:
+            return {'success': False, 'error': 'Failed to fetch Radarr quality profiles'}
+        
+        quality_profiles = response.json()
+        profile_exists = any(profile['id'] == int(quality_profile_id) for profile in quality_profiles)
+        
+        if not profile_exists:
+            return {
+                'success': False, 
+                'error': f'Quality profile ID "{quality_profile_id}" not found in Radarr'
+            }
+        
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': f'Radarr quality profile validation failed: {str(e)}'}
+
+# Add similar validation functions for Sonarr...
+def validate_sonarr_rootfolder(root_folder):
+    """Validate that the root folder exists in Sonarr"""
+    try:
+        url = f"{CONFIG['sonarr']['url']}/api/v3/rootfolder"
+        response = requests.get(url, params={'apikey': CONFIG['sonarr']['api_key']})
+        
+        if response.status_code != 200:
+            return {'success': False, 'error': 'Failed to fetch Sonarr root folders'}
+        
+        root_folders = response.json()
+        folder_exists = any(folder['path'] == root_folder for folder in root_folders)
+        
+        if not folder_exists:
+            return {
+                'success': False, 
+                'error': f'Root folder "{root_folder}" not found in Sonarr'
+            }
+        
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': f'Sonarr root folder validation failed: {str(e)}'}
+
+def validate_sonarr_qualityprofile(quality_profile_id):
+    """Validate that the quality profile exists in Sonarr"""
+    try:
+        url = f"{CONFIG['sonarr']['url']}/api/v3/qualityprofile"
+        response = requests.get(url, params={'apikey': CONFIG['sonarr']['api_key']})
+        
+        if response.status_code != 200:
+            return {'success': False, 'error': 'Failed to fetch Sonarr quality profiles'}
+        
+        quality_profiles = response.json()
+        profile_exists = any(profile['id'] == int(quality_profile_id) for profile in quality_profiles)
+        
+        if not profile_exists:
+            return {
+                'success': False, 
+                'error': f'Quality profile ID "{quality_profile_id}" not found in Sonarr'
+            }
+        
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': f'Sonarr quality profile validation failed: {str(e)}'}
+
+def validate_sonarr_languageprofile(language_profile_id):
+    """Validate that the language profile exists in Sonarr"""
+    try:
+        url = f"{CONFIG['sonarr']['url']}/api/v3/languageprofile"
+        response = requests.get(url, params={'apikey': CONFIG['sonarr']['api_key']})
+        
+        if response.status_code != 200:
+            return {'success': False, 'error': 'Failed to fetch Sonarr language profiles'}
+        
+        language_profiles = response.json()
+        profile_exists = any(profile['id'] == int(language_profile_id) for profile in language_profiles)
+        
+        if not profile_exists:
+            return {
+                'success': False, 
+                'error': f'Language profile ID "{language_profile_id}" not found in Sonarr'
+            }
+        
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': f'Sonarr language profile validation failed: {str(e)}'}
+        
 def update_duckdns_if_needed():
     """Check and update DuckDNS with detailed logging"""
     if not CONFIG['duckdns']['enabled']:
@@ -1187,6 +1322,42 @@ def update_duckdns_if_needed():
 def handle_exception(e):
     logging.error(f"Unhandled exception: {str(e)}", exc_info=True)
     return jsonify({'error': 'An unexpected error occurred'}), 500
+
+@app.route('/api/radarr/rootfolders')
+@debug_log
+def get_radarr_rootfolders():
+    url = f"{CONFIG['radarr']['url']}/api/v3/rootfolder"
+    response = requests.get(url, params={'apikey': CONFIG['radarr']['api_key']})
+    return jsonify(response.json())
+
+@app.route('/api/radarr/qualityprofile')
+@debug_log
+def get_radarr_qualityprofile():
+    url = f"{CONFIG['radarr']['url']}/api/v3/qualityprofile"
+    response = requests.get(url, params={'apikey': CONFIG['radarr']['api_key']})
+    return jsonify(response.json())
+
+@app.route('/api/sonarr/rootfolder')
+@debug_log
+def get_sonarr_rootfolder():
+    url = f"{CONFIG['sonarr']['url']}/api/v3/rootfolder"
+    response = requests.get(url, params={'apikey': CONFIG['sonarr']['api_key']})
+    return jsonify(response.json())
+
+@app.route('/api/sonarr/qualityprofile')
+@debug_log
+def get_sonarr_qualityprofile():
+    url = f"{CONFIG['sonarr']['url']}/api/v3/qualityprofile"
+    response = requests.get(url, params={'apikey': CONFIG['sonarr']['api_key']})
+    return jsonify(response.json())
+
+@app.route('/api/sonarr/languageprofile')
+@debug_log
+def get_sonarr_languageprofile():
+    url = f"{CONFIG['sonarr']['url']}/api/v3/languageprofile"
+    response = requests.get(url, params={'apikey': CONFIG['sonarr']['api_key']})
+    return jsonify(response.json())
+
 
 required_env = ['RADARR_URL', 'RADARR_API_KEY', 'SONARR_URL', 'SONARR_API_KEY']
 missing = [key for key in required_env if not os.getenv(key)]
@@ -2393,6 +2564,7 @@ def delete_episode(episode_id):
 @debug_log
 def index():
     try:
+        reload_configuration()
         return render_template(
             'index.html',
             config=CONFIG

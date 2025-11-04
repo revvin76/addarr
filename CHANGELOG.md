@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.1] - 2025-11-04
+### Fixed
+- Routed calls to Sonarr / Radarr through Flask proxy to allow roaming outside the local network
+- Fixed caching issue when saving configuration. Forcing a page refresh
+- Grey overlay not closing properly after closing config panel
+
 ## [1.1.0] - 2025-11-03
 ### Fixed
 - Configuration page now saves correctly

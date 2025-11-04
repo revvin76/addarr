@@ -770,134 +770,172 @@
 </div>
 
 <script>
-    console.log({{ config | tojson | safe }});
 
-    // Register service worker
-            // Fetch Radarr configuration data
-        function fetchRadarrData() {
-            const radarrUrl = document.getElementById('radarrUrl').value;
-            const apiKey = document.getElementById('radarrApiKey').value;
+// Update fetchRadarrData function
+function fetchRadarrData() {
+    // Fetch root folders
+    fetch(`/api/radarr/rootfolders`)
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('radarrRootFolder');
+            select.innerHTML = '';
             
-            if (!radarrUrl || !apiKey) return;
+            // Get the current saved value from the configuration
+            const currentRootFolder = "{{ config.radarr.root_folder }}";
             
-            // Fetch root folders
-            fetch(`${radarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('radarrRootFolder');
-                    select.innerHTML = '';
-                    data.forEach(folder => {
-                        const option = document.createElement('option');
-                        option.value = folder.path;
-                        option.textContent = folder.path;
-                        if (folder.path === "{{ config.radarr.root_folder}}") {
-                            option.selected = true;
-                        }
-                        select.appendChild(option);
-                    });
-                })
-                .catch(error => console.error('Error loading Radarr root folders:', error));
-            
-            // Fetch quality profiles
-            fetch(`${radarrUrl}/api/v3/qualityprofile?apikey=${apiKey}`)
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('radarrQualityProfile');
-                    select.innerHTML = '';
-                    data.forEach(profile => {
-                        const option = document.createElement('option');
-                        option.value = profile.id;
-                        option.textContent = profile.name;
-                        if (profile.id === {{ config.radarr.quality_profile_id}}) {
-                            option.selected = true;
-                        }
-                        select.appendChild(option);
-                    });
-                })
-                .catch(error => console.error('Error loading Radarr quality profiles:', error));
-        }
-    
-    // Fetch Sonarr configuration data
-    function fetchSonarrData() {
-        const sonarrUrl = document.getElementById('sonarrUrl').value;
-        const apiKey = document.getElementById('sonarrApiKey').value;
-        
-        if (!sonarrUrl || !apiKey) return;
-        
-        // Fetch root folders
-        fetch(`${sonarrUrl}/api/v3/rootfolder?apikey=${apiKey}`)
-            .then(response => response.json())
-            .then(data => {
-                const select = document.getElementById('sonarrRootFolder');
-                select.innerHTML = '';
-                data.forEach(folder => {
-                    const option = document.createElement('option');
-                    option.value = folder.path;
-                    option.textContent = folder.path;
-                    if (folder.path === "{{ config.sonarr.root_folder}}") {
-                        option.selected = true;
-                    }
-                    select.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Error loading Sonarr root folders:', error));
-        
-        // Fetch quality profiles
-        fetch(`${sonarrUrl}/api/v3/qualityprofile?apikey=${apiKey}`)
-            .then(response => response.json())
-            .then(data => {
-                const select = document.getElementById('sonarrQualityProfile');
-                select.innerHTML = '';
-                data.forEach(profile => {
-                    const option = document.createElement('option');
-                    option.value = profile.id;
-                    option.textContent = profile.name;
-                    if (profile.id === {{ config.sonarr.quality_profile_id}}) {
-                        option.selected = true;
-                    }
-                    select.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Error loading Sonarr quality profiles:', error));
-        
-        // Fetch language profiles (Sonarr only)
-        fetch(`${sonarrUrl}/api/v3/languageprofile?apikey=${apiKey}`)
-            .then(response => response.json())
-            .then(data => {
-                const select = document.getElementById('sonarrLanguageProfile');
-                select.innerHTML = '';
-                data.forEach(profile => {
-                    const option = document.createElement('option');
-                    option.value = profile.id;
-                    option.textContent = profile.name;
-                    if (profile.id === {{ config.sonarr.language_profile_id}}) {
-                        option.selected = true;
-                    }
-                    select.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Error loading Sonarr language profiles:', error));
-    }
-        function loadConfigurationData() {
-            // Load Radarr data
-            fetchRadarrData();
-            // Load Sonarr data
-            fetchSonarrData();
-        }
-
-    document.addEventListener('DOMContentLoaded', () => {
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/static/sw.js')
-            .then(registration => {
-                console.log('ServiceWorker registration successful');
-            })
-            .catch(err => {
-                console.log('ServiceWorker registration failed: ', err);
+            data.forEach(folder => {
+                const option = document.createElement('option');
+                option.value = folder.path;
+                option.textContent = folder.path;
+                
+                // Set selected based on current configuration
+                if (folder.path.toString() === currentRootFolder.toString()) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
             });
+
+        })
+        .catch(error => console.error('Error loading Radarr root folders:', error));
+    
+    // Fetch quality profiles
+    fetch(`/api/radarr/qualityprofile`)
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('radarrQualityProfile');
+            select.innerHTML = '';
+            
+            // Get the current saved value from the configuration
+            const currentQualityProfile = "{{ config.radarr.quality_profile_id }}";
+            
+            data.forEach(profile => {
+                console.log(profile);
+                console.log(currentQualityProfile);
+                const option = document.createElement('option');
+                option.value = profile.id;
+                option.textContent = profile.name;
+                
+                // Set selected based on current configuration
+                if (profile.id === currentQualityProfile) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+            
+            // If no option was selected, try to set it explicitly
+            if (currentQualityProfile && select.value !== currentQualityProfile) {
+                select.value = currentQualityProfile;
+            }
+        })
+        .catch(error => console.error('Error loading Radarr quality profiles:', error));
+}
+
+// Update fetchSonarrData function
+function fetchSonarrData() {
+    // Fetch root folders
+    fetch(`/api/sonarr/rootfolder`)
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('sonarrRootFolder');
+            select.innerHTML = '';
+            
+            // Get the current saved value from the configuration
+            const currentRootFolder = "{{ config.sonarr.root_folder }}";
+            
+            data.forEach(folder => {
+                const option = document.createElement('option');
+                option.value = folder.path;
+                option.textContent = folder.path;
+                
+                // Set selected based on current configuration
+                if (folder.path.toString() === currentRootFolder.toString()) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+            
+        })
+        .catch(error => console.error('Error loading Sonarr root folders:', error));
+    
+    // Fetch quality profiles
+    fetch(`/api/sonarr/qualityprofile`)
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('sonarrQualityProfile');
+            select.innerHTML = '';
+            
+            // Get the current saved value from the configuration
+            const currentQualityProfile = "{{ config.sonarr.quality_profile_id }}";
+            
+            data.forEach(profile => {
+                const option = document.createElement('option');
+                option.value = profile.id;
+                option.textContent = profile.name;
+                
+                // Set selected based on current configuration
+                if (profile.id.toString() === currentQualityProfile.toString()) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+            
+            // If no option was selected, try to set it explicitly
+            if (currentQualityProfile && select.value !== currentQualityProfile) {
+                select.value = currentQualityProfile;
+            }
+        })
+        .catch(error => console.error('Error loading Sonarr quality profiles:', error));
+    
+    // Fetch language profiles
+    fetch(`/api/sonarr/languageprofile`)
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('sonarrLanguageProfile');
+            select.innerHTML = '';
+            
+            // Get the current saved value from the configuration
+            const currentLanguageProfile = "{{ config.sonarr.language_profile_id }}";
+            
+            data.forEach(profile => {
+                const option = document.createElement('option');
+                option.value = profile.id;
+                option.textContent = profile.name;
+                
+                // Set selected based on current configuration
+                if (profile.id.toString() === currentLanguageProfile.toString()) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+            
+            // If no option was selected, try to set it explicitly
+            if (currentLanguageProfile && select.value !== currentLanguageProfile) {
+                select.value = currentLanguageProfile;
+            }
+        })
+        .catch(error => console.error('Error loading Sonarr language profiles:', error));
+    }
+
+function loadConfigurationData() {
+    // Load Radarr data
+    fetchRadarrData();
+    // Load Sonarr data
+    fetchSonarrData();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/sw.js')
+        .then(registration => {
+            console.log('ServiceWorker registration successful');
+        })
+        .catch(err => {
+            console.log('ServiceWorker registration failed: ', err);
         });
-        }
     });
+    }
+});
 
 // Load settings on panel open
 document.getElementById('configModal').addEventListener('show.bs.collapse', function() {
@@ -950,35 +988,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Config panel toggle
-    const configToggle = document.getElementById('configToggle');
-    // const configModal = document.getElementById('configModal');
+    // Config panel toggle - Use Bootstrap modal events instead
+    const configModal = document.getElementById('configModal');
     const configOverlay = document.getElementById('configOverlay');
-    const closeConfig = document.getElementById('closeConfig');
-    
-    if (configToggle && configModal) {
-        configToggle.addEventListener('click', function() {
-            configModal.classList.add('open');
+
+    if (configModal && configOverlay) {
+        // When modal opens
+        configModal.addEventListener('show.bs.modal', function() {
             configOverlay.classList.add('open');
             loadConfigurationData();
         });
-    }
-    
-    if (closeConfig) {
-        closeConfig.addEventListener('click', function() {
-            configModal.classList.remove('open');
-            configOverlay.classList.remove('open');
-        });
-    }
-    
-    if (configOverlay) {
-        configOverlay.addEventListener('click', function() {
-            configModal.classList.remove('open');
+        
+        // When modal closes (any method - close button, escape key, clicking outside, etc.)
+        configModal.addEventListener('hide.bs.modal', function() {
             configOverlay.classList.remove('open');
         });
     }
 
-const forms = document.querySelectorAll('form');
+    const forms = document.querySelectorAll('form');
     forms.forEach(form => {
         form.addEventListener('submit', function() {
             spinner.show('Processing...');
@@ -1036,6 +1063,7 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
     submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Saving...';
     submitButton.disabled = true;
     
+    // First save the main configuration
     fetch('/save_config', {
         method: 'POST',
         headers: {
@@ -1046,19 +1074,33 @@ document.getElementById('configForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Close config modal
+            // Close the modal FIRST, before showing notification
             const configModal = bootstrap.Modal.getInstance(document.getElementById('configModal'));
             configModal.hide();
             
+            // Clean up any remaining modal backdrop
+            setTimeout(() => {
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(backdrop => backdrop.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            }, 100);
+            
             // Show success notification
-            showNotification('Saved Successfully!', 'success');
+            showNotification('Configuration saved successfully!', 'success');
+                     
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000); // Reload 2 seconds after the notification appears            
+            
         } else {
-            showNotification('Error: ' + data.error, 'error');
+            throw new Error(data.error || 'Failed to save configuration');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showNotification('Error saving configuration', 'error');
+        showNotification('Error: ' + error.message, 'error');
     })
     .finally(() => {
         // Restore button state
