@@ -6,3 +6,4 @@ colorama==0.4.6
 ascii_magic==2.3.0
 pinggy==0.0.17
 qrcode[pil]==7.4.2
+packaging>=25.0

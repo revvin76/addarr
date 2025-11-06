@@ -1813,6 +1813,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check for update notification
     checkUpdateNotification();
     
+    const backToTopBtn = document.getElementById('backToTop');
+    
+    // Show/hide back to top button based on scroll position
+    window.addEventListener('scroll', function() {
+        if (window.pageYOffset > 300) {
+            backToTopBtn.classList.add('show');
+        } else {
+            backToTopBtn.classList.remove('show');
+        }
+    });
+    
+    // Smooth scroll to top when clicked
+    backToTopBtn.addEventListener('click', function() {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    });
+    
     // Add update button event listeners
     const checkUpdateBtn = document.getElementById('checkUpdateBtn');
     const downloadUpdateBtn = document.getElementById('downloadUpdateBtn');

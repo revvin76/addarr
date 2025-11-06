@@ -68,7 +68,26 @@
 
         {% if results %}
             <div class="row" id="resultsGrid">
-                {% for result in results %}
+                    
+                    <hr>
+
+                    <div class="col-6 col-xs-6 mb-3 result-item result-badge" data-media-type="tv">
+                        <div class="header-badge-container" onclick="event.stopPropagation(); return false;">
+                            <div class="status-badge text-xs badge header-badge tv-card tv-badge" data-media-type="tv">
+                                TV Shows ({{ tv_shows }})
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-6 col-xs-6 mb-3 result-item result-badge" data-media-type="movie">
+                        <div class="header-badge-container" onclick="event.stopPropagation(); return false;">
+                            <div class="status-badge text-xs badge header-badge movie-card movie-badge" data-media-type="movie">
+                                Movies ({{ movies }})
+                            </div>
+                        </div>
+                    </div>               
+                    
+                    {% for result in results %}
                     <div class="col-6 col-xs-6 mb-3 result-item" 
                          data-media-type="{{ result.media_type }}">
                         <div class="search-result-card h-100 {{ 'movie-card' if result.media_type == 'movie' else 'tv-card' }}" 
@@ -77,10 +96,10 @@
                             onclick="showDetails('{{ result.media_type }}', {{ result.tvdbId if result.media_type == 'tv' else result.tmdbId }})">                        
                             <!-- Thumbnail container with overlay -->
                             <div class="search-result-thumbnail-container">
-                                <img src="{{ result.remotePoster if result.remotePoster else '/static/images/favicon.png' }}" 
+                                <img src="{{ result.remotePoster if result.remotePoster else '/static/images/apple-touch-icon.png' }}" 
                                     class="search-result-thumbnail"
                                     alt="{{ result.title }}"
-                                    onerror="this.onerror=null; this.src='/static/images/favicon.png'">
+                                    onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
                                 <div class="fade-overlay"></div>
                                 <!-- Media type watermark -->
                                 <div class="watermark-icon position-absolute">
@@ -142,6 +161,10 @@
     </div>
 </div>
    
+<div id="backToTop" class="back-to-top">
+    <i class="fas fa-chevron-up"></i>
+</div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>    
@@ -155,7 +178,20 @@
         mediaFilter.addEventListener('change', function() {
             const filter = this.value;
             const items = document.querySelectorAll('.result-item');
+            const badges = document.querySelectorAll('.result-badge');
             
+            // Always show badges
+            badges.forEach(badge => {
+                if (filter === 'all') {
+                    badge.classList.remove('col-12', 'col-xs-12');
+                    badge.classList.add('col-6', 'col-xs-6');
+                } else {
+                    badge.classList.remove('col-6', 'col-xs-6');
+                    badge.classList.add('col-12', 'col-xs-12');
+                }
+            });
+            
+            // Filter result items
             items.forEach(item => {
                 if (filter === 'all') {
                     item.style.display = 'block';
@@ -163,6 +199,7 @@
                     item.style.display = item.getAttribute('data-media-type') === filter ? 'block' : 'none';
                 }
             });
+
         });
 
         // Lazy-load library status for visible items
@@ -210,7 +247,7 @@
         lazyLoadStatus();
         window.addEventListener('scroll', lazyLoadStatus);
     });
-
+        
     // Form validation function
     function validateForm() {
         const query = document.querySelector('input[name="query"]').value.trim();

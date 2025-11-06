@@ -18,6 +18,8 @@ import re
 import io
 import logging
 import shutil
+from packaging import version
+
 
 try:
     import pinggy
@@ -218,7 +220,7 @@ setup_logging()
 
 @debug_log
 def check_github_for_updates():
-    # """Check GitHub for new releases"""
+    """Check GitHub for new releases with proper version comparison"""
     try:
         url = f"https://api.github.com/repos/{CONFIG['update']['github_repo']}/releases/latest"
         response = requests.get(url, timeout=10)
@@ -231,21 +233,46 @@ def check_github_for_updates():
             if CONFIG['app']['debug']:
                 logging.info(f"Current version: {current_version}, Latest version: {latest_version}")
             
-            if latest_version > current_version:
-                if CONFIG['app']['debug']:
-                    logging.info(f"Update available: {latest_version}")
-                return {
-                    'update_available': True,
-                    'current_version': current_version,
-                    'latest_version': latest_version,
-                    'release_url': latest_release.get('html_url'),
-                    'release_notes': latest_release.get('body', ''),
-                    'published_at': latest_release.get('published_at')
-                }
-            else:
-                if CONFIG['app']['debug']:
-                    logging.info("No update available")
-                return {'update_available': False}
+            # Use proper semantic version comparison
+            try:
+                current_ver = version.parse(current_version)
+                latest_ver = version.parse(latest_version)
+                
+                if latest_ver > current_ver:
+                    if CONFIG['app']['debug']:
+                        logging.info(f"Update available: {latest_version}")
+                    return {
+                        'update_available': True,
+                        'current_version': current_version,
+                        'latest_version': latest_version,
+                        'release_url': latest_release.get('html_url'),
+                        'release_notes': latest_release.get('body', ''),
+                        'published_at': latest_release.get('published_at')
+                    }
+                else:
+                    if CONFIG['app']['debug']:
+                        logging.info("No update available")
+                    return {'update_available': False}
+                    
+            except Exception as version_error:
+                logging.error(f"Version comparison error: {version_error}")
+                # Fallback to string comparison if version parsing fails
+                if version.parse(latest_version) > version.parse(current_version):
+                    if CONFIG['app']['debug']:
+                        logging.info(f"Update available (fallback): {latest_version}")
+                    return {
+                        'update_available': True,
+                        'current_version': current_version,
+                        'latest_version': latest_version,
+                        'release_url': latest_release.get('html_url'),
+                        'release_notes': latest_release.get('body', ''),
+                        'published_at': latest_release.get('published_at'),
+                        'warning': 'Used fallback version comparison'
+                    }
+                else:
+                    if CONFIG['app']['debug']:
+                        logging.info("No update available (fallback)")
+                    return {'update_available': False}
         else:
             logging.warning(f"GitHub API returned status {response.status_code}")
             return {'update_available': False, 'error': f"GitHub API error: {response.status_code}"}
@@ -253,7 +280,7 @@ def check_github_for_updates():
     except Exception as e:
         logging.error(f"Error checking for updates: {str(e)}")
         return {'update_available': False, 'error': str(e)}
-
+    
 @debug_log
 def ensure_updates_folder():
     # Get the directory where the app is running from
@@ -474,7 +501,7 @@ def update_checker():
                         latest_version = update_info['latest_version']
                         current_version = CONFIG['app']['version']
                         
-                        if latest_version > current_version:
+                        if version.parse(latest_version) > version.parse(current_version):
                             logging.info(f"📦 Auto-check: Update available: {latest_version}")
                             
                             # Check if this update is already downloaded
@@ -516,8 +543,9 @@ def update_checker():
             time.sleep(int(CONFIG['update']['check_interval']))
 
 # Start the automated update checker thread (only for continuous operation)
-update_thread = threading.Thread(target=update_checker, daemon=True)
-update_thread.start()
+if CONFIG['update']['enabled']:
+    update_thread = threading.Thread(target=update_checker, daemon=True)
+    update_thread.start()
 
 @debug_log
 def perform_initial_update_check():
@@ -538,7 +566,7 @@ def perform_initial_update_check():
             current_version = CONFIG['app']['version']
             
             # If the downloaded version is newer than current version, apply it
-            if latest_version > current_version:
+            if version.parse(latest_version) > version.parse(current_version):
                 logging.info(f"📦 Found downloaded update {latest_version} (current: {current_version})")
                 logging.info(f"🔄 Attempting to apply existing update: {latest_version}")
                 
@@ -559,7 +587,7 @@ def perform_initial_update_check():
             latest_version = update_info['latest_version']
             current_version = CONFIG['app']['version']
             
-            if latest_version > current_version:
+            if version.parse(latest_version) > version.parse(current_version):
                 logging.info(f"📦 New update available: {latest_version} (current: {current_version})")
                 
                 # Check if we already have this specific update downloaded
@@ -2034,6 +2062,8 @@ def search():
             'results.html',
             results=combined_results,
             media_type='combined',
+            movies=len(movie_results),
+            tv_shows=len(tv_results),
             query=query
         )
         

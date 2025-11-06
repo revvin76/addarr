@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.2] - 2025-11-06
+### Fixed
+- Improved version checking
+- Fixed update checks to only run if enabled in .env
+
+### Added
+- Added Movie and TV count to Search results
+- Updated logos
+- Added "Back to top" button for search results and manage media page
+- Added search counts and filters to top of search results
+
 ## [1.1.1] - 2025-11-04
 ### Fixed
 - Routed calls to Sonarr / Radarr through Flask proxy to allow roaming outside the local network

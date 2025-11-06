@@ -10,6 +10,7 @@
     --accent-blue: #0d6efd;
     --toolbarBackgroundColor: #262626;
     --text-muted: #a0a0a0;
+    --addarr-primary: #6ab759;
 }
 
 /* Base Styles */
@@ -874,6 +875,16 @@ input:checked + .toggle-slider:before {
     overflow: hidden;
 }
 
+.badge.bg-movie {
+    background-color: var(--movie-accent) !important;
+    color: var(--bs-white);
+    font-weight: 500;    
+}
+.badge.bg-tv {
+    background-color: var(--tv-accent) !important;
+    color: var(--bs-white);
+    font-weight: 500;    
+}
 /* Media type badges */
 .badge.bg-success {
     background-color: var(--movie-accent) !important;
@@ -1636,4 +1647,98 @@ body.spinner-active {
     display: flex;
     align-items: center;
     min-height: calc(100% - 1rem);
+}
+/* Badge styling for filter badges */
+.header-badge {
+    min-width: 120px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    cursor: default !important;
+    pointer-events: none;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+    aspect-ratio: auto;    
+}
+
+/* Ensure badges don't have hover effects */
+.header-badge:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Movie badge specific styling */
+.bg-movie {
+    background: var(--movie-accent);
+}
+
+/* TV badge specific styling */
+.bg-tv {
+    background: var(--tv-accent);
+}
+
+/* Make sure badges maintain their display */
+.header-badge {
+    display: inline-block !important;
+}
+.header-badge-container {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    padding: 0;
+    border-radius: 8px;
+}
+.result-badge {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+}
+#resultsGrid {
+    background: var(--bs-body-color);
+}
+
+/* Back to Top Button */
+.back-to-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, var(--addarr-primary) 0%, var(--addarr-primary) 100%);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.back-to-top.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.back-to-top:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(135deg, var(--addarr-primary) 0%, var(--addarr-primary) 100%);
+}
+
+.back-to-top:active {
+    transform: translateY(-1px);
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+    .back-to-top {
+        bottom: 20px;
+        right: 20px;
+        width: 45px;
+        height: 45px;
+    }
 }
