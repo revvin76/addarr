@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ---
-## [1.1.2] - 2025-11-06
+## [1.1.3] - 2025-11-07
 ### Added
 - Automatic check for and install missing modules from requirements.txt
 
