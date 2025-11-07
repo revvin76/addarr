@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ---
 ## [1.1.2] - 2025-11-06
+### Added
+- Automatic check for and install missing modules from requirements.txt
+
+## [1.1.2] - 2025-11-06
 ### Fixed
 - Improved version checking
 - Fixed update checks to only run if enabled in .env

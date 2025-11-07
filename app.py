@@ -19,6 +19,8 @@ import io
 import logging
 import shutil
 from packaging import version
+from pathlib import Path
+
 
 
 try:
@@ -2606,6 +2608,120 @@ def index():
             'index.html',
             error="Page load failed"
         )
+
+def check_and_install_requirements():
+    """Check if all required modules are installed and install any missing ones"""
+    print("🔍 Checking required modules...")
+    
+    # Path to requirements.txt - look in current directory
+    requirements_path = Path(__file__).parent / 'requirements.txt'
+    
+    if not requirements_path.exists():
+        print("❌ requirements.txt not found. Please ensure it exists in the same directory as app.py")
+        return False
+    
+    try:
+        # Read requirements.txt
+        with open(requirements_path, 'r', encoding='utf-8') as f:
+            requirements = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+        
+        if not requirements:
+            print("⚠️  requirements.txt is empty")
+            return True
+        
+        print(f"📋 Found {len(requirements)} requirements to check")
+        
+        # Mapping of package names to import names (for packages where they differ)
+        package_to_import = {
+            'Flask': 'flask',
+            'python-dotenv': 'dotenv', 
+            'GitPython': 'git',
+            'qrcode[pil]': 'qrcode',
+            'pinggy': 'pinggy',
+            'requests': 'requests',
+            'colorama': 'colorama',
+            'ascii_magic': 'ascii_magic',
+            'packaging': 'packaging'
+        }
+        
+        missing_packages = []
+        
+        # Check each requirement
+        for requirement in requirements:
+            # Extract package name (remove version specifiers)
+            package_name = requirement.split('==')[0].split('>=')[0].split('<=')[0].strip()
+            
+            # Get the import name (use mapping or fallback to package name)
+            import_name = package_to_import.get(package_name, package_name)
+            
+            try:
+                # Try to import the package using the correct import name
+                __import__(import_name)
+                print(f"✅ {package_name} is installed")
+            except ImportError:
+                print(f"❌ {package_name} is missing (tried to import as '{import_name}')")
+                missing_packages.append(requirement)
+        
+        # Install missing packages
+        if missing_packages:
+            print(f"📦 Installing {len(missing_packages)} missing packages...")
+            print(f"Packages to install: {', '.join(missing_packages)}")
+            
+            # Use the same Python executable that's running this script
+            python_executable = sys.executable
+            
+            try:
+                # Run pip install for missing packages
+                result = subprocess.run(
+                    [python_executable, "-m", "pip", "install"] + missing_packages,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                
+                print("✅ Successfully installed all missing packages")
+                print("Installation output:", result.stdout)
+                
+                if result.stderr:
+                    print("Installation warnings:", result.stderr)
+                
+                # Verify the installations
+                print("🔍 Verifying installations...")
+                all_verified = True
+                
+                for requirement in missing_packages:
+                    package_name = requirement.split('==')[0].split('>=')[0].split('<=')[0].strip()
+                    import_name = package_to_import.get(package_name, package_name)
+                    
+                    try:
+                        __import__(import_name)
+                        print(f"✅ {package_name} verified (imported as '{import_name}')")
+                    except ImportError as e:
+                        print(f"❌ Failed to import {package_name} as '{import_name}': {e}")
+                        all_verified = False
+                
+                if not all_verified:
+                    print("⚠️  Some packages failed verification but continuing anyway...")
+                    # Don't return False here - some packages might have complex dependencies
+                    # that don't prevent the app from running
+                
+                return True
+                
+            except subprocess.CalledProcessError as e:
+                print(f"❌ Failed to install packages: {e}")
+                print(f"Error output: {e.stderr}")
+                print(f"stdout: {e.stdout}")
+                return False
+            except Exception as e:
+                print(f"❌ Unexpected error during installation: {e}")
+                return False
+        else:
+            print("✅ All required packages are installed")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error checking requirements: {e}")
+        return False
     
 def print_welcome():
     """Print welcome message and logo only once"""
@@ -2675,6 +2791,11 @@ if __name__ == '__main__':
                 logging.info("DuckDNS update thread started")
             except Exception as e:
                 logging.error(f"Failed to start DuckDNS thread: {str(e)}")
+
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        if not check_and_install_requirements():
+            print("❌ Failed to install required packages. Please check your Python environment.")
+            sys.exit(1)
 
     # Print welcome message in main process only
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
