@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.5] - 2025-11-09
+### Fixed
+-Fixed trending info panel not displaying and added library status.
+
 ## [1.1.4] - 2025-11-09
 ### Added
 - Authentication Section: Added to config panel with username/password fields

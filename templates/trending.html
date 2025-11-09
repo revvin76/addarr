@@ -72,6 +72,8 @@
                 {% for movie in trending_data.movies %}
                 <div class="col-6 col-md-4 col-lg-3 mb-3 result-item" data-media-type="movie">
                     <div class="search-result-card h-100 movie-card" 
+                         data-media-type="movie"
+                         data-media-id="{{ movie.id }}"
                          onclick="showDetails('movie', {{ movie.id }})">
                         <div class="search-result-thumbnail-container">
                             <img src="{% if movie.poster_path %}https://image.tmdb.org/t/p/w300{{ movie.poster_path }}{% else %}/static/images/apple-touch-icon.png{% endif %}" 
@@ -91,6 +93,10 @@
                                     <i class="fas fa-star me-1"></i>{{ "%.1f"|format(movie.vote_average) }}
                                 </span>
                             </div>
+                            <!-- Library Status Badge - Added for trending items -->
+                            <div class="flex justify-between items-center mt-2">
+                                <span class="status-badge text-xs badge bg-secondary">Checking...</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -104,8 +110,10 @@
         <div class="mb-5">
             <div class="row">
                 {% for show in trending_data.tv_shows %}
-                <div class="col-6 col-md-4 col-lg-3 mb-3 result-item" data-media-type="tv" >
+                <div class="col-6 col-md-4 col-lg-3 mb-3 result-item" data-media-type="tv">
                     <div class="search-result-card h-100 tv-card" 
+                         data-media-type="tv"
+                         data-media-id="{{ show.id }}"
                          onclick="showDetails('tv', {{ show.id }})">
                         <div class="search-result-thumbnail-container">
                             <img src="{% if show.poster_path %}https://image.tmdb.org/t/p/w300{{ show.poster_path }}{% else %}/static/images/apple-touch-icon.png{% endif %}" 
@@ -124,6 +132,10 @@
                                 <span class="badge bg-warning text-dark">
                                     <i class="fas fa-star me-1"></i>{{ "%.1f"|format(show.vote_average) }}
                                 </span>
+                            </div>
+                            <!-- Library Status Badge - Added for trending items -->
+                            <div class="flex justify-between items-center mt-2">
+                                <span class="status-badge text-xs badge bg-secondary">Checking...</span>
                             </div>
                         </div>
                     </div>
@@ -166,10 +178,13 @@
             <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
         </div>
     </div>
-
+    
     <div id="backToTop" class="back-to-top">
         <i class="fas fa-chevron-up"></i>
     </div>
+
+    <div id="overlay-backdrop" class="overlay-backdrop"></div>
+    <div id="modal-overlay-backdrop" class="overlay-backdrop modal-overlay-backdrop"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
@@ -177,24 +192,11 @@
     <script>
     // Filter functionality
     document.addEventListener('DOMContentLoaded', function() {
-
         const mediaFilter = document.getElementById('mediaFilter');
         
         mediaFilter.addEventListener('change', function() {
             const filter = this.value;
             const items = document.querySelectorAll('.result-item');
-            const badges = document.querySelectorAll('.result-badge');
-            
-            // Always show badges
-            badges.forEach(badge => {
-                if (filter === 'all') {
-                    badge.classList.remove('col-12', 'col-xs-12');
-                    badge.classList.add('col-6', 'col-xs-6');
-                } else {
-                    badge.classList.remove('col-6', 'col-xs-6');
-                    badge.classList.add('col-12', 'col-xs-12');
-                }
-            });
             
             // Filter result items
             items.forEach(item => {
@@ -204,11 +206,9 @@
                     item.style.display = item.getAttribute('data-media-type') === filter ? 'block' : 'none';
                 }
             });
-
         });
 
-
-        // Lazy-load library status for visible items
+        // Lazy-load library status for visible items - SAME FUNCTIONALITY AS RESULTS PAGE
         const lazyLoadStatus = () => {
             const cards = document.querySelectorAll('.search-result-card:not(.status-checked)');
             
@@ -231,7 +231,7 @@
             );
         };
 
-        // Fetch library status
+        // Fetch library status - SAME AS RESULTS PAGE
         const checkLibraryStatus = (mediaType, mediaId, card) => {
             fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`)
                 .then(response => response.json())
@@ -246,6 +246,11 @@
                 })
                 .catch(error => {
                     console.error('Error checking library status:', error);
+                    const badge = card.querySelector('.status-badge');
+                    if (badge) {
+                        badge.textContent = 'Error';
+                        badge.className = 'status-badge text-xs badge bg-danger';
+                    }
                 });
         };
 
@@ -253,135 +258,6 @@
         lazyLoadStatus();
         window.addEventListener('scroll', lazyLoadStatus);
     });
-
-    // Show details function (same as results.html)
-    function showDetails(mediaType, mediaId) {
-        const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
-        const content = document.getElementById('detailsContent');
-        
-        // Show loading spinner
-        content.innerHTML = `
-            <div class="text-center py-4">
-                <div class="spinner-border text-radarr" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading details...</p>
-            </div>
-        `;
-        
-        modal.show();
-        
-        // Fetch media details
-        fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    content.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                    return;
-                }
-                
-                const media = data.data;
-                const isMovie = mediaType === 'movie';
-                const title = media.title || media.title;
-                const year = media.year || (media.releaseDate ? new Date(media.releaseDate).getFullYear() : 'N/A');
-                
-                let posterUrl = '/static/images/apple-touch-icon.png';
-                if (media.images && media.images.length > 0) {
-                    posterUrl = media.images[0].url || media.images[0].remoteUrl;
-                } else if (media.remotePoster) {
-                    posterUrl = media.remotePoster;
-                }
-                
-                let detailsHtml = `
-                    <div class="row">
-                        <div class="col-md-4">
-                            <img src="${posterUrl}" 
-                                class="img-fluid rounded" 
-                                alt="${title}"
-                                onerror="this.src='/static/images/apple-touch-icon.png'">
-                        </div>
-                        <div class="col-md-8">
-                            <h4>${title} <span class="text-muted">(${year})</span></h4>
-                `;
-                
-                if (media.overview) {
-                    detailsHtml += `<p class="mt-3">${media.overview}</p>`;
-                }
-                
-                // Status information
-                detailsHtml += `
-                    <div class="mt-3">
-                        <span class="badge ${data.on_disk ? 'bg-success' : 'bg-secondary'} me-2">
-                            ${data.on_disk ? 'Available' : 'Not Downloaded'}
-                        </span>
-                        <span class="badge ${data.monitored ? 'bg-primary' : 'bg-warning'} me-2">
-                            ${data.monitored ? 'Monitored' : 'Not Monitored'}
-                        </span>
-                        <span class="badge ${data.status === 'existing' ? 'bg-info' : 'bg-secondary'}">
-                            ${data.status === 'existing' ? 'In Library' : 'Not Added'}
-                        </span>
-                    </div>
-                `;
-                
-                // Add button
-                if (data.status !== 'existing') {
-                    detailsHtml += `
-                        <div class="mt-4">
-                            <button class="btn btn-success" onclick="addToLibrary('${mediaType}', ${mediaId})">
-                                <i class="fas fa-plus me-2"></i>Add to ${isMovie ? 'Radarr' : 'Sonarr'}
-                            </button>
-                        </div>
-                    `;
-                } else {
-                    detailsHtml += `
-                        <div class="mt-4">
-                            <button class="btn btn-outline-secondary" disabled>
-                                <i class="fas fa-check me-2"></i>Already in Library
-                            </button>
-                        </div>
-                    `;
-                }
-                
-                detailsHtml += `</div></div>`;
-                content.innerHTML = detailsHtml;
-            })
-            .catch(error => {
-                console.error('Error loading details:', error);
-                content.innerHTML = `
-                    <div class="alert alert-danger">
-                        Error loading details: ${error.message}
-                    </div>
-                `;
-            });
-    }
-
-    // Add to library function
-    function addToLibrary(mediaType, mediaId) {
-        fetch('/add', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                media_type: mediaType,
-                media_id: mediaId
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Close modal and show success message
-                bootstrap.Modal.getInstance(document.getElementById('detailsModal')).hide();
-                alert('Successfully added to library!');
-            } else {
-                alert('Error adding to library. Please check the logs.');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error adding to library.');
-        });
-    }
 
     // Register service worker
     if ('serviceWorker' in navigator) {

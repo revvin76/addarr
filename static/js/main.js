@@ -953,21 +953,37 @@ function showDetails(mediaType, mediaId) {
                         ${data.youTubeTrailerId ? '' : '<p class="small">Unofficial trailer</p>'}
                     </div>`;
             }
-        
+                    
             if (trailerKey) {
                 currentTrailerKey = trailerKey;
-                setTimeout(() => {
-                    player = new YT.Player('trailerPlayer', {
-                        height: '315',
-                        width: '100%',
-                        videoId: trailerKey,
-                        playerVars: {
-                            'autoplay': 0,
-                            'controls': 1,
-                            'rel': 0
-                        }
-                    });
-                }, 100);
+                
+                // Determine if it's official - we need to check this differently
+                let isOfficial = false;
+                let trailerText = 'Trailer';
+                
+                if (hasTmdbData) {
+                    const trailerObj = tmdbData.trailer || 
+                        (tmdbData.videos && tmdbData.videos.find(v => 
+                            v.site === 'YouTube' && v.type === 'Trailer'
+                        ));
+                    isOfficial = trailerObj ? trailerObj.official === true : false;
+                    trailerText = isOfficial ? 'Official trailer' : 'Trailer';
+                } else if (data.youTubeTrailerId) {
+                    trailerText = 'Trailer';
+                }
+                
+                trailerHtml = `
+                    <div class="mt-4">
+                        <h5>Trailer</h5>
+                        <div class="ratio ratio-16x9">
+                            <iframe src="https://www.youtube.com/embed/${trailerKey}?rel=0&modestbranding=1" 
+                                    frameborder="0" 
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                    allowfullscreen>
+                            </iframe>
+                        </div>
+                        <p class="small text-muted mt-2">${trailerText}</p>
+                    </div>`;
             }
 
             // Determine available images from both TMDB and internal sources
