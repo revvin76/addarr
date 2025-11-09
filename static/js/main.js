@@ -817,7 +817,7 @@ document.getElementById('searchAllMissingBtn')?.addEventListener('click', () => 
     .then(r => r.ok ? alert('Search started') : alert('Failed'));
 });
 
-function showDetails(mediaType, mediaId) {
+function showDetails(mediaType, mediaId, tmdb=false) {
     const modalEl = document.getElementById('detailsModal');
     const modal = new bootstrap.Modal(modalEl);
     const modalTitle = document.getElementById('detailsModalLabel');
@@ -855,13 +855,15 @@ function showDetails(mediaType, mediaId) {
     
     modal.show();
     
-    // Fetch our internal details and TMDB details in parallel
-    const internalPromise = fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
-        .then(response => response.json())
-        .catch(error => {
-            console.error('Internal API error:', error);
-            return { error: 'Failed to load internal details' };
-        });
+    // Only fetch internal data if NOT in TMDB-only mode
+    const internalPromise = tmdb === false 
+        ? fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
+            .then(response => response.json())
+            .catch(error => {
+                console.error('Internal API error:', error);
+                return { error: 'Failed to load internal details' };
+            })
+        : Promise.resolve(null); // Skip entirely when tmdb=true
     
     const tmdbPromise = mediaType === 'tv' 
         ? fetch(`/get_tmdb_details?type=tv&id=${mediaId}`)
@@ -877,242 +879,367 @@ function showDetails(mediaType, mediaId) {
             console.log('Internal data:', internalData);
             console.log('TMDB data:', tmdbData);
             
-            const data = internalData.data || internalData;
             const hasTmdbData = tmdbData && !tmdbData.error;
+            const hasInternalData = tmdb === false && internalData && !internalData.error;
             
-            // Determine poster URL
-            let posterUrl;
-            if (mediaType === 'movie') {
-                const posterImage = data.images?.find(img => img.coverType === 'poster');
-                posterUrl = posterImage?.remoteUrl || posterImage?.url;
+            // If in TMDB-only mode, use ONLY TMDB data
+            if (tmdb === true) {
+                // TMDB-ONLY MODE: Use only TMDB data
+                const title = hasTmdbData ? tmdbData.title : 'No Title';
+                const overview = hasTmdbData ? tmdbData.overview : 'No overview available';
+                const year = hasTmdbData && tmdbData.first_air_date 
+                    ? new Date(tmdbData.first_air_date).getFullYear() 
+                    : 'N/A';
+                const genres = hasTmdbData ? tmdbData.genres : [];
+                const rating = hasTmdbData ? tmdbData.vote_average?.toFixed(1) : 'N/A';
+                const status = hasTmdbData 
+                    ? (tmdbData.status === 'Ended' ? 'Ended' : 'Current')
+                    : 'Unknown';
+                const certification = 'NR'; // Default for TMDB-only
+                
+                // POSTER: TMDB only
+                let posterUrl = hasTmdbData && tmdbData.poster_path 
+                    ? `https://image.tmdb.org/t/p/original${tmdbData.poster_path}`
+                    : '/static/images/logo.png';
+
+                const posterHtml = `
+                    <img src="${posterUrl}" 
+                        class="img-fluid h-100 object-fit-cover" 
+                        alt="${title} poster"
+                        onerror="this.onerror=null; this.src='/static/images/logo.png'"
+                        style="background-color: #2c3e50; background-image: url('/static/images/logo.png'); background-size: 60%; background-position: center; background-repeat: no-repeat;">`;
+                
+                // TRAILER: TMDB only
+                let trailerHtml = '';
+                let trailerKey = null;
+
+                if (hasTmdbData) {
+                    const trailer = tmdbData.trailer || 
+                        (tmdbData.videos && tmdbData.videos.find(v => 
+                            v.site === 'YouTube' && 
+                            v.type === 'Trailer' &&
+                            (v.official === true || tmdbData.trailer === null)
+                        ));
+
+                    if (trailer) {
+                        trailerKey = trailer.key;
+                        const isOfficial = trailer.official === true;
+                        const trailerText = isOfficial ? 'Official trailer' : 'Trailer';
+                        
+                        trailerHtml = `
+                            <div class="mt-4">
+                                <h5>Trailer</h5>
+                                <div class="ratio ratio-16x9">
+                                    <iframe src="https://www.youtube.com/embed/${trailerKey}?rel=0&modestbranding=1" 
+                                            frameborder="0" 
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                            allowfullscreen>
+                                    </iframe>
+                                </div>
+                                <p class="small text-muted mt-2">${trailerText}</p>
+                            </div>`;
+                    }
+                }
+
+                // IMAGES: TMDB only
+                let imagesHtml = '';
+                const allImages = [];
+
+                if (hasTmdbData && tmdbData.images) {
+                    if (tmdbData.images.posters) {
+                        tmdbData.images.posters.slice(0, 10).forEach(poster => {
+                            allImages.push({
+                                url: `https://image.tmdb.org/t/p/w300${poster.file_path}`,
+                                fullUrl: `https://image.tmdb.org/t/p/original${poster.file_path}`,
+                                type: 'poster'
+                            });
+                        });
+                    }
+                    if (tmdbData.images.backdrops) {
+                        tmdbData.images.backdrops.slice(0, 10).forEach(backdrop => {
+                            allImages.push({
+                                url: `https://image.tmdb.org/t/p/w300${backdrop.file_path}`,
+                                fullUrl: `https://image.tmdb.org/t/p/original${backdrop.file_path}`,
+                                type: 'backdrop'
+                            });
+                        });
+                    }
+                }
+
+                if (allImages.length > 0) {
+                    imagesHtml = `
+                    <div class="mt-4">
+                        <h5>Gallery</h5>
+                        <div class="row g-2 image-gallery">
+                            ${allImages.slice(0, 20).map(image => `
+                                <div class="col-4 col-md-3">
+                                    <img src="${image.url}" 
+                                        class="img-thumbnail cursor-pointer"
+                                        onclick="showFullImage('${image.fullUrl || image.url}')"
+                                        alt="${image.type} image"
+                                        title="${image.type}">
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
+                }
+
+                // TMDB-ONLY HTML (no library status)
+                const html = `
+                    <div class="row g-0 h-100">
+                        <div class="col-md-5 px-2">
+                            <img src="${posterUrl}" 
+                                class="poster img-fluid h-100 object-fit-cover" 
+                                alt="${title} poster"
+                                onerror="this.src='https://via.placeholder.com/500x750?text=Poster+Not+Available'">
+                        </div>
+                        
+                        <div class="col-md-7 px-3">
+                            <h1 class="display-6 mb-2 fw-bold">${title}</h1>
+                            
+                            <div class="d-flex align-items-center flex-wrap gap-3 mb-3">
+                                ${year ? `<span class="text-light">${year}</span>` : ''}
+                                <span class="certification-badge bg-dark text-white px-2 rounded">
+                                    ${certification}
+                                </span>
+                                ${mediaType === 'tv' ? `
+                                <span class="certification-badge bg-dark text-white px-2 rounded">
+                                    ${status}
+                                </span>` : ''}
+                                ${rating !== 'N/A' ? `
+                                <span class="text-light">⭐ ${rating}/10</span>` : ''}
+                            </div>
+                            
+                            <div class="d-flex flex-wrap gap-2 mb-4">
+                                ${genres.slice(0, 4).map(genre => `
+                                    <span class="badge bg-secondary">${genre}</span>
+                                `).join('')}
+                            </div>
+                            
+                            <p class="mb-4">${overview}</p>
+
+                            <div class="mt-4">
+                                <button class="btn btn-primary w-100" 
+                                        id="modalAddButton"
+                                        onclick="addItemFromModal('${mediaType}', ${mediaId})">
+                                    Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}
+                                </button>
+                            </div>
+
+                            ${trailerHtml}
+                            ${imagesHtml}
+                        </div>
+                    </div>`;
+                
+                document.getElementById('detailsContent').innerHTML = html;
+                modal.show();
+                
             } else {
-                const posterImage = data.images?.find(img => img.coverType === 'poster');
-                posterUrl = posterImage?.remoteUrl || posterImage?.url ||
-                        (tmdbData?.poster_path ? `https://image.tmdb.org/t/p/original${tmdbData.poster_path}` : null);
-            }
+                // NORMAL MODE: Use both TMDB and internal data with TMDB prioritized
+                const internalDataObj = internalData.data || internalData;
+                
+                // Content: TMDB first, internal fallback
+                const title = hasTmdbData ? tmdbData.title : internalDataObj.title || 'No Title';
+                const overview = hasTmdbData ? tmdbData.overview : internalDataObj.overview || 'No overview available';
+                const year = hasTmdbData && tmdbData.first_air_date 
+                    ? new Date(tmdbData.first_air_date).getFullYear() 
+                    : internalDataObj.year || 'N/A';
+                const genres = hasTmdbData ? tmdbData.genres : (internalDataObj.genres || []);
+                const rating = hasTmdbData 
+                    ? tmdbData.vote_average?.toFixed(1) 
+                    : (internalDataObj.ratings?.imdb?.value || internalDataObj.ratings?.tmdb?.value || 'N/A');
+                const status = hasTmdbData 
+                    ? (tmdbData.status === 'Ended' ? 'Ended' : 'Current')
+                    : (internalDataObj.ended ? 'Ended' : 'Current');
+                const certification = internalDataObj.certification || internalDataObj.mpaaRating || 'NR';
+                
+                // POSTER: TMDB first, then internal
+                let posterUrl;
+                if (hasTmdbData && tmdbData.poster_path) {
+                    posterUrl = `https://image.tmdb.org/t/p/original${tmdbData.poster_path}`;
+                } else if (internalDataObj.images) {
+                    const posterImage = internalDataObj.images.find(img => img.coverType === 'poster');
+                    posterUrl = posterImage?.remoteUrl || posterImage?.url;
+                } else {
+                    posterUrl = '/static/images/logo.png';
+                }
 
-            // Use logo as fallback if no poster available
-            if (!posterUrl || posterUrl.includes('placeholder.com')) {
-                posterUrl = '/static/images/logo.png';
-            }
+                const posterHtml = `
+                    <img src="${posterUrl}" 
+                        class="img-fluid h-100 object-fit-cover" 
+                        alt="${title} poster"
+                        onerror="this.onerror=null; this.src='/static/images/logo.png'"
+                        style="background-color: #2c3e50; background-image: url('/static/images/logo.png'); background-size: 60%; background-position: center; background-repeat: no-repeat;">`;
+                
+                // TRAILER: TMDB first, then internal
+                let trailerHtml = '';
+                let trailerKey = null;
 
-            // Then in your HTML generation for the modal:
-            const title = data.title || (hasTmdbData ? tmdbData.title : 'No Title');            
-            const posterHtml = `
-                <img src="${posterUrl}" 
-                    class="img-fluid h-100 object-fit-cover" 
-                    alt="${title} poster"
-                    onerror="this.onerror=null; this.src='/static/images/logo.png'"
-                    style="background-color: #2c3e50; background-image: url('/static/images/logo.png'); background-size: 60%; background-position: center; background-repeat: no-repeat;">`;
-            
-            const year = data.year || (hasTmdbData && tmdbData.first_air_date 
-                ? new Date(tmdbData.first_air_date).getFullYear() 
-                : 'N/A');
-            const overview = data.overview || (hasTmdbData ? tmdbData.overview : 'No overview available');
-            const genres = (data.genres && data.genres.length) 
-                ? data.genres 
-                : (hasTmdbData ? tmdbData.genres : []);
-            const rating = hasTmdbData 
-                ? tmdbData.vote_average?.toFixed(1) 
-                : (data.ratings?.imdb?.value || data.ratings?.tmdb?.value || 'N/A');
-            const status = data.ended 
-                ? 'Ended' 
-                : (hasTmdbData && tmdbData.status === 'Ended' ? 'Ended' : 'Current');
-            
-            // Determine trailer
-            let trailerHtml = '';
-            let trailerKey = null;
+                if (hasTmdbData) {
+                    const trailer = tmdbData.trailer || 
+                        (tmdbData.videos && tmdbData.videos.find(v => 
+                            v.site === 'YouTube' && 
+                            v.type === 'Trailer' &&
+                            (v.official === true || tmdbData.trailer === null)
+                        ));
 
-            if (hasTmdbData) {
-                // First try the direct trailer field
-                const trailer = tmdbData.trailer || 
-                    // Then look in videos array
-                    (tmdbData.videos && tmdbData.videos.find(v => 
-                        v.site === 'YouTube' && 
-                        v.type === 'Trailer' &&
-                        // Prefer official trailers but fallback to any
-                        (v.official === true || tmdbData.trailer === null)
-                    ));
-
-                if (trailer) {
-                    trailerKey = trailer.key;
+                    if (trailer) {
+                        trailerKey = trailer.key;
+                    }
+                } else if (internalDataObj.youTubeTrailerId) {
+                    trailerKey = internalDataObj.youTubeTrailerId;
+                }
+                        
+                if (trailerKey) {
+                    currentTrailerKey = trailerKey;
+                    const isOfficial = hasTmdbData && trailerKey === (tmdbData.trailer?.key);
+                    const trailerText = isOfficial ? 'Official trailer' : 'Trailer';
+                    
                     trailerHtml = `
                         <div class="mt-4">
                             <h5>Trailer</h5>
-                            <div id="trailerPlayer"></div>
-                            ${trailer.official ? '' : '<p class="small">Official trailer</p>'}
+                            <div class="ratio ratio-16x9">
+                                <iframe src="https://www.youtube.com/embed/${trailerKey}?rel=0&modestbranding=1" 
+                                        frameborder="0" 
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                        allowfullscreen>
+                                </iframe>
+                            </div>
+                            <p class="small text-muted mt-2">${trailerText}</p>
                         </div>`;
                 }
-            } else if (data.youTubeTrailerId) {
-                // Fallback to internal trailer ID if TMDB fails
-                trailerKey = data.youTubeTrailerId;
-                trailerHtml = `
-                    <div class="mt-4">
-                        <h5>Trailer</h5>
-                        <div id="trailerPlayer"></div>
-                        ${data.youTubeTrailerId ? '' : '<p class="small">Unofficial trailer</p>'}
-                    </div>`;
-            }
-                    
-            if (trailerKey) {
-                currentTrailerKey = trailerKey;
-                
-                // Determine if it's official - we need to check this differently
-                let isOfficial = false;
-                let trailerText = 'Trailer';
-                
-                if (hasTmdbData) {
-                    const trailerObj = tmdbData.trailer || 
-                        (tmdbData.videos && tmdbData.videos.find(v => 
-                            v.site === 'YouTube' && v.type === 'Trailer'
-                        ));
-                    isOfficial = trailerObj ? trailerObj.official === true : false;
-                    trailerText = isOfficial ? 'Official trailer' : 'Trailer';
-                } else if (data.youTubeTrailerId) {
-                    trailerText = 'Trailer';
-                }
-                
-                trailerHtml = `
-                    <div class="mt-4">
-                        <h5>Trailer</h5>
-                        <div class="ratio ratio-16x9">
-                            <iframe src="https://www.youtube.com/embed/${trailerKey}?rel=0&modestbranding=1" 
-                                    frameborder="0" 
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                    allowfullscreen>
-                            </iframe>
-                        </div>
-                        <p class="small text-muted mt-2">${trailerText}</p>
-                    </div>`;
-            }
 
-            // Determine available images from both TMDB and internal sources
-            let imagesHtml = '';
-            const allImages = [];
+                // IMAGES: Combine both sources
+                let imagesHtml = '';
+                const allImages = [];
 
-            // Add internal images first
-            if (data.images && data.images.length > 0) {
-                data.images.forEach(image => {
-                    if (image.remoteUrl) {
-                        allImages.push({
-                            url: image.remoteUrl,
-                            type: image.coverType || 'unknown'
+                if (hasTmdbData && tmdbData.images) {
+                    if (tmdbData.images.posters) {
+                        tmdbData.images.posters.slice(0, 10).forEach(poster => {
+                            allImages.push({
+                                url: `https://image.tmdb.org/t/p/w300${poster.file_path}`,
+                                fullUrl: `https://image.tmdb.org/t/p/original${poster.file_path}`,
+                                type: 'poster'
+                            });
                         });
                     }
-                });
-            }
+                    if (tmdbData.images.backdrops) {
+                        tmdbData.images.backdrops.slice(0, 10).forEach(backdrop => {
+                            allImages.push({
+                                url: `https://image.tmdb.org/t/p/w300${backdrop.file_path}`,
+                                fullUrl: `https://image.tmdb.org/t/p/original${backdrop.file_path}`,
+                                type: 'backdrop'
+                            });
+                        });
+                    }
+                }
 
-            // Add TMDB images if available
-            if (hasTmdbData && tmdbData.images && tmdbData.images.posters) {
-                tmdbData.images.posters.slice(0, 10).forEach(poster => {
-                    allImages.push({
-                        url: `https://image.tmdb.org/t/p/w300${poster.file_path}`,
-                        fullUrl: `https://image.tmdb.org/t/p/original${poster.file_path}`,
-                        type: 'poster'
+                if (internalDataObj.images && internalDataObj.images.length > 0) {
+                    internalDataObj.images.forEach(image => {
+                        if (image.remoteUrl && !allImages.some(img => img.url === image.remoteUrl)) {
+                            allImages.push({
+                                url: image.remoteUrl,
+                                fullUrl: image.remoteUrl,
+                                type: image.coverType || 'unknown'
+                            });
+                        }
                     });
-                });
-            }
+                }
 
-            if (hasTmdbData && tmdbData.images && tmdbData.images.backdrops) {
-                tmdbData.images.backdrops.slice(0, 10).forEach(backdrop => {
-                    allImages.push({
-                        url: `https://image.tmdb.org/t/p/w300${backdrop.file_path}`,
-                        fullUrl: `https://image.tmdb.org/t/p/original${backdrop.file_path}`,
-                        type: 'backdrop'
-                    });
-                });
-            }
-
-            // Create HTML if we have images
-            if (allImages.length > 0) {
-                imagesHtml = `
-                <div class="mt-4">
-                    <h5>Gallery</h5>
-                    <div class="row g-2 image-gallery">
-                        ${allImages.slice(0, 20).map(image => `
-                            <div class="col-4 col-md-3">
-                                <img src="${image.url}" 
-                                    class="img-thumbnail cursor-pointer"
-                                    onclick="showFullImage('${image.fullUrl || image.url}')"
-                                    alt="${image.type} image"
-                                    title="${image.type}">
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>`;
-            }
-
-            const alreadyAdded = internalData.status === 'existing';
-
-            // Build the HTML
-            const html = `
-                <div class="row g-0 h-100">
-                    <div class="col-md-5 px-2">
-                        <img src="${posterUrl}" 
-                            class="poster img-fluid h-100 object-fit-cover" 
-                            alt="${title} poster"
-                            onerror="this.src='https://via.placeholder.com/500x750?text=Poster+Not+Available'">
-                    </div>
-                    
-                    <div class="col-md-7 px-3">
-                        <h1 class="display-6 mb-2 fw-bold">${title}</h1>
-                        
-                        <div class="d-flex align-items-center flex-wrap gap-3 mb-3">
-                            ${year ? `<span class="text-light">${year}</span>` : ''}
-                            <span class="certification-badge bg-dark text-white px-2 rounded">
-                                ${data.certification || data.mpaaRating || 'NR'}
-                            </span>
-                            ${mediaType === 'tv' ? `
-                            <span class="certification-badge bg-dark text-white px-2 rounded">
-                                ${status}
-                            </span>` : ''}
-                            ${rating !== 'N/A' ? `
-                            <span class="text-light">⭐ ${rating}/10</span>` : ''}
-                        </div>
-                        
-                        <div class="d-flex flex-wrap gap-2 mb-4">
-                            ${genres.slice(0, 4).map(genre => `
-                                <span class="badge bg-secondary">${genre}</span>
+                if (allImages.length > 0) {
+                    imagesHtml = `
+                    <div class="mt-4">
+                        <h5>Gallery</h5>
+                        <div class="row g-2 image-gallery">
+                            ${allImages.slice(0, 20).map(image => `
+                                <div class="col-4 col-md-3">
+                                    <img src="${image.url}" 
+                                        class="img-thumbnail cursor-pointer"
+                                        onclick="showFullImage('${image.fullUrl || image.url}')"
+                                        alt="${image.type} image"
+                                        title="${image.type}">
+                                </div>
                             `).join('')}
                         </div>
+                    </div>`;
+                }
+
+                // LIBRARY STATUS: From internal data
+                const alreadyAdded = internalData.status === 'existing';
+                const onDisk = internalData.on_disk;
+                const monitored = internalData.monitored;
+                const seasonCount = internalDataObj.statistics?.seasonCount;
+
+                // NORMAL MODE HTML (with library status)
+                const html = `
+                    <div class="row g-0 h-100">
+                        <div class="col-md-5 px-2">
+                            <img src="${posterUrl}" 
+                                class="poster img-fluid h-100 object-fit-cover" 
+                                alt="${title} poster"
+                                onerror="this.src='https://via.placeholder.com/500x750?text=Poster+Not+Available'">
+                        </div>
                         
-                        <p class="mb-4">${overview}</p>
-                        
-                        <div class="row g-2 mb-4">
-                            ${data.statistics?.seasonCount ? `
-                                <span class="badge bg-success">
-                                    Seasons: ${data.statistics.seasonCount}
+                        <div class="col-md-7 px-3">
+                            <h1 class="display-6 mb-2 fw-bold">${title}</h1>
+                            
+                            <div class="d-flex align-items-center flex-wrap gap-3 mb-3">
+                                ${year ? `<span class="text-light">${year}</span>` : ''}
+                                <span class="certification-badge bg-dark text-white px-2 rounded">
+                                    ${certification}
+                                </span>
+                                ${mediaType === 'tv' ? `
+                                <span class="certification-badge bg-dark text-white px-2 rounded">
+                                    ${status}
                                 </span>` : ''}
-                            <div class="col-auto">
-                                <span class="badge ${internalData.status === 'existing' ? 'bg-success' : 'bg-warning'}">
-                                    ${internalData.status === 'existing' ? 'In Library' : 'Not Added'}
-                                </span>
+                                ${rating !== 'N/A' ? `
+                                <span class="text-light">⭐ ${rating}/10</span>` : ''}
                             </div>
-                            ${internalData.on_disk !== undefined ? `
-                            <div class="col-auto">
-                                <span class="badge ${internalData.on_disk ? 'bg-success' : 'bg-secondary'}">
-                                    ${internalData.on_disk ? 'Downloaded' : 'Not Downloaded'}
-                                </span>
+                            
+                            <div class="d-flex flex-wrap gap-2 mb-4">
+                                ${genres.slice(0, 4).map(genre => `
+                                    <span class="badge bg-secondary">${genre}</span>
+                                `).join('')}
                             </div>
-                            ` : ''}
-                        </div>
+                            
+                            <p class="mb-4">${overview}</p>
+                            
+                            <div class="row g-2 mb-4">
+                                ${seasonCount ? `
+                                    <span class="badge bg-success">
+                                        Seasons: ${seasonCount}
+                                    </span>` : ''}
+                                <div class="col-auto">
+                                    <span class="badge ${alreadyAdded ? 'bg-success' : 'bg-warning'}">
+                                        ${alreadyAdded ? 'In Library' : 'Not Added'}
+                                    </span>
+                                </div>
+                                ${onDisk !== undefined ? `
+                                <div class="col-auto">
+                                    <span class="badge ${onDisk ? 'bg-success' : 'bg-secondary'}">
+                                        ${onDisk ? 'Downloaded' : 'Not Downloaded'}
+                                    </span>
+                                </div>
+                                ` : ''}
+                            </div>
 
-                        <div class="mt-4">
-                            <button class="btn ${alreadyAdded ? 'btn-success' : 'btn-primary'} w-100" 
-                                    id="modalAddButton"
-                                    onclick="${alreadyAdded ? '' : `addItemFromModal('${mediaType}', ${mediaId})`}"
-                                    ${alreadyAdded ? 'disabled' : ''}>
-                                ${alreadyAdded ? '✓ Already in Library' : `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`}
-                            </button>
-                        </div>
+                            <div class="mt-4">
+                                <button class="btn ${alreadyAdded ? 'btn-success' : 'btn-primary'} w-100" 
+                                        id="modalAddButton"
+                                        onclick="${alreadyAdded ? '' : `addItemFromModal('${mediaType}', ${mediaId})`}"
+                                        ${alreadyAdded ? 'disabled' : ''}>
+                                    ${alreadyAdded ? '✓ Already in Library' : `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`}
+                                </button>
+                            </div>
 
-                        ${trailerHtml}
-                        ${imagesHtml}
-                    </div>
-                </div>`;
-            
-            document.getElementById('detailsContent').innerHTML = html;
-            modal.show();
+                            ${trailerHtml}
+                            ${imagesHtml}
+                        </div>
+                    </div>`;
+                
+                document.getElementById('detailsContent').innerHTML = html;
+                modal.show();
+            }
         })
         .catch(error => {
             console.error('Error:', error);

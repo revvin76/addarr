@@ -114,7 +114,7 @@
                     <div class="search-result-card h-100 tv-card" 
                          data-media-type="tv"
                          data-media-id="{{ show.id }}"
-                         onclick="showDetails('tv', {{ show.id }}, 'tmdb')">
+                         onclick="showDetails('tv', {{ show.id }}, true)">
                         <div class="search-result-thumbnail-container">
                             <img src="{% if show.poster_path %}https://image.tmdb.org/t/p/w300{{ show.poster_path }}{% else %}/static/images/apple-touch-icon.png{% endif %}" 
                                 class="search-result-thumbnail"
