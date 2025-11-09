@@ -2247,6 +2247,7 @@ def search():
             media_type='combined',
             movies=len(movie_results),
             tv_shows=len(tv_results),
+            all_results=len(combined_results),
             query=query,
             config=CONFIG  # ADD THIS LINE
         )
@@ -2641,6 +2642,77 @@ def delete_movie(movie_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/tvdb/lookup')
+@debug_log
+@requires_auth
+def lookup_tvdb_id():
+    """Lookup TVDB ID from TMDB ID"""
+    tmdb_id = request.args.get('tmdb_id')
+    
+    if not tmdb_id:
+        return jsonify({'success': False, 'error': 'Missing TMDB ID'})
+    
+    try:
+        # Use TMDB API to get external IDs
+        url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/external_ids"
+        params = {
+            'api_key': CONFIG['tmdb']['key']
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            tvdb_id = data.get('tvdb_id')
+            if tvdb_id:
+                return jsonify({
+                    'success': True,
+                    'tmdb_id': tmdb_id,
+                    'tvdb_id': tvdb_id
+                })
+        
+        return jsonify({'success': False, 'error': 'TVDB ID not found'})
+        
+    except Exception as e:
+        logging.error(f"TVDB lookup error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/sonarr/search')
+@debug_log
+@requires_auth
+def search_sonarr_by_name():
+    """Search Sonarr by show name"""
+    term = request.args.get('term')
+    
+    if not term:
+        return jsonify([])
+    
+    try:
+        url = f"{CONFIG['sonarr']['url']}/api/v3/series/lookup"
+        params = {
+            'term': term,
+            'apikey': CONFIG['sonarr']['api_key']
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code == 200:
+            results = response.json()
+            # Return limited data
+            simplified_results = []
+            for item in results[:5]:  # Limit to 5 results
+                simplified_results.append({
+                    'title': item.get('title'),
+                    'tvdbId': item.get('tvdbId'),
+                    'year': item.get('year'),
+                    'status': item.get('status')
+                })
+            return jsonify(simplified_results)
+        
+        return jsonify([])
+        
+    except Exception as e:
+        logging.error(f"Sonarr search error: {str(e)}")
+        return jsonify([])
+    
 @app.route('/api/movie/<int:movie_id>/monitor', methods=['PUT'])
 @debug_log
 def monitor_movie(movie_id):

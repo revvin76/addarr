@@ -62,31 +62,21 @@
             <h3 class="text-light">Welcome to ADDARR</h3>
             <p class="text-light">Search for movies and TV shows to add to your media library.</p>
         </div>
-        <div class="row justify-content-center">
-            <div class="col-md-8 col-lg-6">
-                <form action="/search" method="POST" onsubmit="return validateForm()">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <input type="text" class="form-control form-control-lg" 
-                                name="query" placeholder="Search movies and TV shows..." required>
-                        </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
-                        </div>
+        <div class="col-12 col-xs-12 col-md-8 col-lg-8 mb-2">
+            <form action="/search" method="POST" onsubmit="return validateForm()">
+                    <div class="col-12 mb-2">
+                        <input type="text" class="form-control form-control-lg" 
+                            name="query" placeholder="Search movies and TV shows..." required>
                     </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Trending -->
-        <div class="row justify-content-center mt-4">
-            <div class="col-md-8 col-lg-6">
-                <div class="d-grid gap-2">
-                    <a href="/trending" class="btn btn-outline-info btn-lg">
-                        <i class="fas fa-fire me-2"></i>View Trending Media
-                    </a>
-                </div>
-            </div>
+                    <div class="col-12 mb-2">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
+                    </div>
+                    <div class="col-12 mb-2">
+                        <a href="/trending" class="btn btn-outline-info btn-lg w-100">
+                            <i class="fas fa-fire me-2"></i>View Trending Media
+                        </a>            
+                    </div>
+            </form>
         </div>
     </div>
         

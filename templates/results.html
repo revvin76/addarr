@@ -59,43 +59,35 @@
 
     <div class="container mt-4 text-xs">
 
-        
-        <!-- Filter and Search Controls -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <form action="/search" method="POST" onsubmit="return validateForm()">
-                    <div class="row g-2">
-                        <div class="col-12">
-                            <input type="text" class="form-control form-control-lg" 
-                                name="query" placeholder="Search movies and TV shows..." 
-                                value="{{ query }}" required>
-                        </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-primary btn-lg w-100">Search</button>
-                        </div>
-                        <div class="col-md-6 mb-2">
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="fas fa-filter"></i>
-                                </span>
-                                <select id="mediaFilter" class="form-select">
-                                    <option value="all">All Media</option>
-                                    <option value="movie">Movies Only</option>
-                                    <option value="tv">TV Shows Only</option>
-                                </select>
-                            </div>
-                        </div>                           
-                    </div>
-                </form>
-            </div>         
+        <div class="col-12 col-xs-12 col-md-8 col-lg-8 mb-2">
+            <form action="/search" method="POST" onsubmit="return validateForm()">
+                <div class="col-12 mb-2">
+                    <input type="text" class="form-control form-control-lg" 
+                        name="query" placeholder="Search movies and TV shows..." 
+                        value="{{ query }}" required>
+                </div>
+                <div class="col-12 mb-4">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">Search</button>
+                </div>
+            </form>
         </div>
 
+        <div class="col-md-2 mb-2 ml-auto">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-filter"></i>
+                </span>
+                <select id="mediaFilter" class="form-select">
+                    <option value="all">All Media ({{ all_results }})</option>
+                    <option value="movie">Movies Only ({{ movies }})</option>
+                    <option value="tv">TV Shows Only ({{ tv_shows }})</option>
+                </select>
+            </div>
+        </div> 
         {% if results %}
             <div class="row" id="resultsGrid">
                     
-                    <hr>
-
-                    <div class="col-6 col-xs-6 mb-3 result-item result-badge" data-media-type="tv">
+                    <!-- <div class="col-6 col-xs-6 col-lg-12 result-item result-badge" data-media-type="tv">
                         <div class="header-badge-container" onclick="event.stopPropagation(); return false;">
                             <div class="status-badge text-xs badge header-badge tv-card tv-badge" data-media-type="tv">
                                 TV Shows ({{ tv_shows }})
@@ -103,16 +95,16 @@
                         </div>
                     </div>
 
-                    <div class="col-6 col-xs-6 mb-3 result-item result-badge" data-media-type="movie">
+                    <div class="col-6 col-xs-6 col-lg-12 result-item result-badge" data-media-type="movie">
                         <div class="header-badge-container" onclick="event.stopPropagation(); return false;">
                             <div class="status-badge text-xs badge header-badge movie-card movie-badge" data-media-type="movie">
                                 Movies ({{ movies }})
                             </div>
                         </div>
-                    </div>               
+                    </div>                -->
                     
                     {% for result in results %}
-                    <div class="col-6 col-xs-6 mb-3 result-item" 
+                    <div class="col-6 col-xs-6 col-lg-12 mb-3 result-item" 
                          data-media-type="{{ result.media_type }}">
                         <div class="search-result-card h-100 {{ 'movie-card' if result.media_type == 'movie' else 'tv-card' }}" 
                             data-media-type="{{ result.media_type }}" 

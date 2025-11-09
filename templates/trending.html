@@ -70,7 +70,7 @@
         <div class="mb-5">
             <div class="row">
                 {% for movie in trending_data.movies %}
-                <div class="col-6 col-md-4 col-lg-3 mb-3 result-item" data-media-type="movie">
+                <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="movie">
                     <div class="search-result-card h-100 movie-card" 
                          data-media-type="movie"
                          data-media-id="{{ movie.id }}"
@@ -110,7 +110,7 @@
         <div class="mb-5">
             <div class="row">
                 {% for show in trending_data.tv_shows %}
-                <div class="col-6 col-md-4 col-lg-3 mb-3 result-item" data-media-type="tv">
+                <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="tv">
                     <div class="search-result-card h-100 tv-card" 
                          data-media-type="tv"
                          data-media-id="{{ show.id }}"
