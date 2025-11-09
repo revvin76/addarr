@@ -1,6 +1,6 @@
 import os
 from functools import wraps
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, Response, session, redirect, url_for
 from dotenv import load_dotenv
 import threading
 from datetime import datetime
@@ -20,6 +20,7 @@ import logging
 import shutil
 from packaging import version
 from pathlib import Path
+import base64
 
 
 
@@ -59,6 +60,8 @@ root.setLevel(logging.DEBUG if os.environ.get('FLASK_DEBUG', 'false').lower() ==
 # Global variables
 shutdown_event = False
 app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-change-in-production') 
+
 tunnel_process = None
 tunnel_url = None
 
@@ -106,6 +109,11 @@ CONFIG = {
         'applied': os.getenv('UPDATE_APPLIED', 'false').lower() == 'true',
         'applied_version': os.getenv('UPDATE_APPLIED_VERSION', '')
     },
+    'auth': {
+        'enabled': os.getenv('AUTH_ENABLED', 'false').lower() == 'true',
+        'username': os.getenv('AUTH_USERNAME', ''),
+        'password': os.getenv('AUTH_PASSWORD', '')
+    },
     'tunnel': {
         'enabled': os.getenv('TUNNEL_ENABLED', 'false').lower() == 'true',
         'auth_token': os.getenv('PINGGY_AUTH_TOKEN', ''),
@@ -150,6 +158,11 @@ def reload_configuration():
         CONFIG['app']['port'] = int(os.getenv('SERVER_PORT', '5000'))
         CONFIG['app']['log_level'] = os.getenv('LOG_LEVEL', 'INFO')
         
+        # Auth settings
+        CONFIG['auth']['enabled'] = os.getenv('AUTH_ENABLED', 'false').lower() == 'true'
+        CONFIG['auth']['username'] = os.getenv('AUTH_USERNAME', '')
+        CONFIG['auth']['password'] = os.getenv('AUTH_PASSWORD', '')
+
         # Update settings
         CONFIG['update']['github_repo'] = os.getenv('GITHUB_REPO', 'revvin76/addarr')
         CONFIG['update']['check_interval'] = os.getenv('CHECK_INTERVAL', '3600')
@@ -220,6 +233,61 @@ def debug_log(func):
 
 setup_logging()
 
+def authenticate():
+    """Sends a 401 response that enables basic auth"""
+    return Response(
+        'Could not verify your access level for that URL.\n'
+        'You have to login with proper credentials', 401,
+        {'WWW-Authenticate': 'Basic realm="Login Required"'})
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not CONFIG['auth']['enabled']:
+            return f(*args, **kwargs)
+            
+        # Check session first
+        if session.get('authenticated'):
+            return f(*args, **kwargs)
+            
+        # Fall back to basic auth for API calls
+        auth = request.authorization
+        if auth and check_auth(auth.username, auth.password):
+            session['authenticated'] = True
+            session['username'] = auth.username
+            return f(*args, **kwargs)
+            
+        # For web routes, redirect to login page
+        if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+            return authenticate()  # Return basic auth for API calls
+        else:
+            return redirect(url_for('login', next=request.url))
+            
+    return decorated
+
+def check_auth(username, password):
+    """Check if a username/password combination is valid"""
+    if not CONFIG['auth']['enabled']:
+        return True  # Always return true if auth is disabled
+        
+    return (username == CONFIG['auth']['username'] and 
+            password == CONFIG['auth']['password'])
+
+def backup_env_file():
+    """Create a timestamped backup of the .env file"""
+    try:
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        backup_path = os.path.join(os.path.dirname(__file__), f".env.backup.{int(time.time())}")
+        
+        if os.path.exists(env_path):
+            shutil.copy2(env_path, backup_path)
+            logging.info(f"✅ Created .env backup: {backup_path}")
+            return backup_path
+        return None
+    except Exception as e:
+        logging.error(f"❌ Failed to create .env backup: {str(e)}")
+        return None
+    
 @debug_log
 def check_github_for_updates():
     """Check GitHub for new releases with proper version comparison"""
@@ -340,7 +408,48 @@ def download_update():
     except Exception as e:
         logging.error(f"Error downloading update: {str(e)}")
         return {'success': False, 'error': str(e)}
-   
+
+@debug_log
+def fetch_trending_from_tmdb(media_type='all'):
+    """Fetch trending media from TMDB API"""
+    try:
+        api_key = CONFIG['tmdb']['key']
+        if not api_key:
+            logging.warning("TMDB API key not configured")
+            return {'movies': [], 'tv_shows': []}
+        
+        trending_data = {'movies': [], 'tv_shows': []}
+        
+        # Fetch trending movies
+        if media_type in ['all', 'movie']:
+            movie_url = f"https://api.themoviedb.org/3/trending/movie/week"
+            movie_params = {'api_key': api_key, 'language': 'en-GB'}
+            
+            movie_response = requests.get(movie_url, params=movie_params, timeout=10)
+            if movie_response.status_code == 200:
+                movie_data = movie_response.json()
+                trending_data['movies'] = movie_data.get('results', [])[:20]  # Limit to 20
+            else:
+                logging.error(f"TMDB movie API error: {movie_response.status_code}")
+        
+        # Fetch trending TV shows
+        if media_type in ['all', 'tv']:
+            tv_url = f"https://api.themoviedb.org/3/trending/tv/week"
+            tv_params = {'api_key': api_key, 'language': 'en-GB'}
+            
+            tv_response = requests.get(tv_url, params=tv_params, timeout=10)
+            if tv_response.status_code == 200:
+                tv_data = tv_response.json()
+                trending_data['tv_shows'] = tv_data.get('results', [])[:20]  # Limit to 20
+            else:
+                logging.error(f"TMDB TV API error: {tv_response.status_code}")
+        
+        return trending_data
+        
+    except Exception as e:
+        logging.error(f"Error fetching trending data from TMDB: {str(e)}")
+        return {'movies': [], 'tv_shows': []}
+       
 @debug_log
 def get_downloaded_updates():
     try:
@@ -428,6 +537,13 @@ def set_env(key, value):
         env_path = os.path.join(os.path.dirname(__file__), '.env')
         env_lines = []
         
+        # Create backup before making changes (only once per session)
+        if not hasattr(set_env, 'backup_created'):
+            backup_env_file()
+            set_env.backup_created = True
+        
+        env_lines = []
+
         # Read existing .env file
         if os.path.exists(env_path):
             with open(env_path, 'r') as f:
@@ -460,6 +576,7 @@ def set_env(key, value):
     
 @app.route('/get_media_details')
 @debug_log
+@requires_auth
 def get_media_details():
     media_type = request.args.get('type')
     media_id = request.args.get('id')
@@ -707,6 +824,11 @@ def update_env_file_from_demo(extract_path, current_dir):
     try:
         logging.info("🔄 Starting .env file update process...")
         
+        # CREATE BACKUP BEFORE PROCEEDING
+        backup_path = backup_env_file()
+        if backup_path:
+            logging.info(f"📁 Created backup at: {backup_path}")
+
         # Make sure shutil is available
         import shutil  # ADD THIS HERE TOO FOR SAFETY
         
@@ -1109,13 +1231,69 @@ def restart_application():
         logging.error(traceback.format_exc())
         return {'success': False, 'error': str(e)}
 
+@app.route('/login', methods=['GET', 'POST'])
+@debug_log
+def login():
+    """Login page for authentication"""
+    # If auth is not enabled, redirect to home
+    if not CONFIG['auth']['enabled']:
+        return redirect('/')
+    
+    # If already authenticated, redirect to home
+    if session.get('authenticated'):
+        return redirect('/')
+    
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if check_auth(username, password):
+            session['authenticated'] = True
+            session['username'] = username
+            return redirect(request.args.get('next') or '/')
+        else:
+            error = 'Invalid username or password'
+    
+    return render_template('login.html', error=error, config=CONFIG)
+
+@app.route('/logout')
+@debug_log
+def logout():
+    """Logout user and clear session"""
+    session.clear()
+    return redirect('/')
+
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@app.route('/trending')
+@debug_log
+@requires_auth  
+def trending_media():
+    """Display trending movies and TV shows from TMDB"""
+    try:
+        media_type = request.args.get('type', 'all')  # all, movie, tv
+        
+        trending_data = fetch_trending_from_tmdb(media_type)
+        
+        return render_template(
+            'trending.html',
+            trending_data=trending_data,
+            media_type=media_type,
+            config=CONFIG
+        )
+        
+    except Exception as e:
+        logging.error(f"Error loading trending media: {str(e)}")
+        return render_template('error.html', error="Failed to load trending media")
+
+
 @app.route('/save_config', methods=['POST'])
 @debug_log
+@requires_auth  
 def save_config():
     try:
         data = request.get_json()
@@ -1920,6 +2098,7 @@ def restart_application_route():
 
 @app.route('/logs')
 @debug_log
+@requires_auth  
 def get_logs():
     try:
         log_path = 'addarr.log'
@@ -1971,6 +2150,7 @@ def not_found(e):
 
 @app.route('/get_tmdb_details')
 @debug_log
+@requires_auth  
 def get_tmdb_details():
     media_type = request.args.get('type')  # 'tv' or 'movie'
     tmdb_id = request.args.get('id')      # TMDB ID
@@ -2026,6 +2206,7 @@ def get_tmdb_details():
       
 @app.route('/search', methods=['POST'])
 @debug_log
+@requires_auth
 def search():
     query = request.form['query']
     print(f"Searching for: {query}")
@@ -2066,13 +2247,13 @@ def search():
             media_type='combined',
             movies=len(movie_results),
             tv_shows=len(tv_results),
-            query=query
+            query=query,
+            config=CONFIG  # ADD THIS LINE
         )
         
     except Exception as e:
         print(f"Search error: {str(e)}")
         return render_template('error.html', error=str(e))
-
 def search_radarr(query):
     url = f"{CONFIG['radarr']['url']}/api/v3/movie/lookup"
     params = {
@@ -2093,6 +2274,7 @@ def search_sonarr(query):
 
 @app.route('/add', methods=['POST'])
 @debug_log
+@requires_auth  
 def add_to_arr():
     data = request.json
     media_type = data['media_type']
@@ -2262,6 +2444,7 @@ def get_sonarr_details(tvdb_id):
 
 @app.route('/check_library_status')
 @debug_log
+@requires_auth  
 def check_library_status():
     media_type = request.args.get('type')
     media_id = request.args.get('id')
@@ -2285,11 +2468,13 @@ def check_library_status():
 
 @app.route('/images/<path:filename>')
 @debug_log
+@requires_auth  
 def serve_image(filename):
     return send_from_directory('static/images', filename)
 
 @app.route('/manage')
 @debug_log
+@requires_auth  
 def manage_media():
     try:
         # Get all movies from Radarr
@@ -2326,6 +2511,7 @@ def manage_media():
 
 @app.route('/get_media_manage')
 @debug_log
+@requires_auth  
 def get_media_manage():
     media_type = request.args.get('type')
     media_id = request.args.get('id')
@@ -2377,6 +2563,7 @@ def get_media_manage():
 
 @app.route('/delete_movie/<int:movie_id>', methods=['POST'])
 @debug_log
+@requires_auth  
 def delete_movie_manage(movie_id):
     url = f"{CONFIG['radarr']['url']}/api/v3/movie/{movie_id}"
     r = requests.delete(url, params={'apikey': CONFIG['radarr']['api_key']})
@@ -2384,6 +2571,7 @@ def delete_movie_manage(movie_id):
 
 @app.route('/delete_movie_file/<int:movie_id>', methods=['POST'])
 @debug_log
+@requires_auth  
 def delete_movie_file(movie_id):
     # Radarr can delete only file by setting deleteFiles=True/False
     url = f"{CONFIG['radarr']['url']}/api/v3/movie/{movie_id}"
@@ -2392,6 +2580,7 @@ def delete_movie_file(movie_id):
 
 @app.route('/search_movie/<int:movie_id>', methods=['POST'])
 @debug_log
+@requires_auth  
 def search_movie_manage(movie_id):
     url = f"{CONFIG['radarr']['url']}/api/v3/command"
     payload = {"name": "MoviesSearch", "movieIds": [movie_id]}
@@ -2400,6 +2589,7 @@ def search_movie_manage(movie_id):
 
 @app.route('/delete_show/<int:series_id>', methods=['POST'])
 @debug_log
+@requires_auth  
 def delete_show(series_id):
     url = f"{CONFIG['sonarr']['url']}/api/v3/series/{series_id}"
     r = requests.delete(url, params={'apikey': CONFIG['sonarr']['api_key'], 'deleteFiles': 'true'})
@@ -2407,6 +2597,7 @@ def delete_show(series_id):
 
 @app.route('/delete_all_episodes/<int:series_id>', methods=['POST'])
 @debug_log
+@requires_auth  
 def delete_all_episodes(series_id):
     # Delete all files for a series
     url = f"{CONFIG['sonarr']['url']}/api/v3/episodefile/bulk"
@@ -2416,6 +2607,7 @@ def delete_all_episodes(series_id):
 
 @app.route('/delete_episode/<int:episode_id>', methods=['POST'])
 @debug_log
+@requires_auth  
 def delete_episode_manage(episode_id):
     url = f"{CONFIG['sonarr']['url']}/api/v3/episodefile/{episode_id}"
     r = requests.delete(url, params={'apikey': CONFIG['sonarr']['api_key']})
@@ -2423,6 +2615,7 @@ def delete_episode_manage(episode_id):
 
 @app.route('/search_episode/<int:episode_id>', methods=['POST'])
 @debug_log
+@requires_auth  
 def search_episode_manage(episode_id):
     url = f"{CONFIG['sonarr']['url']}/api/v3/command"
     payload = {"name": "EpisodeSearch", "episodeIds": [episode_id]}
@@ -2431,6 +2624,7 @@ def search_episode_manage(episode_id):
 
 @app.route('/search_all_missing/<int:series_id>', methods=['POST'])
 @debug_log
+@requires_auth  
 def search_all_missing(series_id):
     url = f"{CONFIG['sonarr']['url']}/api/v3/command"
     payload = {"name": "SeriesSearch", "seriesId": series_id}
@@ -2594,6 +2788,7 @@ def delete_episode(episode_id):
 
 @app.route('/')
 @debug_log
+@requires_auth  
 def index():
     try:
         reload_configuration()

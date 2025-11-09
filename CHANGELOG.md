@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.4] - 2025-11-09
+### Added
+- Authentication Section: Added to config panel with username/password fields
+- Basic Auth Protection: Uses Flask's basic auth with a decorator pattern
+- Login/Logout page
+- .env Backup System: Creates timestamped backups before any .env modifications
+- Trending Feature: New route that fetches trending media from TMDB API
+- Trending Template: New HTML template to display trending content
+- Security: All main routes are protected when auth is enabled
+- The backup system will create files like .env.backup.1635789200 before any .env modifications, which should prevent the blank .env file issue you experienced.
+
 ## [1.1.3] - 2025-11-07
 ### Added
 - Automatic check for and install missing modules from requirements.txt

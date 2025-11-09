@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Login - Addarr</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/styles.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">    
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a1a" />
+</head>
+<body class="bg-dark">
+
+    <!-- Login Form -->
+    <div class="container d-flex flex-column justify-content-center" style="min-height: calc(100vh - 120px);">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-4">
+                <div class="card bg-dark border-secondary">
+                    <div class="card-body p-4">
+                        <div class="text-center mb-4">
+                            <img src="/static/images/logo.png" alt="Addarr Logo" height="60" class="mb-3">
+                            <h3 class="text-light">Login Required</h3>
+                            <p class="text-muted">Enter your credentials to access Addarr</p>
+                        </div>
+
+                        {% if error %}
+                        <div class="alert alert-danger" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>{{ error }}
+                        </div>
+                        {% endif %}
+
+                        <form method="POST" action="/login">
+                            <div class="mb-3">
+                                <label for="username" class="form-label text-light">Username</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-dark border-secondary text-light">
+                                        <i class="fas fa-user"></i>
+                                    </span>
+                                    <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                           id="username" name="username" required 
+                                           placeholder="Enter your username">
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="password" class="form-label text-light">Password</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-dark border-secondary text-light">
+                                        <i class="fas fa-lock"></i>
+                                    </span>
+                                    <input type="password" class="form-control bg-dark text-light border-secondary" 
+                                           id="password" name="password" required 
+                                           placeholder="Enter your password">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-2">
+                                <i class="fas fa-sign-in-alt me-2"></i>Login
+                            </button>
+                        </form>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Loading Spinner -->
+    <div id="globalLoadingSpinner" class="loading-spinner">
+        <div class="spinner-container">
+            <button id="forceCloseSpinner" class="btn-close btn-close-white mt-3" style="display: none;"></button>
+            <div class="spinner-border spinner-radarr" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>

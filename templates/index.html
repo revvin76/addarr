@@ -30,6 +30,7 @@
             </a>
             
             <div class="d-flex gap-2">
+
                 <a href="/manage" class="btn btn-outline-radarr me-2"><i class="fas fa-film"></i></a>
                 <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#configModal">
                     <i class="fas fa-cog"></i>
@@ -37,6 +38,20 @@
                 <button id="infoToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#infoModal">
                     <i class="fas fa-info-circle"></i>
                 </button>
+
+                <!-- Authentication Button -->
+                {% if config.auth.enabled %}
+                    {% if session.get('authenticated') %}
+                        <a href="/logout" class="btn btn-outline-radarr me-2" title="Logout">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </a>
+                    {% else %}
+                        <a href="/login" class="btn btn-outline-warning me-2" title="Login">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </a>
+                    {% endif %}
+                {% endif %}
+                                
             </div>
         </div>
     </div>
@@ -60,6 +75,17 @@
                         </div>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Trending -->
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-8 col-lg-6">
+                <div class="d-grid gap-2">
+                    <a href="/trending" class="btn btn-outline-info btn-lg">
+                        <i class="fas fa-fire me-2"></i>View Trending Media
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -326,6 +352,50 @@
                                                 <label for="pinggyReservedSubdomain" class="form-label">Reserved Subdomain</label>
                                                 <input type="text" class="form-control bg-dark text-light border-secondary" 
                                                     id="pinggyReservedSubdomain" name="PINGGY_RESERVED_SUBDOMAIN" value="{{ config.tunnel.reserved_subdomain }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Authentication Settings -->
+                    <div class="mb-4">
+                        <h5 class="text-warning mb-3">
+                            <i class="fas fa-lock me-2"></i>Authentication Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="authEnabled" 
+                                                name="AUTH_ENABLED" {% if config.auth.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="authEnabled">
+                                                Enable Basic Authentication
+                                            </label>
+                                            <small class="text-muted">Require username and password to access Addarr</small>
+                                        </div>
+                                    </div>
+                                    <!-- Collapsible content -->
+                                    <div class="col-12 collapsible-content" id="authContent" {% if not config.auth.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="authUsername" class="form-label">Username</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                                    id="authUsername" name="AUTH_USERNAME" value="{{ config.auth.username }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="authPassword" class="form-label">Password</label>
+                                                <input type="password" class="form-control bg-dark text-light border-secondary" 
+                                                    id="authPassword" name="AUTH_PASSWORD" value="{{ config.auth.password }}">
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="alert alert-warning">
+                                                    <small><i class="fas fa-exclamation-triangle me-1"></i> 
+                                                    Make sure to remember your credentials. If you lose them, you'll need to manually edit the .env file.</small>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -769,6 +839,10 @@
     </div>
 </div>
 
+<div id="backToTop" class="back-to-top">
+    <i class="fas fa-chevron-up"></i>
+</div>
+
 <script>
 
 // Update fetchRadarrData function
@@ -954,7 +1028,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setupCollapsibleSection('enableAutoUpdate', 'autoUpdateContent');
     setupCollapsibleSection('tunnelEnabled', 'tunnelContent');
     setupCollapsibleSection('debugEnabled', 'debugContent');
-    
+    setupCollapsibleSection('authEnabled', 'authContent');
+
     function setupCollapsibleSection(checkboxId, contentId) {
         const checkbox = document.getElementById(checkboxId);
         const content = document.getElementById(contentId);
