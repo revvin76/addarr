@@ -2504,7 +2504,8 @@ def manage_media():
         
         return render_template(
             'manage.html',
-            media=combined_media
+            media=combined_media,
+            config=CONFIG 
         )
     except Exception as e:
         logging.error(f"Error fetching media: {str(e)}", exc_info=True)
