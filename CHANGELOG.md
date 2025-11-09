@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 ---
 ## [1.1.5] - 2025-11-09
 ### Fixed
--Fixed trending info panel not displaying and added library status.
+- 'View updates' on the configuration panel now works
+- Removed gap above TV results on the Trending page
+- Fixed the information panels for TV items in the Trending page. nb, not yet able to check against Sonarr whether they are added. This will be a future update.
+- Fixed the 'Managed media' page that was not loading
+
+### Updated
+- Updated the CSS styling for Desktop versions of Addarr. Still work to be done on this.
+
+## [1.1.5] - 2025-11-09
+### Fixed
+- Fixed trending info panel not displaying and added library status.
 
 ## [1.1.4] - 2025-11-09
 ### Added
