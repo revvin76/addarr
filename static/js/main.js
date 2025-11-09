@@ -1687,7 +1687,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function listDownloadedUpdates() {
-    let configPanel = document.getElementById('configPanel');
+    let configPanel = document.getElementById('configModal');
     fetch('/api/update/list')
         .then(response => response.json())
         .then(data => {

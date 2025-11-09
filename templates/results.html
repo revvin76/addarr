@@ -33,15 +33,9 @@
             
             <div class="d-flex gap-2">
 
-                <a href="/manage" class="btn btn-outline-radarr me-2"><i class="fas fa-film"></i></a>
-                <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#configModal">
-                    <i class="fas fa-cog"></i>
-                </button>                
-                <button id="infoToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#infoModal">
-                    <i class="fas fa-info-circle"></i>
-                </button>
+                <a href="/" class="btn btn-outline-radarr me-2"><i class="fas fa-arrow-left"></i></a>
 
-                                <!-- Authentication Button -->
+                <!-- Authentication Button -->
                 {% if config.auth.enabled %}
                     {% if session.get('authenticated') %}
                         <a href="/logout" class="btn btn-outline-radarr me-2" title="Logout">
@@ -52,7 +46,7 @@
                             <i class="fas fa-sign-in-alt"></i>
                         </a>
                     {% endif %}
-                {% endif %}
+                {% endif %}                
             </div>
         </div>
     </div>
