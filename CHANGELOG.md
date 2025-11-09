@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ---
-## [1.1.5] - 2025-11-09
+## [1.1.6] - 2025-11-09
 ### Fixed
 - 'View updates' on the configuration panel now works
 - Removed gap above TV results on the Trending page
