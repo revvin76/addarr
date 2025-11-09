@@ -64,11 +64,11 @@
                 </div>
             </div>               
         </div>
-
-        <!-- Trending Movies -->
-        {% if media_type in ['all', 'movie'] and trending_data.movies %}
+        
         <div class="mb-5">
             <div class="row">
+            <!-- Trending Movies -->
+            {% if media_type in ['all', 'movie'] and trending_data.movies %}
                 {% for movie in trending_data.movies %}
                 <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="movie">
                     <div class="search-result-card h-100 movie-card" 
@@ -101,14 +101,10 @@
                     </div>
                 </div>
                 {% endfor %}
-            </div>
-        </div>
-        {% endif %}
+            {% endif %}
 
-        <!-- Trending TV Shows -->
-        {% if media_type in ['all', 'tv'] and trending_data.tv_shows %}
-        <div class="mb-5">
-            <div class="row">
+            <!-- Trending TV Shows -->
+            {% if media_type in ['all', 'tv'] and trending_data.tv_shows %}
                 {% for show in trending_data.tv_shows %}
                 <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="tv">
                     <div class="search-result-card h-100 tv-card" 
@@ -141,10 +137,10 @@
                     </div>
                 </div>
                 {% endfor %}
+
+            {% endif %}
             </div>
         </div>
-        {% endif %}
-
         {% if not trending_data.movies and not trending_data.tv_shows %}
         <div class="alert alert-warning text-center">
             <i class="fas fa-exclamation-triangle me-2"></i>
