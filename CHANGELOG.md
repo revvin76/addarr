@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.7] - 2025-11-11
+### Updated
+- Massive overhaul on the memory optimisation. Should be more memory efficient
+- Split utility functions, routes, updates and memory management into separate files for easier maintenance
+
+### Known issues
+- 'Last updated' is not updating correctly
+- 'TestConnection' function not working
+- 'View updates' doesn't load
+- TV shows on Trending page can not be added to Library. Needs a conversion from TMDB to TVDB
+- Loading spinners not loading correctly
+
 ## [1.1.6] - 2025-11-09
 ### Fixed
 - 'View updates' on the configuration panel now works
