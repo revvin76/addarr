@@ -343,6 +343,12 @@ def init_routes(app, config_manager, auth_decorator, debug_decorator, shared_uti
         
         return jsonify({'in_library': in_library})
 
+    @app.route('/api/update/dismiss', methods=['POST'])
+    @debug_log
+    def dismiss_update_notification():
+        # """Dismiss the update notification"""
+        set_env('UPDATE_NOTIFICATION', 'false')
+        return jsonify({'success': True})
 
     # Information page
     @app.route('/api/info/network')

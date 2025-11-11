@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.8] - 2025-11-11
+### Fixed
+- Dismiss page for new updates was not disappearing
+
 ## [1.1.7] - 2025-11-11
 ### Updated
 - Massive overhaul on the memory optimisation. Should be more memory efficient
