@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.9] - 2025-11-12
+### Fixed
+- Auto-update had been broken by v1.1.7. Fixed and tested working fine now
+
 ## [1.1.8] - 2025-11-11
 ### Fixed
 - Dismiss page for new updates was not disappearing

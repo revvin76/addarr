@@ -1,5 +1,5 @@
 # =========================================
-# Addarr v1.1.8 - Environment Configuration
+# Addarr v1.1.9 - Environment Configuration
 # =========================================
 
 # === RADARR SETTINGS ===
@@ -55,3 +55,8 @@ UPDATE_APPLIED_VERSION=
 AUTH_ENABLED=false
 AUTH_USERNAME=
 AUTH_PASSWORD=
+
+# === Update Testing ===
+MOCK_UPDATE=false
+UPDATE_TEST_MODE=false
+ALLOW_MOCK_DOWNLOAD=false

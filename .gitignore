@@ -22,6 +22,7 @@ share/python-wheels/
 *.manifest
 *.spec
 *.py.bak
+dev/
 
 # Flask / Python
 instance/
@@ -96,3 +97,4 @@ HOWTO.txt
 
 ssh*
 addarr.log
+.git/

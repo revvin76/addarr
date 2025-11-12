@@ -199,8 +199,8 @@ def get_network_info():
         'tunnel_url': tunnel_url,
         'tunnel_active': tunnel_url is not None
     }
-# ============ WELCOME FUNCTION ============
 
+# ============ WELCOME FUNCTION ============
 def print_welcome():
     """Print welcome message and logo only once"""
     from colorama import Fore, Style
@@ -236,6 +236,92 @@ def print_welcome():
 
     print(f"{Fore.GREEN}✅ Ready to add media!{Style.RESET_ALL}\n")
     print(f"{Fore.YELLOW}Press Ctrl-C to shutdown{Style.RESET_ALL}")
+
+# ============ AUTO UPDATE AND RESTART FUNCTION ============
+def perform_immediate_update_check():
+    """Perform immediate update check and apply if available"""
+    try:
+        print("🔍 Checking for updates...")
+        
+        # Force config reload to get latest version
+        CONFIG._reload_config()
+        
+        # Check for updates synchronously
+        update_info = update_manager._check_github_for_updates()
+        
+        if update_info.get('update_available'):
+            latest_version = update_info['latest_version']
+            current_version = CONFIG.app.version
+            
+            print(f"🎯 Update available: {current_version} → {latest_version}")
+            print("📥 Downloading and applying update...")
+            
+            # Check if already downloaded
+            existing_updates = update_manager.get_downloaded_updates_optimized()
+            already_downloaded = any(update['version'] == latest_version for update in existing_updates)
+            
+            if not already_downloaded:
+                # Download the update
+                download_result = update_manager._download_update(latest_version)
+                if not download_result.get('success'):
+                    print(f"❌ Download failed: {download_result.get('error')}")
+                    return False
+            
+            # Apply the update
+            apply_result = update_manager._apply_update(latest_version)
+            if apply_result.get('success'):
+                print(f"✅ Successfully updated to version {latest_version}")
+                
+                # Update environment with new version
+                update_manager.set_env('APP_VERSION', latest_version)
+                update_manager.set_env('UPDATE_APPLIED', 'true')
+                update_manager.set_env('UPDATE_APPLIED_VERSION', latest_version)
+                update_manager.set_env('LAST_CHECKED', str(int(time.time())))
+                
+                return True
+            else:
+                print(f"❌ Update application failed: {apply_result.get('error')}")
+                return False
+        else:
+            print("✅ No updates available")
+            # Update last checked time even when no update is available
+            update_manager.set_env('LAST_CHECKED', str(int(time.time())))
+            return False
+            
+    except Exception as e:
+        print(f"❌ Update check failed: {str(e)}")
+        logging.error(f"Immediate update check failed: {str(e)}")
+        return False
+
+def restart_application():
+    """Restart the application after update"""
+    try:
+        print("🔄 Restarting application...")
+        
+        # Stop managers gracefully
+        try:
+            update_manager.stop()
+        except:
+            pass
+            
+        try:
+            memory_manager.stop()
+        except:
+            pass
+            
+        try:
+            cleanup_tunnel()
+        except:
+            pass
+        
+        # Use subprocess to restart
+        python = sys.executable
+        os.execv(python, [python] + sys.argv)
+        
+    except Exception as e:
+        print(f"❌ Failed to restart: {str(e)}")
+        # If restart fails, just exit and let the system restart it
+        sys.exit(0)
 
 # ============ AUTH DECORATORS ============
 
@@ -298,7 +384,8 @@ routes.init_routes(
     auth_decorator=requires_auth,
     debug_decorator=conditional_debug_log,
     shared_utils=utils,
-    network_info_func=get_network_info
+    network_info_func=get_network_info,
+    update_manager=update_manager
 )
 
 # ============ STARTUP AND SHUTDOWN ============
@@ -309,6 +396,16 @@ def startup_sequence():
     import gc
     gc.collect()
     
+    # Check for updates FIRST before anything else
+    if CONFIG.update.enabled and os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        print("🔧 Checking for updates...")
+        update_applied = perform_immediate_update_check()
+        if update_applied:
+            # If update was applied, we need to restart
+            print("🔄 Update applied. Restarting application...")
+            restart_application()
+
+    # Only continue if no update was applied
     # Start tunnel if enabled
     if CONFIG.tunnel.enabled and os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         print("🔧 Starting tunnel...")

@@ -236,37 +236,7 @@ class SharedUtils:
         )
         
         return result
-    
-    def check_github_for_updates(self):
-        """Check GitHub for updates"""
-        try:
-            url = f"https://api.github.com/repos/{self.config.update.github_repo}/releases/latest"
-            response = requests.get(url, timeout=10)
-            
-            if response.status_code == 200:
-                latest_release = response.json()
-                current_version = self.config.app.version
-                latest_version = latest_release.get('tag_name', '').lstrip('v')
-                
-                if version.parse(latest_version) > version.parse(current_version):
-                    return {
-                        'update_available': True,
-                        'current_version': current_version,
-                        'latest_version': latest_version,
-                        'release_url': latest_release.get('html_url'),
-                        'release_notes': latest_release.get('body', '')[:500],
-                        'published_at': latest_release.get('published_at')
-                    }
-            return {'update_available': False}
-        except Exception as e:
-            logging.error(f"Error checking for updates: {str(e)}")
-            return {'update_available': False, 'error': str(e)}
-    
-    def download_update(self):
-        """Download update"""
-        # Implementation from original app.py
-        pass
-    
+
     def check_auth(self, username, password):
         """Check authentication"""
         if not self.config.auth.enabled:

@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # Import shared utilities (will be passed from app.py)
-def init_routes(app, config_manager, auth_decorator, debug_decorator, shared_utils, network_info_func=None):
+def init_routes(app, config_manager, update_manager, auth_decorator, debug_decorator, shared_utils, network_info_func=None):
     """
     Initialize all routes with shared dependencies
     """
@@ -21,6 +21,7 @@ def init_routes(app, config_manager, auth_decorator, debug_decorator, shared_uti
     requires_auth = auth_decorator
     conditional_debug_log = debug_decorator
     utils = shared_utils
+    update_manager = update_manager
 
     # ============ ROUTE DEFINITIONS ============
     @app.route('/')
@@ -344,7 +345,7 @@ def init_routes(app, config_manager, auth_decorator, debug_decorator, shared_uti
         return jsonify({'in_library': in_library})
 
     @app.route('/api/update/dismiss', methods=['POST'])
-    @debug_log
+    @conditional_debug_log
     def dismiss_update_notification():
         # """Dismiss the update notification"""
         set_env('UPDATE_NOTIFICATION', 'false')
@@ -525,7 +526,7 @@ def init_routes(app, config_manager, auth_decorator, debug_decorator, shared_uti
     @app.route('/api/update/check')
     @conditional_debug_log
     def check_update():
-        update_info = utils.check_github_for_updates()
+        update_info = update_manager.check_github_for_updates()
         return jsonify(update_info)
 
     @app.route('/api/update/download', methods=['POST'])
@@ -541,6 +542,16 @@ def init_routes(app, config_manager, auth_decorator, debug_decorator, shared_uti
             'update_notification': os.getenv('UPDATE_NOTIFICATION', 'false') == 'true',
             'latest_version': os.getenv('LATEST_VERSION', ''),
             'current_version': CONFIG.app.version
+        })
+
+    @app.route('/api/update/list')
+    @conditional_debug_log
+    def list_downloaded_updates():
+        # """Get list of downloaded updates"""
+        update_files = update_manager.get_downloaded_updates_optimized()
+        return jsonify({
+            'updates': update_files,
+            'total_count': len(update_files)
         })
 
     # Authentication routes
