@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.10] - 2025-11-12
+### Added
+- Update channel selection 'prod' or 'dev'. Set in the .env file. Dev channel may introduce breaking changes and would requite fresh installation to resolve.
+
+### Fixed
+- Check for updates button was not working
+
+### Updated
+- Version display now includes channel tag dev or prod
+
 ## [1.1.9] - 2025-11-12
 ### Fixed
 - Auto-update had been broken by v1.1.7. Fixed and tested working fine now
