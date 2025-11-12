@@ -72,6 +72,7 @@ class LazyConfig:
                 'last_checked': float(os.getenv('LAST_CHECKED', '0')),
                 'enabled': os.getenv('ENABLE_AUTO_UPDATE', 'false').lower() == 'true',
                 'updates_folder': os.getenv('UPDATES_FOLDER', 'updates'),
+                'channel': os.getenv('UPDATE_CHANNEL', 'prod'),
                 'notification': os.getenv('UPDATE_NOTIFICATION', 'false').lower() == 'true',
                 'latest_version': os.getenv('LATEST_VERSION', ''),
                 'applied': os.getenv('UPDATE_APPLIED', 'false').lower() == 'true',

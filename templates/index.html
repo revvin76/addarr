@@ -442,8 +442,11 @@
                         </h5>
                         <div class="card bg-dark border-secondary">
                             <div class="card-body">
-                                <div class="version-info text-center mb-3">
-                                    <p class="mb-2">Current Version: <code class="text-success">{{ config.app.version }}</code></p>
+                                <div class="version-info">
+                                    v{{ config.app.version }} 
+                                    <span class="badge {% if config.update.channel == 'dev' %}badge-warning{% else %}badge-success{% endif %}">
+                                        {{ config.update.channel|upper }}
+                                    </span>
                                 </div>
                                 <div class="row g-2">
                                     <div class="col-md-4">

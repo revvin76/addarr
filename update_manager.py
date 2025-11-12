@@ -10,6 +10,7 @@ import zipfile
 import tempfile
 import subprocess
 from datetime import datetime
+import sys
 
 class UpdateManager:
     """Memory-efficient update management"""
@@ -18,7 +19,8 @@ class UpdateManager:
         self.update_thread = None
         self.running = False
         self._lock = threading.Lock()
-        self._stop_event = threading.Event()  # Add stop event
+        self._stop_event = threading.Event() 
+        self.current_channel = self.config.update.channel
     
         # Mock mode support
         self.mock_mode = os.getenv('MOCK_UPDATE', 'false').lower() == 'true'
@@ -135,49 +137,18 @@ class UpdateManager:
                     break
     
     def _check_github_for_updates(self):
-        """Check GitHub for updates with memory efficiency"""
-        logging.info("Check GitHub for updates...")
+        """Check GitHub for updates with branch/channel support"""
+        logging.info(f"Check GitHub for updates on {self.current_channel} channel...")
         if self.mock_mode:
             return self._mock_check_for_updates()
 
         try:
-            url = f"https://api.github.com/repos/{self.config.update.github_repo}/releases/latest"
-            
-            logging.info(url)
-            # Add headers to avoid rate limiting
-            headers = {
-                'User-Agent': 'Addarr-Update-Checker',
-                'Accept': 'application/vnd.github.v3+json'
-            }
-            
-            # Add GitHub token if available for higher rate limits
-            github_token = os.getenv('GITHUB_TOKEN')
-            if github_token:
-                headers['Authorization'] = f'token {github_token}'
-            
-            with requests.get(url, timeout=10, headers=headers) as response:
-                if response.status_code == 200:
-                    latest_release = response.json()
-                    current_version = self.config.app.version
-                    latest_version = latest_release.get('tag_name', '').lstrip('v')
-                    
-                    logging.info(f"Current: {current_version}, Latest: {latest_version}")
-                    
-                    if version.parse(latest_version) > version.parse(current_version):
-                        return {
-                            'update_available': True,
-                            'current_version': current_version,
-                            'latest_version': latest_version,
-                            'release_url': latest_release.get('html_url'),
-                            'release_notes': latest_release.get('body', '')[:500],
-                            'published_at': latest_release.get('published_at')
-                        }
-                    else:
-                        logging.info("No update available - already on latest version")
-                else:
-                    logging.warning(f"GitHub API returned status {response.status_code}")
-                    
-            return {'update_available': False}
+            # Use releases for PROD, latest commit for DEV
+            if self.current_channel == 'prod':
+                return self._check_prod_updates()
+            else:
+                return self._check_dev_updates()
+                
         except Exception as e:
             logging.error(f"Error checking for updates: {str(e)}")
             return {'update_available': False, 'error': str(e)}
@@ -215,51 +186,142 @@ class UpdateManager:
                     
         except Exception as e:
             logging.error(f"❌ Error handling available update: {str(e)}")
-                
-    def _download_update(self, version):
-        """Download update with memory efficiency"""
+
+    def _check_prod_updates(self):
+            """Check for PROD updates using releases"""
+            url = f"https://api.github.com/repos/{self.config.update.github_repo}/releases/latest"
+            
+            logging.info(f"Checking PROD releases: {url}")
+            headers = {
+                'User-Agent': 'Addarr-Update-Checker',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            
+            github_token = os.getenv('GITHUB_TOKEN')
+            if github_token:
+                headers['Authorization'] = f'token {github_token}'
+            
+            with requests.get(url, timeout=10, headers=headers) as response:
+                if response.status_code == 200:
+                    latest_release = response.json()
+                    current_version = self.config.app.version
+                    latest_version = latest_release.get('tag_name', '').lstrip('v')
+                    
+                    logging.info(f"PROD - Current: {current_version}, Latest: {latest_version}")
+                    
+                    if version.parse(latest_version) > version.parse(current_version):
+                        return {
+                            'update_available': True,
+                            'current_version': current_version,
+                            'latest_version': latest_version,
+                            'release_url': latest_release.get('html_url'),
+                            'release_notes': latest_release.get('body', '')[:500],
+                            'published_at': latest_release.get('published_at'),
+                            'channel': 'prod'
+                        }
+                    else:
+                        logging.info("No PROD update available")
+                else:
+                    logging.warning(f"GitHub API returned status {response.status_code}")
+                    
+            return {'update_available': False, 'channel': 'prod'}
+    
+    def _check_dev_updates(self):
+        """Check for DEV updates using latest commit on dev branch"""
         try:
-            logging.info(f"📥 Downloading update: {version}")
+            # Get latest commit from dev branch
+            url = f"https://api.github.com/repos/{self.config.update.github_repo}/branches/dev"
+            
+            headers = {
+                'User-Agent': 'Addarr-Update-Checker',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            
+            github_token = os.getenv('GITHUB_TOKEN')
+            if github_token:
+                headers['Authorization'] = f'token {github_token}'
+            
+            with requests.get(url, timeout=10, headers=headers) as response:
+                if response.status_code == 200:
+                    branch_info = response.json()
+                    latest_commit_sha = branch_info['commit']['sha'][:7]  # Short SHA
+                    latest_commit_date = branch_info['commit']['commit']['committer']['date']
+                    
+                    # Get current version/commit from environment
+                    current_version = self.config.app.version
+                    
+                    # For dev, we'll use commit SHA as version identifier
+                    current_commit = os.getenv('APP_COMMIT', '')
+                    
+                    # Check if we need update (different commit or newer date)
+                    needs_update = current_commit != latest_commit_sha
+                    
+                    if needs_update:
+                        return {
+                            'update_available': True,
+                            'current_version': f"{current_version}-{current_commit}" if current_commit else current_version,
+                            'latest_version': f"{current_version}-{latest_commit_sha}",
+                            'latest_commit': latest_commit_sha,
+                            'commit_date': latest_commit_date,
+                            'release_url': f"https://github.com/{self.config.update.github_repo}/commit/{latest_commit_sha}",
+                            'release_notes': f"Dev update - Commit: {latest_commit_sha}",
+                            'channel': 'dev'
+                        }
+                    else:
+                        logging.info("No DEV update available - already on latest commit")
+                else:
+                    logging.warning(f"GitHub API returned status {response.status_code}")
+                    
+            return {'update_available': False, 'channel': 'dev'}
+            
+        except Exception as e:
+            logging.error(f"Error checking DEV updates: {str(e)}")
+            return {'update_available': False, 'error': str(e), 'channel': 'dev'}
+    
+    def _download_update(self, version):
+        """Download update with branch support"""
+        try:
+            logging.info(f"📥 Downloading {self.current_channel} update: {version}")
             
             if self.mock_mode:
-                # Mock download for testing
-                logging.info(f"🔧 MOCK MODE: Would download update {version}")
-                time.sleep(2)  # Simulate download time
-                return {'success': True, 'version': version}
+                logging.info(f"🔧 MOCK MODE: Would download {self.current_channel} update {version}")
+                time.sleep(2)
+                return {'success': True, 'version': version, 'channel': self.current_channel}
             
-            # Ensure updates folder exists
             updates_folder = self.ensure_updates_folder()
-            
-            # Construct download URL
             repo = self.config.update.github_repo
-            download_url = f"https://github.com/{repo}/archive/refs/tags/v{version}.zip"
             
-            # Download the release
+            if self.current_channel == 'prod':
+                # Download from release
+                download_url = f"https://github.com/{repo}/archive/refs/tags/v{version}.zip"
+            else:
+                # Download from dev branch
+                download_url = f"https://github.com/{repo}/archive/refs/heads/dev.zip"
+            
+            # Download the file
             response = requests.get(download_url, stream=True, timeout=30)
             response.raise_for_status()
             
-            # Save to file
-            filename = f"addarr_{version}.zip"
+            # Save to file with channel prefix
+            filename = f"addarr_{self.current_channel}_{version}.zip"
             file_path = os.path.join(updates_folder, filename)
             
-            # Stream download to file to save memory
+            # Stream download to file
             total_size = int(response.headers.get('content-length', 0))
             downloaded_size = 0
             
             with open(file_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:  # filter out keep-alive chunks
+                    if chunk:
                         f.write(chunk)
                         downloaded_size += len(chunk)
                         
-                        # Log progress for large downloads
-                        if total_size > 0 and downloaded_size % (1024 * 1024) == 0:  # Every 1MB
+                        if total_size > 0 and downloaded_size % (1024 * 1024) == 0:
                             progress = (downloaded_size / total_size) * 100
                             logging.info(f"Download progress: {progress:.1f}%")
             
-            # Verify download
             if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                logging.info(f"✅ Successfully downloaded update: {version}")
+                logging.info(f"✅ Successfully downloaded {self.current_channel} update: {version}")
                 
                 # Clean up old updates
                 self.cleanup_old_updates()
@@ -268,21 +330,21 @@ class UpdateManager:
                     'success': True, 
                     'version': version,
                     'file_path': file_path,
-                    'filename': filename
+                    'filename': filename,
+                    'channel': self.current_channel
                 }
             else:
                 raise Exception("Downloaded file is empty or missing")
                 
         except Exception as e:
             logging.error(f"❌ Download error: {str(e)}")
-            # Clean up partial download
             if 'file_path' in locals() and os.path.exists(file_path):
                 try:
                     os.remove(file_path)
                 except:
                     pass
-            return {'success': False, 'error': str(e)}
-
+            return {'success': False, 'error': str(e), 'channel': self.current_channel}
+        
     def _apply_update(self, version):
         """Apply update with memory cleanup"""
         try:
@@ -335,7 +397,7 @@ class UpdateManager:
         try:
             # Get current app directory
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            parent_dir = os.path.dirname(current_dir)
+            app_root = os.path.dirname(os.path.abspath(sys.argv[0]))
             
             # Create temporary extraction directory
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -353,7 +415,7 @@ class UpdateManager:
                     source_dir = temp_dir
                 
                 # Copy files, preserving .env and config
-                self._copy_update_files(source_dir, parent_dir)
+                self._copy_update_files(source_dir, app_root)
                 
             return True
             
@@ -515,7 +577,6 @@ class UpdateManager:
             i += 1
         
         return f"{size_bytes:.2f} {size_names[i]}"
-
     
     def get_downloaded_updates_optimized(self):
         # """Get downloaded updates"""
