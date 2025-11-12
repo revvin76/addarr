@@ -526,7 +526,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @app.route('/api/update/check')
     @conditional_debug_log
     def check_update():
-        update_info = update_manager.check_github_for_updates()
+        update_info = update_manager._check_github_for_updates()
         return jsonify(update_info)
 
     @app.route('/api/update/download', methods=['POST'])
