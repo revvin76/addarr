@@ -98,3 +98,4 @@ HOWTO.txt
 ssh*
 addarr.log
 .git/
+static/image_cache/*.*

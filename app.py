@@ -396,18 +396,23 @@ def startup_sequence():
     import gc
     gc.collect()
     
+    # Only run in the main process, not the reloader process
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        return
+        
     # Check for updates FIRST before anything else
-    if CONFIG.update.enabled and os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    if CONFIG.update.enabled:
         print("🔧 Checking for updates...")
         update_applied = perform_immediate_update_check()
         if update_applied:
             # If update was applied, we need to restart
             print("🔄 Update applied. Restarting application...")
             restart_application()
+            return  # Don't continue if we're restarting
 
     # Only continue if no update was applied
     # Start tunnel if enabled
-    if CONFIG.tunnel.enabled and os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    if CONFIG.tunnel.enabled:
         print("🔧 Starting tunnel...")
         start_pinggy_tunnel()
         
@@ -420,16 +425,20 @@ def startup_sequence():
             print(".", end="", flush=True)
         print()  # New line after progress dots
 
-    # Start update manager if enabled
+    
+    # Start update manager if enabled (background checks)
     if CONFIG.update.enabled:
         update_manager.start()
     
     # Start memory manager
     memory_manager.start()
     
-    # Print welcome message in main process only
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        print_welcome()
+    # Print welcome message
+    print_welcome()
+
+    # # Print welcome message in main process only
+    # if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    #     print_welcome()
 
 def shutdown_sequence():
     global tunnel_process  # Add this line to access the global variable

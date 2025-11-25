@@ -526,7 +526,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @app.route('/api/update/check')
     @conditional_debug_log
     def check_update():
-        update_info = update_manager.check_github_for_updates()
+        update_info = update_manager._check_github_for_updates()
         return jsonify(update_info)
 
     @app.route('/api/update/download', methods=['POST'])
@@ -541,8 +541,29 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         return jsonify({
             'update_notification': os.getenv('UPDATE_NOTIFICATION', 'false') == 'true',
             'latest_version': os.getenv('LATEST_VERSION', ''),
-            'current_version': CONFIG.app.version
+            'current_version': CONFIG.app.version,
+            'channel': CONFIG.update.channel,
+            'current_commit': os.getenv('APP_COMMIT', '')
         })
+
+    @app.route('/api/update/channel', methods=['POST'])
+    @conditional_debug_log
+    def switch_channel():
+        """Switch between prod and dev channels"""
+        data = request.json
+        new_channel = data.get('channel', 'prod')
+        
+        if new_channel not in ['prod', 'dev']:
+            return jsonify({'success': False, 'error': 'Invalid channel'})
+        
+        # Update environment
+        update_manager.set_env('UPDATE_CHANNEL', new_channel)
+        
+        # Reload config
+        CONFIG._reload_config()
+        update_manager.current_channel = new_channel
+        
+        return jsonify({'success': True, 'channel': new_channel})
 
     @app.route('/api/update/list')
     @conditional_debug_log
