@@ -986,48 +986,56 @@ function showDetails(mediaType, mediaId, tmdb=false) {
 
                 // TMDB-ONLY HTML (no library status)
                 const html = `
-                    <div class="row g-0 h-100">
-                        <div class="col-md-5 px-2">
-                            <img src="${posterUrl}" 
-                                class="poster img-fluid h-100 object-fit-cover" 
-                                alt="${title} poster"
-                                onerror="this.src='https://via.placeholder.com/500x750?text=Poster+Not+Available'">
+                    <div class="g-0">
+                        <!-- Row 1: Poster and Basic Info -->
+                        <div class="row details g-0 mb-4">
+                            <!-- Column 1: Poster -->
+                            <div class="px-2">
+                                <img src="${posterUrl}" 
+                                    class="poster img-fluid w-100 rounded" 
+                                    alt="${title} poster"
+                                    onerror="this.src='/static/images/placeholder.png'">
+                            </div>
+                            
+                            <!-- Column 2: Title, Info, and Add Button -->
+                            <div class="px-3">
+                                <h1 class="display-6 mb-2 fw-bold">${title}</h1>
+                                
+                                <div class="d-flex align-items-center flex-wrap gap-3 mb-3">
+                                    ${year ? `<span class="text-light">${year}</span>` : ''}
+                                    <span class="certification-badge bg-dark text-white px-2 rounded">
+                                        ${certification}
+                                    </span>
+                                    ${mediaType === 'tv' ? `
+                                    <span class="certification-badge bg-dark text-white px-2 rounded">
+                                        ${status}
+                                    </span>` : ''}
+                                    ${rating !== 'N/A' ? `
+                                    <span class="text-light">⭐ ${rating}/10</span>` : ''}
+                                </div>
+                                
+                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                    ${genres.slice(0, 4).map(genre => `
+                                        <span class="badge bg-secondary">${genre}</span>
+                                    `).join('')}
+                                </div>
+                                
+                                <p class="mb-3" style="line-height: 1.5;">${overview}</p>
+
+                                <div class="mt-3">
+                                    <button class="btn btn-primary w-100" 
+                                            id="modalAddButton"
+                                            onclick="addItemFromModal('${mediaType}', ${mediaId})">
+                                        Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="col-md-7 px-3">
-                            <h1 class="display-6 mb-2 fw-bold">${title}</h1>
-                            
-                            <div class="d-flex align-items-center flex-wrap gap-3 mb-3">
-                                ${year ? `<span class="text-light">${year}</span>` : ''}
-                                <span class="certification-badge bg-dark text-white px-2 rounded">
-                                    ${certification}
-                                </span>
-                                ${mediaType === 'tv' ? `
-                                <span class="certification-badge bg-dark text-white px-2 rounded">
-                                    ${status}
-                                </span>` : ''}
-                                ${rating !== 'N/A' ? `
-                                <span class="text-light">⭐ ${rating}/10</span>` : ''}
-                            </div>
-                            
-                            <div class="d-flex flex-wrap gap-2 mb-4">
-                                ${genres.slice(0, 4).map(genre => `
-                                    <span class="badge bg-secondary">${genre}</span>
-                                `).join('')}
-                            </div>
-                            
-                            <p class="mb-4">${overview}</p>
-
-                            <div class="mt-4">
-                                <button class="btn btn-primary w-100" 
-                                        id="modalAddButton"
-                                        onclick="addItemFromModal('${mediaType}', ${mediaId})">
-                                    Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}
-                                </button>
-                            </div>
-
-                            ${trailerHtml}
-                            ${imagesHtml}
+                        <!-- Row 2: Trailer and Images (span both columns) -->
+                        <div class=" g-0">
+                                ${trailerHtml}
+                                ${imagesHtml}
                         </div>
                     </div>`;
                 
@@ -1055,7 +1063,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                 
                 // POSTER: TMDB first, then internal
                 let posterUrl;
-                if (hasTmdbData && tmdbData.poster_path) {
+                if (hasTmdbData && tmdbData.poster_path && tmdb!==false) {
                     posterUrl = `https://image.tmdb.org/t/p/original${tmdbData.poster_path}`;
                 } else if (internalDataObj.images) {
                     const posterImage = internalDataObj.images.find(img => img.coverType === 'poster');
@@ -1172,68 +1180,71 @@ function showDetails(mediaType, mediaId, tmdb=false) {
 
                 // NORMAL MODE HTML (with library status)
                 const html = `
-                    <div class="row g-0 h-100">
-                        <div class="col-md-5 px-2">
-                            <img src="${posterUrl}" 
-                                class="poster img-fluid h-100 object-fit-cover" 
-                                alt="${title} poster"
-                                onerror="this.src='https://via.placeholder.com/500x750?text=Poster+Not+Available'">
-                        </div>
-                        
-                        <div class="col-md-7 px-3">
-                            <h1 class="display-6 mb-2 fw-bold">${title}</h1>
-                            
-                            <div class="d-flex align-items-center flex-wrap gap-3 mb-3">
-                                ${year ? `<span class="text-light">${year}</span>` : ''}
-                                <span class="certification-badge bg-dark text-white px-2 rounded">
-                                    ${certification}
-                                </span>
-                                ${mediaType === 'tv' ? `
-                                <span class="certification-badge bg-dark text-white px-2 rounded">
-                                    ${status}
-                                </span>` : ''}
-                                ${rating !== 'N/A' ? `
-                                <span class="text-light">⭐ ${rating}/10</span>` : ''}
+                    <div class="g-0">
+                        <!-- Row 1: Poster and Basic Info -->
+                        <div class="row details g-0 mb-4">
+                            <!-- Column 1: Poster -->
+                            <div class="px-2">
+                                <img src="${posterUrl}" 
+                                    class="poster img-fluid w-100 rounded" 
+                                    alt="${title} poster"
+                                    onerror="this.src='/static/images/placeholder.png'">
                             </div>
                             
-                            <div class="d-flex flex-wrap gap-2 mb-4">
-                                ${genres.slice(0, 4).map(genre => `
-                                    <span class="badge bg-secondary">${genre}</span>
-                                `).join('')}
-                            </div>
-                            
-                            <p class="mb-4">${overview}</p>
-                            
-                            <div class="row g-2 mb-4">
-                                ${seasonCount ? `
-                                    <span class="badge bg-success">
-                                        Seasons: ${seasonCount}
+                            <!-- Column 2: Title, Info, and Add Button -->
+                            <div class="px-3">
+                                <h1 class="display-6 mb-2 fw-bold">${title}</h1>
+                                
+                                <div class="d-flex align-items-center flex-wrap gap-3 mb-3">
+                                    ${year ? `<span class="text-light">${year}</span>` : ''}
+                                    <span class="certification-badge bg-dark text-white px-2 rounded">
+                                        ${certification}
+                                    </span>
+                                    ${mediaType === 'tv' ? `
+                                    <span class="certification-badge bg-dark text-white px-2 rounded">
+                                        ${status}
                                     </span>` : ''}
-                                <div class="col-auto">
+                                    ${rating !== 'N/A' ? `
+                                    <span class="text-light">⭐ ${rating}/10</span>` : ''}
+                                </div>
+                                
+                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                    ${genres.slice(0, 4).map(genre => `
+                                        <span class="badge bg-secondary">${genre}</span>
+                                    `).join('')}
+                                </div>
+                                
+                                <p class="mb-3" style="line-height: 1.5;">${overview}</p>
+                                
+                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                    ${seasonCount ? `
+                                        <span class="badge bg-success">
+                                            Seasons: ${seasonCount}
+                                        </span>` : ''}
                                     <span class="badge ${alreadyAdded ? 'bg-success' : 'bg-warning'}">
                                         ${alreadyAdded ? 'In Library' : 'Not Added'}
                                     </span>
-                                </div>
-                                ${onDisk !== undefined ? `
-                                <div class="col-auto">
+                                    ${onDisk !== undefined ? `
                                     <span class="badge ${onDisk ? 'bg-success' : 'bg-secondary'}">
                                         ${onDisk ? 'Downloaded' : 'Not Downloaded'}
-                                    </span>
+                                    </span>` : ''}
                                 </div>
-                                ` : ''}
-                            </div>
 
-                            <div class="mt-4">
-                                <button class="btn ${alreadyAdded ? 'btn-success' : 'btn-primary'} w-100" 
-                                        id="modalAddButton"
-                                        onclick="${alreadyAdded ? '' : `addItemFromModal('${mediaType}', ${mediaId})`}"
-                                        ${alreadyAdded ? 'disabled' : ''}>
-                                    ${alreadyAdded ? '✓ Already in Library' : `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`}
-                                </button>
+                                <div class="mt-3">
+                                    <button class="btn ${alreadyAdded ? 'btn-success' : 'btn-primary'} w-100" 
+                                            id="modalAddButton"
+                                            onclick="${alreadyAdded ? '' : `addItemFromModal('${mediaType}', ${mediaId})`}"
+                                            ${alreadyAdded ? 'disabled' : ''}>
+                                        ${alreadyAdded ? '✓ Already in Library' : `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`}
+                                    </button>
+                                </div>
                             </div>
-
-                            ${trailerHtml}
-                            ${imagesHtml}
+                        </div>
+                        
+                        <!-- Row 2: Trailer and Images (span both columns) -->
+                        <div class=" g-0">
+                                ${trailerHtml}
+                                ${imagesHtml}
                         </div>
                     </div>`;
                 
@@ -2529,3 +2540,315 @@ class PWALoadingHelper {
 document.addEventListener('DOMContentLoaded', function() {
     window.pwaHelper = new PWALoadingHelper();
 });
+
+// static/js/media_grid.js - Shared media grid functionality
+
+// Handle media click - determines whether to show details or manage details
+function handleMediaClick(mediaType, mediaId, internalId) {
+    if (internalId && internalId !== 'null') {
+        showManageDetails(mediaType, internalId);
+    } else {
+        showDetails(mediaType, mediaId);
+    }
+}
+
+// Check library status for all items on page load
+function initializeMediaGrid() {
+    const cards = document.querySelectorAll('.search-result-card');
+    
+    cards.forEach(card => {
+        const mediaType = card.dataset.mediaType;
+        const mediaId = card.dataset.mediaId;
+        const internalId = card.dataset.internalId;
+        
+        // If we already have an internal ID (from manage page), item is in library
+        if (internalId && internalId !== 'null') {
+            const statusBadge = card.querySelector('.status-badge');
+            const manageControls = card.querySelector('.manage-controls');
+            
+            statusBadge.textContent = 'In Library';
+            statusBadge.className = 'status-badge text-xs badge bg-success';
+            showManageControls(mediaType, mediaId, internalId, manageControls, true);
+        } else {
+            // Check library status via API
+            checkLibraryStatus(mediaType, mediaId, card);
+        }
+    });
+}
+
+// Fetch library status and update UI
+function checkLibraryStatus(mediaType, mediaId, card) {
+    fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`)
+        .then(response => response.json())
+        .then(data => {
+            const statusSection = card.querySelector('.media-status-section');
+            const statusBadge = card.querySelector('.status-badge');
+            const manageControls = card.querySelector('.manage-controls');
+            
+            if (data.in_library) {
+                statusBadge.textContent = 'In Library';
+                statusBadge.className = 'status-badge text-xs badge bg-success';
+                
+                // Get internal ID and update the card
+                fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
+                    .then(response => response.json())
+                    .then(details => {
+                        const itemData = details.data || details;
+                        const internalId = itemData.id;
+                        
+                        // Update card with internal ID
+                        card.closest('.result-item').dataset.internalId = internalId;
+                        
+                        // Show manage controls
+                        showManageControls(mediaType, mediaId, internalId, manageControls, false);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching internal ID:', error);
+                    });
+            } else {
+                statusBadge.textContent = 'Not Added';
+                statusBadge.className = 'status-badge text-xs badge bg-secondary';
+                manageControls.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error checking library status:', error);
+            const statusBadge = card.querySelector('.status-badge');
+            statusBadge.textContent = 'Error';
+            statusBadge.className = 'status-badge text-xs badge bg-danger';
+        });
+}
+
+// Show manage controls for items in library
+function showManageControls(mediaType, mediaId, internalId, manageControls, isManagePage = false) {
+    // For manage page, we already have all the data in the initial render
+    // For other pages, we might need to fetch additional details
+    if (!isManagePage) {
+        fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
+            .then(response => response.json())
+            .then(details => {
+                updateManageControlsHTML(mediaType, mediaId, internalId, manageControls, details);
+            })
+            .catch(error => {
+                console.error('Error fetching manage details:', error);
+            });
+    } else {
+        // For manage page, we can construct basic info from existing data
+        const card = manageControls.closest('.search-result-card');
+        const statusBadge = card.querySelector('.status-badge');
+        updateManageControlsHTML(mediaType, mediaId, internalId, manageControls, null);
+    }
+}
+
+// Update manage controls HTML
+function updateManageControlsHTML(mediaType, mediaId, internalId, manageControls, details) {
+    const itemData = details ? (details.data || details) : null;
+    
+    let manageHTML = '';
+    if (mediaType === 'movie') {
+        const hasFile = itemData ? itemData.hasFile : false;
+        const monitored = itemData ? itemData.monitored : true;
+        
+        manageHTML = `
+            <div class="manage-info">
+                <small class="text-xs">
+                    <i class="fas fa-hdd me-1"></i>
+                    ${hasFile ? 'On Disk' : 'Missing'}
+                </small>
+                <div class="form-check form-switch mt-1">
+                    <input class="form-check-input monitor-toggle" 
+                           type="checkbox" 
+                           ${monitored ? 'checked' : ''}
+                           data-media-type="${mediaType}"
+                           data-internal-id="${internalId}">
+                    <label class="form-check-label text-xs">Monitored</label>
+                </div>
+            </div>
+        `;
+    } else {
+        const stats = itemData ? (itemData.statistics || {}) : {};
+        const monitored = itemData ? itemData.monitored : true;
+        
+        manageHTML = `
+            <div class="manage-info">
+                <small class="text-xs">
+                    <i class="fas fa-hdd me-1"></i>
+                    ${stats.episodeFileCount || 0}/${stats.episodeCount || 0} episodes
+                </small>
+                <div class="form-check form-switch mt-1">
+                    <input class="form-check-input monitor-toggle" 
+                           type="checkbox" 
+                           ${monitored ? 'checked' : ''}
+                           data-media-type="${mediaType}"
+                           data-internal-id="${internalId}">
+                    <label class="form-check-label text-xs">Monitored</label>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Add action buttons
+    manageHTML += `
+        <div class="action-buttons mt-2">
+            <button class="btn btn-sm btn-outline-warning search-btn me-1" 
+                    data-media-type="${mediaType}"
+                    data-internal-id="${internalId}">
+                <i class="fas fa-search"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger delete-btn" 
+                    data-media-type="${mediaType}"
+                    data-internal-id="${internalId}">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    manageControls.innerHTML = manageHTML;
+    manageControls.style.display = 'block';
+    
+    // Add event listeners to new buttons
+    addManageEventListeners(manageControls);
+}
+
+// Add event listeners to manage controls
+function addManageEventListeners(container) {
+    // Monitor toggle
+    const monitorToggle = container.querySelector('.monitor-toggle');
+    if (monitorToggle) {
+        monitorToggle.addEventListener('change', function(e) {
+            e.stopPropagation();
+            const mediaType = this.dataset.mediaType;
+            const internalId = this.dataset.internalId;
+            const monitored = this.checked;
+            
+            fetch(`/api/${mediaType}/${internalId}/monitor`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ monitored })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to update monitoring status');
+                showNotification('Monitoring status updated', 'success');
+            })
+            .catch(error => {
+                console.error(error);
+                this.checked = !monitored;
+                showNotification('Failed to update monitoring status', 'error');
+            });
+        });
+    }
+
+    // Search button
+    const searchBtn = container.querySelector('.search-btn');
+    if (searchBtn) {
+        searchBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const mediaType = this.dataset.mediaType;
+            const internalId = this.dataset.internalId;
+            
+            fetch(`/api/${mediaType}/${internalId}/search`, {
+                method: 'POST'
+            })
+            .then(response => {
+                if (response.ok) {
+                    showNotification('Search initiated successfully', 'success');
+                } else {
+                    throw new Error('Failed to initiate search');
+                }
+            })
+            .catch(error => {
+                console.error(error);
+                showNotification('Failed to initiate search', 'error');
+            });
+        });
+    }
+
+    // Delete button
+    const deleteBtn = container.querySelector('.delete-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (confirm('Are you sure you want to delete this from your library?')) {
+                const mediaType = this.dataset.mediaType;
+                const internalId = this.dataset.internalId;
+                
+                fetch(`/api/${mediaType}/${internalId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showNotification('Item deleted successfully', 'success');
+                        // Refresh the page or update the UI
+                        window.location.reload();
+                    } else {
+                        throw new Error('Failed to delete item');
+                    }
+                })
+                .catch(error => {
+                    console.error(error);
+                    showNotification('Failed to delete item', 'error');
+                });
+            }
+        });
+    }
+}
+
+// Simple notification function
+function showNotification(message, type) {
+    // Implement toast notification or use alert for now
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const notification = document.createElement('div');
+    notification.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+// Clear search functionality
+function initializeClearSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const clearButton = document.getElementById('clearSearch');
+    
+    if (!searchInput || !clearButton) return;
+    
+    // Update clear button state based on input content
+    function updateClearButton() {
+        if (searchInput.value.trim() !== '') {
+            clearButton.disabled = false;
+        } else {
+            clearButton.disabled = true;
+        }
+    }
+    
+    // Clear the search input
+    function clearSearch() {
+        if (!clearButton.disabled) {
+            searchInput.value = '';
+            searchInput.focus();
+            updateClearButton();
+        }
+    }
+    
+    // Event listeners
+    searchInput.addEventListener('input', updateClearButton);
+    searchInput.addEventListener('keyup', updateClearButton);
+    clearButton.addEventListener('click', clearSearch);
+    
+    // Initialize on page load
+    updateClearButton();
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeMediaGrid();
+    initializeClearSearch();
+});
+

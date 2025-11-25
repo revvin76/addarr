@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.11] - 2025-11-25
+### Updated
+- CSS styles for Desktop browser - small tweaks top layouts
+
+### Added
+- Clear field button in the search results for easier new searches
+
 ## [1.1.10] - 2025-11-12
 ### Added
 - Update channel selection 'prod' or 'dev'. Set in the .env file. Dev channel may introduce breaking changes and would requite fresh installation to resolve.
