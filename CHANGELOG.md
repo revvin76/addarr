@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## [1.1.11] - 2025-11-25
 ### Updated
 - CSS styles for Desktop browser - small tweaks top layouts
+- Lazy loading for the manage media page thumbnails to improve performance
 
 ### Added
 - Clear field button in the search results for easier new searches

@@ -2000,3 +2000,26 @@ body.spinner-active {
     background-color: #bb2d3b;
     border-color: #b02a37;
 }
+
+/* Placeholder image styling */
+.manage-result-thumbnail[src="/static/images/placeholder.png"] {
+    background-color: #2a2a2a;
+    background-image: url('/static/images/logo.png');
+    background-size: 60%;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Loading states */
+.media-item.loading {
+    opacity: 0.7;
+}
+
+/* Ensure smooth loading */
+.manage-result-thumbnail {
+    transition: opacity 0.3s ease;
+}
+
+.manage-result-thumbnail.loading {
+    opacity: 0.5;
+}

@@ -2813,10 +2813,17 @@ function showNotification(message, type) {
     }, 3000);
 }
 // Clear search functionality
-function initializeClearSearch() {
+function initializeClearSearchOLD() {
     const searchInput = document.getElementById('searchInput');
+    if (!searchInput) {
+        console.error('Search input not found');
+        return;
+    }
     const clearButton = document.getElementById('clearSearch');
-    
+    if (!clearButton) {
+        console.error('Search input not found');
+        return;
+    }
     if (!searchInput || !clearButton) return;
     
     // Update clear button state based on input content
@@ -2845,10 +2852,77 @@ function initializeClearSearch() {
     // Initialize on page load
     updateClearButton();
 }
+// Filter and search functionality
+function updateMediaDisplay() {
+    const searchInput = document.getElementById('searchInput');
+    if (!searchInput) {
+        console.error('Search input not found');
+        return;
+    }
+    
+    const searchTerm = searchInput.value.toLowerCase();
+    const currentFilter = document.getElementById('mediaFilter').value;
+    
+    document.querySelectorAll('.media-item').forEach(item => {
+        const title = item.dataset.title;
+        const isMovie = item.classList.contains('movie-item');
+        const isTV = item.classList.contains('tv-item');
+                    
+        const matchesSearch = searchTerm === '' || title.includes(searchTerm);
+        const matchesFilter = currentFilter === 'all' || 
+                            (currentFilter === 'movie' && isMovie) || 
+                            (currentFilter === 'tv' && isTV);
+        
+        item.style.display = (matchesSearch && matchesFilter) ? 'block' : 'none';
+    });
+}
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    initializeMediaGrid();
-    initializeClearSearch();
-});
+// Clear search functionality for manage page
+function initializeClearSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const clearButton = document.getElementById('clearSearch');
+    
+    if (!searchInput || !clearButton) {
+        console.log('Clear search elements not found');
+        return;
+    }
+    
+    // Update clear button state based on input content
+    function updateClearButton() {
+        if (searchInput.value.trim() !== '') {
+            clearButton.disabled = false;
+        } else {
+            clearButton.disabled = true;
+        }
+    }
+    
+    // Clear the search input
+    function clearSearch() {
+        if (!clearButton.disabled) {
+            searchInput.value = '';
+            searchInput.focus();
+            updateClearButton();
+            updateMediaDisplay(); // Update display when cleared
+        }
+    }
+    
+    // Event listeners
+    searchInput.addEventListener('input', function() {
+        updateClearButton();
+        updateMediaDisplay(); // Real-time filtering
+    });
+    
+    searchInput.addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') {
+            updateMediaDisplay();
+        }
+    });
+    
+    clearButton.addEventListener('click', clearSearch);
+    
+    // Initialize on page load
+    updateClearButton();
+}
+
+
 

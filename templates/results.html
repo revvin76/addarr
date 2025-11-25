@@ -210,6 +210,12 @@
         });
     });
 
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeMediaGrid();
+        initializeClearSearch();
+    });
+
     // Fetch library status and update UI
     function checkLibraryStatus(mediaType, mediaId, card) {
         fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`)
