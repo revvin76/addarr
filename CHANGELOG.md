@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.12] - 2026-02-20
+### Updated
+- Added thread to monitor for active tunnel, re-establishing automatically if required
+
 ## [1.1.11] - 2025-11-25
 ### Updated
 - CSS styles for Desktop browser - small tweaks top layouts

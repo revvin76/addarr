@@ -23,6 +23,67 @@ import routes
 # Global variables for tunnel functionality - define them at module level
 tunnel_process = None
 tunnel_url = None
+tunnel_lock = threading.Lock()
+tunnel_should_run = True
+
+def monitor_tunnel():
+    """Monitor tunnel and auto-reconnect if it drops"""
+    global tunnel_process, tunnel_url, tunnel_should_run
+
+    logging.info("Tunnel monitor started")
+
+    while tunnel_should_run:
+        time.sleep(5)
+
+        with tunnel_lock:
+            if not tunnel_process:
+                continue
+
+            # Detect dead tunnel
+            try:
+                # If the process has a poll method (subprocess-like)
+                if hasattr(tunnel_process, "poll") and tunnel_process.poll() is not None:
+                    logging.warning("Tunnel process exited. Attempting reconnect...")
+                    print("Tunnel disconnected. Attempting reconnect...")
+                    tunnel_process = None
+                    tunnel_url = None
+                    attempt_reconnect()
+
+                # If Pinggy exposes a connected flag
+                elif hasattr(tunnel_process, "connected") and not tunnel_process.connected:
+                    logging.warning("Tunnel connection lost. Attempting reconnect...")
+                    print("Tunnel connection lost. Attempting reconnect...")
+                    tunnel_process = None
+                    tunnel_url = None
+                    attempt_reconnect()
+
+            except Exception as e:
+                logging.error(f"Tunnel monitor error: {e}")
+
+def attempt_reconnect():
+    """Try to reconnect tunnel every 10 seconds until successful"""
+    global tunnel_process, tunnel_url
+
+    while tunnel_should_run:
+        try:
+            print("Reconnecting tunnel...")
+            logging.info("Attempting tunnel reconnect...")
+
+            start_pinggy_tunnel()
+
+            # Wait up to 15 seconds for tunnel_url to populate
+            for _ in range(15):
+                if tunnel_url:
+                    print("Tunnel reconnected")
+                    logging.info("Tunnel successfully reconnected")
+                    return
+                time.sleep(1)
+
+        except Exception as e:
+            logging.error(f"Reconnect failed: {e}")
+
+        print("Reconnect failed. Retrying in 10 seconds...")
+        time.sleep(10)
 
 # Setup basic logging
 def setup_basic_logging():
@@ -416,14 +477,20 @@ def startup_sequence():
         print("🔧 Starting tunnel...")
         start_pinggy_tunnel()
         
-        # Wait for tunnel to establish
-        print("⏳ Waiting for tunnel to establish...", end="", flush=True)
-        for i in range(15):  # Wait up to 15 seconds
-            if tunnel_url is not None:
-                break
-            time.sleep(1)
-            print(".", end="", flush=True)
-        print()  # New line after progress dots
+        monitor_thread = threading.Thread(
+            target=monitor_tunnel,
+            daemon=True,
+            name="TunnelMonitor"
+        )
+        monitor_thread.start()        
+        # # Wait for tunnel to establish
+        # print("⏳ Waiting for tunnel to establish...", end="", flush=True)
+        # for i in range(15):  # Wait up to 15 seconds
+        #     if tunnel_url is not None:
+        #         break
+        #     time.sleep(1)
+        #     print(".", end="", flush=True)
+        # print()  # New line after progress dots
 
     
     # Start update manager if enabled (background checks)
@@ -442,6 +509,8 @@ def startup_sequence():
 
 def shutdown_sequence():
     global tunnel_process  # Add this line to access the global variable
+    global tunnel_should_run
+    tunnel_should_run = False
     
     logging.info("Shutting down application...")
     
