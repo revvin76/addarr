@@ -39,25 +39,37 @@
                 {% endif %}                
             </div>
         </div>
-    </div>
-
-    <div class="container mt-4">
-        <div class="text-center mb-4">
-            <h3 class="text-light">Trending This Week</h3>
-            <p class="text-light">Popular movies and TV shows from TMDB</p>
             
-            <div class="col-md-6 mb-2">
-                <div class="input-group">
-                    <span class="input-group-text">
-                        <i class="fas fa-filter"></i>
-                    </span>
-                    <select id="mediaFilter" class="form-select">
-                        <option value="all">All Media</option>
-                        <option value="movie">Movies Only</option>
-                        <option value="tv">TV Shows Only</option>
-                    </select>
+        <div class="container mt-4">
+            <div class="text-center mb-4">
+                <h3 class="text-light">Trending This Week</h3>
+                <p class="text-light">Popular movies and TV shows from TMDB</p>
+
+                <div class="col-md-12 mb-2">
+                    <div class="flex-container"> <!-- Added custom class -->
+                        <div class="input-group input-group-flex"> <!-- Added custom class -->
+                            <span class="input-group-text">
+                                <i class="fas fa-filter"></i>
+                            </span>
+                            <select id="mediaFilter" class="form-select">
+                                <option value="all">All Media</option>
+                                <option value="movie">Movies Only</option>
+                                <option value="tv">TV Shows Only</option>
+                            </select>
+                        </div>
+                        <div class="input-group input-group-flex"> <!-- Added custom class -->
+                            <span class="input-group-text">
+                                <i class="fas fa-filter"></i>
+                            </span>
+                            <select id="statusFilter" class="form-select">
+                                <option value="status_all">All Statuses</option>
+                                <option value="status_in_library">In Library</option>
+                                <option value="status_not_added">Not Added</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-            </div>               
+            </div>
         </div>
         
         <div class="mb-5">
@@ -105,7 +117,7 @@
                     <div class="search-result-card h-100 tv-card" 
                          data-media-type="tv"
                          data-media-id="{{ show.id }}"
-                         onclick="showDetails('tv', {{ show.id }}, true)">
+                         onclick="redirectToSearch('{{ show.name | escape }}', '2025')">
                         <div class="search-result-thumbnail-container">
                             <img src="{% if show.poster_path %}https://image.tmdb.org/t/p/w300{{ show.poster_path }}{% else %}/static/images/apple-touch-icon.png{% endif %}" 
                                 class="search-result-thumbnail"
@@ -184,6 +196,7 @@
     // Filter functionality
     document.addEventListener('DOMContentLoaded', function() {
         const mediaFilter = document.getElementById('mediaFilter');
+        const statusFilter = document.getElementById('statusFilter');
         
         mediaFilter.addEventListener('change', function() {
             const filter = this.value;
@@ -198,7 +211,25 @@
                 }
             });
         });
-
+        statusFilter.addEventListener('change', function() {
+            const filter = this.value;
+            const items = document.querySelectorAll('.result-item');
+            
+            // Filter result items based on library status
+            items.forEach(item => {
+                const badge = item.querySelector('.status-badge');
+                if (badge) {
+                    const inLibrary = badge.textContent.trim() === 'In Library';
+                    if (filter === 'status_all') {
+                        item.style.display = 'block';
+                    } else if (filter === 'status_in_library') {
+                        item.style.display = inLibrary ? 'block' : 'none';
+                    } else if (filter === 'status_not_added') {
+                        item.style.display = !inLibrary ? 'block' : 'none';
+                    }
+                }
+            });
+        });
         // Lazy-load library status for visible items - SAME FUNCTIONALITY AS RESULTS PAGE
         const lazyLoadStatus = () => {
             const cards = document.querySelectorAll('.search-result-card:not(.status-checked)');

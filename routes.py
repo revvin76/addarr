@@ -1,6 +1,7 @@
 # routes.py
 from flask import render_template, request, jsonify, Response, session, redirect, url_for, send_from_directory
 from functools import wraps
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
 import os
@@ -8,6 +9,8 @@ from collections import deque
 import requests
 import re
 from datetime import datetime
+from update_manager import UpdateManager
+
 
 # Import shared utilities (will be passed from app.py)
 def init_routes(app, config_manager, update_manager, auth_decorator, debug_decorator, shared_utils, network_info_func=None):
@@ -22,6 +25,46 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     conditional_debug_log = debug_decorator
     utils = shared_utils
     update_manager = update_manager
+
+    # Library status cache with 60s TTL
+    library_cache = {
+        'movies': {'data': None, 'timestamp': 0},
+        'series': {'data': None, 'timestamp': 0}
+    }
+    CACHE_TTL = 60  # 60 seconds
+    
+    def get_cached_library(media_type):
+        """Get library from cache or fetch fresh if expired (60s TTL)"""
+        cache_key = 'movies' if media_type == 'movie' else 'series'
+        cache_entry = library_cache[cache_key]
+        current_time = time.time()
+        
+        # Check if cache is still valid
+        if cache_entry['data'] is not None and (current_time - cache_entry['timestamp']) < CACHE_TTL:
+            return cache_entry['data']
+        
+        # Fetch fresh data
+        try:
+            if media_type == 'movie':
+                response = requests.get(
+                    f"{CONFIG.radarr.url}/api/v3/movie",
+                    params={'apikey': CONFIG.radarr.api_key}
+                )
+            else:
+                response = requests.get(
+                    f"{CONFIG.sonarr.url}/api/v3/series",
+                    params={'apikey': CONFIG.sonarr.api_key}
+                )
+            
+            data = response.json()
+            # Update cache
+            cache_entry['data'] = data
+            cache_entry['timestamp'] = current_time
+            return data
+        except Exception as e:
+            logging.error(f"Error fetching {media_type} library: {str(e)}")
+            # Return cached data if available, even if expired
+            return cache_entry['data'] if cache_entry['data'] is not None else []
 
     # ============ ROUTE DEFINITIONS ============
     @app.route('/')
@@ -123,16 +166,21 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    @app.route('/search', methods=['POST'])
+    @app.route('/search', methods=['GET', 'POST'])
     @conditional_debug_log
     @requires_auth
     def search():
-        query = request.form['query']
+        query = request.args.get('q') or request.form.get('query')
         logging.info(f"Searching for: {query}")
         
         try:
-            movie_results = utils.search_radarr(query)
-            tv_results = utils.search_sonarr(query)
+            # Search Radarr and Sonarr concurrently using ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                movie_future = executor.submit(utils.search_radarr, query)
+                tv_future = executor.submit(utils.search_sonarr, query)
+                
+                movie_results = movie_future.result()
+                tv_results = tv_future.result()
             
             movie_results = movie_results if isinstance(movie_results, list) else []
             tv_results = tv_results if isinstance(tv_results, list) else []
@@ -188,8 +236,13 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @requires_auth  
     def manage_media():
         try:
-            movies = utils.get_radarr_movies()
-            series = utils.get_sonarr_series()
+            # Fetch movies and series concurrently using ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                movies_future = executor.submit(utils.get_radarr_movies)
+                series_future = executor.submit(utils.get_sonarr_series)
+                
+                movies = movies_future.result()
+                series = series_future.result()
             
             combined_media = []
             
@@ -327,19 +380,12 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         media_type = request.args.get('type')
         media_id = request.args.get('id')
         
+        # Use cached library data (60s TTL)
+        existing = get_cached_library(media_type)
+        
         if media_type == 'movie':
-            # Check Radarr
-            existing = requests.get(
-                f"{CONFIG.radarr.url}/api/v3/movie",
-                params={'apikey': CONFIG.radarr.api_key}
-            ).json()
             in_library = any(str(m.get('tmdbId')) == str(media_id) for m in existing)
         else:
-            # Check Sonarr
-            existing = requests.get(
-                f"{CONFIG.sonarr.url}/api/v3/series",
-                params={'apikey': CONFIG.sonarr.api_key}
-            ).json()
             in_library = any(str(s.get('tvdbId')) == str(media_id) for s in existing)
         
         return jsonify({'in_library': in_library})
@@ -348,7 +394,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @conditional_debug_log
     def dismiss_update_notification():
         # """Dismiss the update notification"""
-        set_env('UPDATE_NOTIFICATION', 'false')
+        update_manager.set_env('UPDATE_NOTIFICATION', 'false')
         return jsonify({'success': True})
 
     # Information page
@@ -509,7 +555,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     def get_last_updated():
         """Get the last updated time of the application"""
         try:
-            app_path = os.path.abspath(__file__)
+            app_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'app.py'))
             stat = os.stat(app_path)
             last_updated = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
             
@@ -532,7 +578,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @app.route('/api/update/download', methods=['POST'])
     @conditional_debug_log
     def download_update_route():
-        result = utils.download_update()
+        result = update_manager.download_update()
         return jsonify(result)
 
     @app.route('/api/update/status')

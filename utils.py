@@ -19,7 +19,7 @@ class SharedUtils:
                 return {'movies': [], 'tv_shows': []}
             
             trending_data = {'movies': [], 'tv_shows': []}
-            limit = 10
+            limit = 20
             
             if media_type in ['all', 'movie']:
                 with requests.get(

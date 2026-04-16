@@ -2023,3 +2023,12 @@ body.spinner-active {
 .manage-result-thumbnail.loading {
     opacity: 0.5;
 }
+
+.flex-container {
+    display:flex;
+    gap: 1%;
+}
+
+.flex-container .input-group {
+    width: 49%;
+}

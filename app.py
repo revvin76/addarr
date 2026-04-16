@@ -1,4 +1,12 @@
 # app.py (Simplified)
+import sys
+import io
+# Force UTF-8 encoding for console output on Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+else:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 import os
 from flask import Flask
 import logging
@@ -6,7 +14,6 @@ from logging.handlers import RotatingFileHandler
 import threading
 import time
 import atexit
-import sys
 import gc
 import psutil
 import requests
@@ -23,6 +30,7 @@ import routes
 # Global variables for tunnel functionality - define them at module level
 tunnel_process = None
 tunnel_url = None
+tunnel_url_lock = threading.Lock()  # Lock to protect tunnel_url access
 
 # Setup basic logging
 def setup_basic_logging():
@@ -42,7 +50,7 @@ setup_basic_logging()
 
 # Initialize core components
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_DEBUG') if os.getenv('FLASK_DEBUG') else os.urandom(24)
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 CONFIG = LazyConfig()
 memory_manager = MemoryManager(CONFIG)
@@ -151,17 +159,20 @@ def start_pinggy_tunnel():
             print()  # New line after progress dots
             
             if tunnel_process.urls:
-                tunnel_url = tunnel_process.urls[1] if len(tunnel_process.urls) > 1 else tunnel_process.urls[0]
+                with tunnel_url_lock:
+                    tunnel_url = tunnel_process.urls[1] if len(tunnel_process.urls) > 1 else tunnel_process.urls[0]
+                    tunnel_url_to_print = tunnel_url
                 print(f"✅ Pinggy Pro tunnel started successfully!")
-                print(f"   🌐 Public URL: {tunnel_url}")                
-                logging.info(f"Pinggy Pro tunnel started: {tunnel_url}")
+                print(f"   🌐 Public URL: {tunnel_url_to_print}")                
+                logging.info(f"Pinggy Pro tunnel started: {tunnel_url_to_print}")
             else:
                 raise Exception("No tunnel URLs received")
             
         except Exception as e:
             print(f"\n❌ Tunnel failed: {e}")
             logging.error(f"Tunnel failed: {str(e)}")
-            tunnel_url = None
+            with tunnel_url_lock:
+                tunnel_url = None
     
     # Start tunnel in separate thread
     print("🧵 Starting tunnel thread...")
@@ -182,7 +193,8 @@ def cleanup_tunnel():
                 except Exception as e:
                     print(f"Warning: Error closing tunnel gracefully: {e}")
             tunnel_process = None
-            tunnel_url = None
+            with tunnel_url_lock:
+                tunnel_url = None
         except Exception as e:
             print(f"Warning: Error during tunnel cleanup: {e}")
             logging.warning(f"Error during tunnel cleanup: {str(e)}")
@@ -190,14 +202,16 @@ def cleanup_tunnel():
 def get_network_info():
     """Get comprehensive network information"""
     global tunnel_url
+    with tunnel_url_lock:
+        current_tunnel_url = tunnel_url
     return {
         'local_ip': get_ip_address(),
         'port': CONFIG.app.port,
         'duckdns_enabled': CONFIG.duckdns.enabled,
         'duckdns_domain': CONFIG.duckdns.domain,
         'tunnel_enabled': CONFIG.tunnel.enabled,
-        'tunnel_url': tunnel_url,
-        'tunnel_active': tunnel_url is not None
+        'tunnel_url': current_tunnel_url,
+        'tunnel_active': current_tunnel_url is not None
     }
 
 # ============ WELCOME FUNCTION ============
@@ -214,8 +228,11 @@ def print_welcome():
     """
     
     # Check if tunnel URL is available (it might be set by the tunnel thread)
-    if tunnel_url:
-        app_info += f"{Fore.WHITE}• Tunnel: {Fore.CYAN}{tunnel_url}{Style.RESET_ALL}\n"
+    with tunnel_url_lock:
+        current_tunnel_url = tunnel_url
+    
+    if current_tunnel_url:
+        app_info += f"{Fore.WHITE}• Tunnel: {Fore.CYAN}{current_tunnel_url}{Style.RESET_ALL}\n"
     elif CONFIG.tunnel.enabled:
         app_info += f"{Fore.WHITE}• Tunnel: {Fore.YELLOW}Starting...{Style.RESET_ALL}\n"
     
@@ -231,8 +248,10 @@ def print_welcome():
         print(f"{Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}")
     
     print(app_info)
-    if tunnel_url:
-        display_enhanced_qr_code(tunnel_url)
+    with tunnel_url_lock:
+        current_tunnel_url = tunnel_url
+    if current_tunnel_url:
+        display_enhanced_qr_code(current_tunnel_url)
 
     print(f"{Fore.GREEN}✅ Ready to add media!{Style.RESET_ALL}\n")
     print(f"{Fore.YELLOW}Press Ctrl-C to shutdown{Style.RESET_ALL}")
@@ -301,18 +320,18 @@ def restart_application():
         # Stop managers gracefully
         try:
             update_manager.stop()
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error stopping update_manager: {str(e)}")
             
         try:
             memory_manager.stop()
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error stopping memory_manager: {str(e)}")
             
         try:
             cleanup_tunnel()
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error cleaning up tunnel: {str(e)}")
         
         # Use subprocess to restart
         python = sys.executable
@@ -360,7 +379,6 @@ def conditional_debug_log(func):
         if not CONFIG.app.debug:
             return func(*args, **kwargs)
         
-        import time
         start_time = time.time()
         logger = logging.getLogger(func.__module__)
         
@@ -393,9 +411,6 @@ routes.init_routes(
 def startup_sequence():
     global tunnel_url  # Add this line to access the global variable
     
-    import gc
-    gc.collect()
-    
     # Only run in the main process, not the reloader process
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         return
@@ -419,8 +434,9 @@ def startup_sequence():
         # Wait for tunnel to establish
         print("⏳ Waiting for tunnel to establish...", end="", flush=True)
         for i in range(15):  # Wait up to 15 seconds
-            if tunnel_url is not None:
-                break
+            with tunnel_url_lock:
+                if tunnel_url is not None:
+                    break
             time.sleep(1)
             print(".", end="", flush=True)
         print()  # New line after progress dots
@@ -468,9 +484,8 @@ def shutdown_sequence():
 atexit.register(shutdown_sequence)
 
 if __name__ == '__main__':
-    startup_sequence()
-    
     try:
+        startup_sequence()
         app.run(
             host='0.0.0.0', 
             debug=CONFIG.app.debug, 

@@ -816,7 +816,13 @@ document.getElementById('searchAllMissingBtn')?.addEventListener('click', () => 
   fetch(`/api/tv/${currentShowId}/search_missing`, { method: 'POST' })
     .then(r => r.ok ? alert('Search started') : alert('Failed'));
 });
-
+function redirectToSearch(name, year) {
+    let query = name;
+    if (year) {
+        query += ` (${year})`;
+    }
+    window.location.href = `/search?q=${encodeURIComponent(query)}`;
+}
 function showDetails(mediaType, mediaId, tmdb=false) {
     const modalEl = document.getElementById('detailsModal');
     const modal = new bootstrap.Modal(modalEl);

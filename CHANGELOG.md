@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.13] - 2026-04-16
+### Fixed
+- Secret key was using the value of FLASK_DEBUG instead of the FLASK_SECRET_KEY
+- Startup sequence was running before app.run()
+- Imported updateManager to routes.py to fix issue with dismiss notifications
+- Download update route that was referencing a function that no longer existed
+- Last updated time derived from app.py instead of routes.py
+- Tunnel URL race condition in print_welcome
+- Changed a bare except to allow error logging instead of silent failures
+- Removed redundant import of time module
+
+### Updated
+- Trending page now includes a status filter and 20 results per media instead of 10
+- Added a 60s TTL in-process cache for check_library_status which was fetching all card data on each card
+- Manage_media fetched movies and series sequentially instead of in parallel
+- Search_media fetched movies and series sequentially instead of in parallel
+- Removed unnecessary garbage collection
+
 ## [1.1.11] - 2025-11-25
 ### Updated
 - CSS styles for Desktop browser - small tweaks top layouts
