@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.14] - 2026-04-16
+### Fixed
+- Fixed ReferenceError for showManageDetails function on manage page by removing defer attribute from main.js script load
+
+---
 ## [1.1.13] - 2026-04-16
 ### Fixed
 - Secret key was using the value of FLASK_DEBUG instead of the FLASK_SECRET_KEY
