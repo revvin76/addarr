@@ -7,6 +7,13 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Added missing `/save_config` endpoint that was causing 404 errors when saving configuration
 
+### Added
+- Created VERSION file at project root for centralized version management
+- Added version.py module for programmatic version access
+- Added update_version.py script to automatically update version across all files
+- Added version field to PWA manifest.json
+- Updated demo_env header and APP_VERSION to 1.1.15
+
 ---
 ## [1.1.14] - 2026-04-16
 ### Fixed

@@ -1,6 +1,9 @@
 # =========================================
-# Addarr v1.1.9 - Environment Configuration
+# Addarr v1.1.15 - Environment Configuration
 # =========================================
+# VERSION: See VERSION file at project root
+# Last Updated: 2026-04-16
+# VERSION: See VERSION file at project root
 
 # === RADARR SETTINGS ===
 RADARR_URL=http://localhost:7878
@@ -34,7 +37,7 @@ ENABLE_AUTO_UPDATE=true
 
 # === FLASK APP SETTINGS ===
 UPDATE_CHANNEL=prod # Options: prod, dev
-APP_VERSION=1.0.0
+APP_VERSION=1.1.15
 APP_COMMIT=abc1234
 FLASK_DEBUG=false
 SERVER_PORT=5000
