@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.15] - 2026-04-16
+### Fixed
+- Added missing `/save_config` endpoint that was causing 404 errors when saving configuration
+
+---
 ## [1.1.14] - 2026-04-16
 ### Fixed
 - Fixed ReferenceError for showManageDetails function on manage page by removing defer attribute from main.js script load

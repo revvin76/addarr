@@ -672,6 +672,43 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             logging.error(f"Template error: {e}")
             return "Page not found", 404
 
+    # Configuration save route
+    @app.route('/save_config', methods=['POST'])
+    @conditional_debug_log
+    @requires_auth
+    def save_config():
+        """Save configuration from the config form"""
+        try:
+            data = request.json
+            
+            if not data:
+                return jsonify({'success': False, 'error': 'No configuration data provided'}), 400
+            
+            # Save each configuration value to the .env file
+            for key, value in data.items():
+                # Skip if None
+                if value is None:
+                    continue
+                
+                # Convert boolean values to string
+                if isinstance(value, bool):
+                    value = 'true' if value else 'false'
+                else:
+                    value = str(value)
+                
+                # Save to environment using update_manager
+                update_manager.set_env(key, value)
+            
+            # Reload configuration after saving
+            CONFIG._reload_config()
+            
+            logging.info(f"Configuration updated with {len(data)} parameters")
+            return jsonify({'success': True, 'message': 'Configuration saved successfully'})
+            
+        except Exception as e:
+            logging.error(f"Error saving configuration: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     # Error handlers
     @app.errorhandler(404)
     def not_found(e):
