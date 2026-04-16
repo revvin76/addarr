@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.16] - 2026-04-16
+### Fixed
+- Fixed search results page not updating status badges on page load - was reading data attributes from wrong element
+- Fixed status badges not updating after adding item to library - now refreshes badge after successful add
+- Improved notification system in addItem function - uses showNotification instead of alert
+
+---
 ## [1.1.15] - 2026-04-16
 ### Fixed
 - Added missing `/save_config` endpoint that was causing 404 errors when saving configuration

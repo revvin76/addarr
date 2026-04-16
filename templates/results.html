@@ -200,12 +200,13 @@
             });
         });
 
-        // Check library status for all items
-        const cards = document.querySelectorAll('.search-result-card');
+        // Check library status for all items - get data from result-item parent
+        const resultItems = document.querySelectorAll('.result-item');
         
-        cards.forEach(card => {
-            const mediaType = card.dataset.mediaType;
-            const mediaId = card.dataset.mediaId;
+        resultItems.forEach(resultItem => {
+            const mediaType = resultItem.dataset.mediaType;
+            const mediaId = resultItem.dataset.mediaId;
+            const card = resultItem.querySelector('.search-result-card');
             checkLibraryStatus(mediaType, mediaId, card);
         });
     });

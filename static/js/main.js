@@ -40,13 +40,32 @@ function addItem(mediaType, mediaId) {
     })
     .then(response => response.json())
     .then(data => {
-        alert(data.success ? 'Added successfully!' : 'Error adding item');
+        if (data.success) {
+            showNotification('Added successfully!', 'success');
+            
+            // Refresh the status badge for this item after a short delay
+            setTimeout(() => {
+                // Find the result item by matching media type and ID
+                const resultItem = document.querySelector(
+                    `.result-item[data-media-type="${mediaType}"][data-media-id="${mediaId}"]`
+                );
+                if (resultItem) {
+                    const card = resultItem.querySelector('.search-result-card');
+                    if (card) {
+                        // Re-check library status to update the badge
+                        checkLibraryStatus(mediaType, mediaId, card);
+                    }
+                }
+            }, 500);
+        } else {
+            showNotification('Error adding item', 'error');
+        }
         btn.disabled = false;
         btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`;
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error adding item');
+        showNotification('Error adding item', 'error');
         btn.disabled = false;
         btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`;
     });
