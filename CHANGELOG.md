@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.19] - 2026-04-17
+### Fixed
+- Simplified badge layout in search results and trending pages
+- Removed manage-controls divs that were cluttering the interface
+- Badge now displays "On Disk" (green) or "Missing" (red) based on file status
+
+### Changed
+- Delete button now appears inline next to status badge instead of separate controls
+- Delete button only displays for items that are in library (On Disk or Missing status)
+- Simplified JavaScript logic by removing showManageControls and addManageEventListeners
+
+### Improved
+- Consistent badge and button styling across results.html and trending.html
+- Cleaner interface with focused functionality (status + delete only)
+
+---
 ## [1.1.18] - 2026-04-17
 ### Fixed
 - Refactored manage page badge layout to fix status badge transitions and card sizing issues
