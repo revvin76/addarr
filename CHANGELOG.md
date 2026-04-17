@@ -5,18 +5,20 @@ All notable changes to this project will be documented in this file.
 ---
 ## [1.1.23] - 2026-04-17
 ### Fixed
+- Fixed SyntaxError in main.js (line 2736) caused by duplicate function call and closing brace
+- Fixed main.js loading issue that prevented showDetails function from being available
 - Fixed trending TV shows linking to wrong TV show (TMDB ID vs TVDB ID mismatch issue)
 - Removed undefined `redirectToSearch` function call on trending TV show cards
+- Fixed trending page TV show library status to accurately reflect library status in Sonarr
+- Added episode count display for TV shows on trending page
 - TV shows on trending page now use TMDB-only mode since we don't have TVDB IDs from TMDB
 - Skip library status checking for TV shows on trending page (TMDB IDs don't map to Sonarr's TVDB requirement)
-- TV shows now display "TMDB Only" status badge indicating they're from TMDB data source
 
 ### Changed
 - Updated trending TV show onclick to call `showDetails('tv', id, true)` for TMDB-only display mode
-- Library status badge for trending TV shows now shows "TMDB Only" instead of "Checking..."
-
-### Technical
-- Updated showDetails placeholder function signature in both templates to accept tmdbOnly parameter for proper function forwarding
+- Library status badge for trending TV shows now shows accurate status ("On Disk", "Missing", or "Not Added")
+- Trending TV show cards now display episode count information
+- Updated showDetails placeholder function signature in both templates to accept tmdbOnly parameter
 
 ---
 ## [1.1.22] - 2026-04-17

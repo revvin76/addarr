@@ -2732,8 +2732,6 @@ function updateManageControlsHTML(mediaType, mediaId, internalId, manageControls
     // Add event listeners to new buttons
     addManageEventListeners(manageControls);
 }
-    addManageEventListeners(manageControls);
-}
 
 // Add event listeners to manage controls
 function addManageEventListeners(container) {

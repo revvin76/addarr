@@ -282,23 +282,13 @@
 
         // Fetch library status and update badge with delete button
         const checkLibraryStatus = (mediaType, mediaId, card) => {
-            // Skip library status check for TV shows on trending page
-            // (TMDB IDs don't match Sonarr's TVDB ID requirement)
-            if (mediaType === 'tv') {
-                const badge = card.querySelector('.status-badge');
-                if (badge) {
-                    badge.textContent = 'TMDB Only';
-                    badge.className = 'status-badge text-xs badge bg-info';
-                }
-                return;
-            }
             
-            fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`)
+            fetch(`/check_library_status?type=${mediaType}&id=${mediaId}&source=tmdb`)
                 .then(response => response.json())
                 .then(data => {
                     const badge = card.querySelector('.status-badge');
                     const deleteBtn = card.querySelector('.delete-btn');
-                    
+                    console.log('Library status for', mediaType, mediaId, data);
                     if (!badge) return;
                     
                     if (data.in_library) {
@@ -307,18 +297,19 @@
                             .then(response => response.json())
                             .then(details => {
                                 const itemData = details.data || details;
+                                const stats = data.statistics || {};
+                                console.log('Details for', mediaType, mediaId, itemData);
                                 let isOnDisk = false;
                                 
                                 if (mediaType === 'movie') {
                                     isOnDisk = itemData.hasFile || false;
                                 } else {
-                                    const stats = itemData.statistics || {};
                                     isOnDisk = (stats.episodeFileCount || 0) > 0;
                                 }
                                 
                                 // Update badge
                                 if (isOnDisk) {
-                                    badge.textContent = 'On Disk';
+                                    badge.textContent = mediaType === 'tv' ? ` [${stats.episodeFileCount}/ ${stats.episodeCount}] eps)` : 'On Disk';
                                     badge.className = 'status-badge text-xs badge text-bg-success';
                                 } else {
                                     badge.textContent = 'Missing';

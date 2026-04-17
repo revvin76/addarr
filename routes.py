@@ -379,16 +379,35 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     def check_library_status():
         media_type = request.args.get('type')
         media_id = request.args.get('id')
+        source = request.args.get('source', 'tvdb' if media_type == 'tv' else 'tmdb')
         
         # Use cached library data (60s TTL)
         existing = get_cached_library(media_type)
         
+        match= None
         if media_type == 'movie':
-            in_library = any(str(m.get('tmdbId')) == str(media_id) for m in existing)
+            # Radarr almost exclusively uses tmdbId
+            # in_library = any(str(m.get('tmdbId')) == str(media_id) for m in existing)
+            match = next((m for m in existing if str(m.get('tmdbId')) == str(media_id)), None)
         else:
-            in_library = any(str(s.get('tvdbId')) == str(media_id) for s in existing)
+            target_key = 'tmdbId' if source == 'tmdb' else 'tvdbId'
+            match = next((s for s in existing if str(s.get(target_key)) == str(media_id)), None)
+            
+            # if source == 'tmdb':
+            #     in_library = any(str(s.get('tmdbId')) == str(media_id) for s in existing)
+            # else:
+            #     in_library = any(str(s.get('tvdbId')) == str(media_id) for s in existing)
         
-        return jsonify({'in_library': in_library})
+        if match:
+            # If found, return the actual statistics from the Sonarr/Radarr database
+            return jsonify({
+                'in_library': True,
+                'statistics': match.get('statistics', {}),
+                'path': match.get('path'),
+                'status': match.get('status')
+            })
+    
+        return jsonify({'in_library': False})
 
     @app.route('/api/update/dismiss', methods=['POST'])
     @conditional_debug_log

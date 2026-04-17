@@ -56,7 +56,7 @@ class SharedUtils:
         params = {'term': query, 'apikey': self.config.sonarr.api_key}
         response = requests.get(url, params=params)
         return response.json()
-    
+
     def add_to_radarr(self, tmdb_id):
         url = f"{self.config.radarr.url}/api/v3/movie"
         headers = {'Content-Type': 'application/json'}
@@ -75,31 +75,36 @@ class SharedUtils:
         )
         return response.status_code in [200, 201]
     
-    def add_to_sonarr(self, tvdb_id):
+    def add_to_sonarr(self, series_id, source="tmdb"):
         lookup_url = f"{self.config.sonarr.url}/api/v3/series/lookup"
-        params = {'term': f'tvdb:{tvdb_id}', 'apikey': self.config.sonarr.api_key}
+        params = {'term': f'{source}:{series_id}', 'apikey': self.config.sonarr.api_key}
         
         lookup_res = requests.get(lookup_url, params=params)
         if lookup_res.status_code != 200:
             return False
         
+        results = lookup_res.json()
+        if not results or len(results) == 0:
+            print(f"No series found on Sonarr for {source}:{series_id}")
+            return False
+        
         series_data = lookup_res.json()[0]
         
-        payload = {
-            'tvdbId': tvdb_id,
-            'title': series_data['title'],
+        series_data.update({
             'monitored': True,
             'rootFolderPath': self.config.sonarr.root_folder,
             'qualityProfileId': self.config.sonarr.quality_profile_id,
             'languageProfileId': self.config.sonarr.language_profile_id,
-            'addOptions': {'searchForMissingEpisodes': True, 'monitor': 'all'},
             'seasonFolder': True,
-            'seriesType': 'standard'
-        }
-        
+            'seriesType': 'standard',
+            'addOptions': {
+                'searchForMissingEpisodes': True, 
+                'monitor': 'all'
+            }
+        })        
         response = requests.post(
             f"{self.config.sonarr.url}/api/v3/series",
-            json=payload,
+            json=series_data,
             params={'apikey': self.config.sonarr.api_key}
         )
         
@@ -169,8 +174,10 @@ class SharedUtils:
         existing_url = f"{self.config.sonarr.url}/api/v3/series"
         existing = requests.get(existing_url, params={'apikey': self.config.sonarr.api_key}).json()
         
+        source = "tmdb"
         for series in existing:
             if str(series.get('tvdbId')) == str(tvdb_id):
+                source = "tvdb"
                 status_url = f"{self.config.sonarr.url}/api/v3/series/{series['id']}"
                 details = requests.get(status_url, params={'apikey': self.config.sonarr.api_key}).json()
                 
@@ -186,7 +193,7 @@ class SharedUtils:
         
         lookup_url = f"{self.config.sonarr.url}/api/v3/series/lookup"
         lookup = requests.get(lookup_url, params={
-            'term': f'tvdb:{tvdb_id}',
+            'term': f'{source}:{tvdb_id}',
             'apikey': self.config.sonarr.api_key
         }).json()
         
