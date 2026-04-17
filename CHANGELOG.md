@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.22] - 2026-04-17
+### Fixed
+- Fixed "showDetails not defined" ReferenceError that occurred when clicking search result or trending cards
+- Moved main.js script loading to `<head>` section (from body footer) to ensure function is available before onclick handlers
+- Added YouTube iframe API early to ensure YouTube player support
+- Added placeholder showDetails function with retry mechanism for resilience
+- Applied fix to both results.html and trending.html for consistency
+
+---
 ## [1.1.21] - 2026-04-17
 ### Fixed
 - Restored full modal details (poster image, YouTube trailer, gallery) to search results and trending pages
