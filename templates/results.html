@@ -118,17 +118,12 @@
                                 </h3>
                             </div>
                             
-                            <!-- Status and Manage Section - Will be populated by JavaScript -->
-                            <div class="media-status-section">
-                                <!-- Library Status Badge -->
-                                <div class="flex justify-between items-center mt-2 mb-2">
-                                    <span class="status-badge text-xs badge bg-secondary">Checking...</span>
-                                </div>
-                                
-                                <!-- Manage Controls - Will be shown if item is in library -->
-                                <div class="manage-controls" style="display: none;">
-                                    <!-- This section will be populated by JavaScript when item is in library -->
-                                </div>
+                            <!-- Status Badge with Delete Button -->
+                            <div class="media-status-section d-flex justify-content-between align-items-center mt-2 gap-2">
+                                <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
+                                <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -217,7 +212,7 @@
         initializeClearSearch();
     });
 
-    // Fetch library status and update UI with detailed logging
+    // Fetch library status and update UI
     function checkLibraryStatus(mediaType, mediaId, card) {
         if (!card) {
             console.error('Card element not provided to checkLibraryStatus');
@@ -225,7 +220,7 @@
         }
         
         const statusBadge = card.querySelector('.status-badge');
-        const manageControls = card.querySelector('.manage-controls');
+        const deleteBtn = card.querySelector('.delete-btn');
         
         if (!statusBadge) {
             console.error('Status badge not found in card for', mediaType, mediaId);
@@ -245,20 +240,48 @@
                 console.log(`[checkLibraryStatus] Response for ${mediaType} ${mediaId}:`, data);
                 
                 if (data.in_library) {
-                    console.log(`✅ Found in library: ${mediaType} ${mediaId}`);
-                    statusBadge.textContent = 'In Library';
-                    statusBadge.className = 'status-badge text-xs badge bg-success';
-                    
-                    // Show manage controls and fetch detailed info
-                    if (manageControls) {
-                        showManageControls(mediaType, mediaId, manageControls);
-                    }
+                    // Fetch detailed info to check if on disk or missing
+                    fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
+                        .then(response => response.json())
+                        .then(details => {
+                            const itemData = details.data || details;
+                            let isOnDisk = false;
+                            
+                            if (mediaType === 'movie') {
+                                isOnDisk = itemData.hasFile || false;
+                            } else {
+                                const stats = itemData.statistics || {};
+                                isOnDisk = (stats.episodeFileCount || 0) > 0;
+                            }
+                            
+                            // Update badge
+                            if (isOnDisk) {
+                                statusBadge.textContent = 'On Disk';
+                                statusBadge.className = 'status-badge text-xs badge text-bg-success';
+                            } else {
+                                statusBadge.textContent = 'Missing';
+                                statusBadge.className = 'status-badge text-xs badge text-bg-danger';
+                            }
+                            
+                            // Show delete button and set up event listener
+                            if (deleteBtn) {
+                                deleteBtn.style.display = 'block';
+                                deleteBtn.dataset.mediaType = mediaType;
+                                deleteBtn.dataset.mediaId = mediaId;
+                                deleteBtn.onclick = deleteFromLibrary;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching details:', error);
+                            statusBadge.textContent = 'Error';
+                            statusBadge.className = 'status-badge text-xs badge bg-danger';
+                        });
                 } else {
                     console.log(`⊘ Not in library: ${mediaType} ${mediaId}`);
                     statusBadge.textContent = 'Not Added';
                     statusBadge.className = 'status-badge text-xs badge bg-secondary';
-                    if (manageControls) {
-                        manageControls.style.display = 'none';
+                    if (deleteBtn) {
+                        deleteBtn.style.display = 'none';
                     }
                 }
             })
@@ -266,165 +289,35 @@
                 console.error(`[checkLibraryStatus] Error for ${mediaType} ${mediaId}:`, error);
                 statusBadge.textContent = 'Error';
                 statusBadge.className = 'status-badge text-xs badge bg-danger';
-                if (manageControls) {
-                    manageControls.style.display = 'none';
+                if (deleteBtn) {
+                    deleteBtn.style.display = 'none';
                 }
             });
     }
 
-    // Show manage controls for items in library
-    function showManageControls(mediaType, mediaId, manageControls) {
-        fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
-            .then(response => response.json())
-            .then(details => {
-                const data = details.data || details;
-                
-                let manageHTML = '';
-                if (mediaType === 'movie') {
-                    manageHTML = `
-                        <div class="manage-info">
-                            <small class="text-xs">
-                                <i class="fas fa-hdd me-1"></i>
-                                ${data.hasFile ? 'On Disk' : 'Missing'}
-                            </small>
-                            <div class="form-check form-switch mt-1">
-                                <input class="form-check-input monitor-toggle" 
-                                       type="checkbox" 
-                                       ${data.monitored ? 'checked' : ''}
-                                       data-media-type="${mediaType}"
-                                       data-media-id="${mediaId}">
-                                <label class="form-check-label text-xs">Monitored</label>
-                            </div>
-                        </div>
-                    `;
+    // Delete from library
+    function deleteFromLibrary(e) {
+        e.stopPropagation();
+        const mediaType = this.dataset.mediaType;
+        const mediaId = this.dataset.mediaId;
+        
+        if (confirm('Are you sure you want to delete this from your library?')) {
+            fetch(`/api/${mediaType}/${mediaId}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (response.ok) {
+                    showNotification('Item deleted successfully', 'success');
+                    // Refresh the library status
+                    const card = this.closest('.search-result-card');
+                    checkLibraryStatus(mediaType, mediaId, card);
                 } else {
-                    const stats = data.statistics || {};
-                    manageHTML = `
-                        <div class="manage-info">
-                            <small class="text-xs">
-                                <i class="fas fa-hdd me-1"></i>
-                                ${stats.episodeFileCount || 0}/${stats.episodeCount || 0} episodes
-                            </small>
-                            <div class="form-check form-switch mt-1">
-                                <input class="form-check-input monitor-toggle" 
-                                       type="checkbox" 
-                                       ${data.monitored ? 'checked' : ''}
-                                       data-media-type="${mediaType}"
-                                       data-media-id="${mediaId}">
-                                <label class="form-check-label text-xs">Monitored</label>
-                            </div>
-                        </div>
-                    `;
+                    throw new Error('Failed to delete item');
                 }
-                
-                // Add action buttons
-                manageHTML += `
-                    <div class="action-buttons mt-2">
-                        <button class="btn btn-sm btn-outline-warning search-btn me-1" 
-                                data-media-type="${mediaType}"
-                                data-media-id="${mediaId}">
-                            <i class="fas fa-search"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger delete-btn" 
-                                data-media-type="${mediaType}"
-                                data-media-id="${mediaId}">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                `;
-                
-                manageControls.innerHTML = manageHTML;
-                manageControls.style.display = 'block';
-                
-                // Add event listeners to new buttons
-                addManageEventListeners(manageControls);
             })
             .catch(error => {
-                console.error('Error fetching manage details:', error);
-            });
-    }
-
-    // Add event listeners to manage controls
-    function addManageEventListeners(container) {
-        // Monitor toggle
-        const monitorToggle = container.querySelector('.monitor-toggle');
-        if (monitorToggle) {
-            monitorToggle.addEventListener('change', function() {
-                const mediaType = this.dataset.mediaType;
-                const mediaId = this.dataset.mediaId;
-                const monitored = this.checked;
-                
-                fetch(`/api/${mediaType}/${mediaId}/monitor`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ monitored })
-                })
-                .then(response => {
-                    if (!response.ok) throw new Error('Failed to update monitoring status');
-                    showNotification('Monitoring status updated', 'success');
-                })
-                .catch(error => {
-                    console.error(error);
-                    this.checked = !monitored;
-                    showNotification('Failed to update monitoring status', 'error');
-                });
-            });
-        }
-
-        // Search button
-        const searchBtn = container.querySelector('.search-btn');
-        if (searchBtn) {
-            searchBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const mediaType = this.dataset.mediaType;
-                const mediaId = this.dataset.mediaId;
-                
-                fetch(`/api/${mediaType}/${mediaId}/search`, {
-                    method: 'POST'
-                })
-                .then(response => {
-                    if (response.ok) {
-                        showNotification('Search initiated successfully', 'success');
-                    } else {
-                        throw new Error('Failed to initiate search');
-                    }
-                })
-                .catch(error => {
-                    console.error(error);
-                    showNotification('Failed to initiate search', 'error');
-                });
-            });
-        }
-
-        // Delete button
-        const deleteBtn = container.querySelector('.delete-btn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                if (confirm('Are you sure you want to delete this from your library?')) {
-                    const mediaType = this.dataset.mediaType;
-                    const mediaId = this.dataset.mediaId;
-                    
-                    fetch(`/api/${mediaType}/${mediaId}`, {
-                        method: 'DELETE'
-                    })
-                    .then(response => {
-                        if (response.ok) {
-                            showNotification('Item deleted successfully', 'success');
-                            // Refresh the library status
-                            const card = this.closest('.search-result-card');
-                            checkLibraryStatus(mediaType, mediaId, card);
-                        } else {
-                            throw new Error('Failed to delete item');
-                        }
-                    })
-                    .catch(error => {
-                        console.error(error);
-                        showNotification('Failed to delete item', 'error');
-                    });
-                }
+                console.error(error);
+                showNotification('Failed to delete item', 'error');
             });
         }
     }
