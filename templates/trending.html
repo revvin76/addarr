@@ -20,7 +20,7 @@
     <!-- Placeholder function - will be overridden by main.js -->
     <script>
         if (typeof showDetails === 'undefined') {
-            window.showDetails = function(mediaType, mediaId) {
+            window.showDetails = function(mediaType, mediaId, tmdbOnly = false) {
                 console.warn('showDetails not yet loaded from main.js');
                 const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
                 document.getElementById('detailsContent').innerHTML = '<p class="text-center">Loading...</p>';
@@ -28,7 +28,7 @@
                 // Retry after a short delay
                 setTimeout(() => {
                     if (typeof showDetails !== 'undefined') {
-                        showDetails(mediaType, mediaId);
+                        showDetails(mediaType, mediaId, tmdbOnly);
                     }
                 }, 500);
             };
@@ -142,7 +142,7 @@
                     <div class="search-result-card h-100 tv-card" 
                          data-media-type="tv"
                          data-media-id="{{ show.id }}"
-                         onclick="redirectToSearch('{{ show.name | escape }}', '2025')">
+                         onclick="showDetails('tv', {{ show.id }}, true)">
                         <div class="search-result-thumbnail-container">
                             <img src="{% if show.poster_path %}https://image.tmdb.org/t/p/w300{{ show.poster_path }}{% else %}/static/images/apple-touch-icon.png{% endif %}" 
                                 class="search-result-thumbnail"
@@ -282,6 +282,17 @@
 
         // Fetch library status and update badge with delete button
         const checkLibraryStatus = (mediaType, mediaId, card) => {
+            // Skip library status check for TV shows on trending page
+            // (TMDB IDs don't match Sonarr's TVDB ID requirement)
+            if (mediaType === 'tv') {
+                const badge = card.querySelector('.status-badge');
+                if (badge) {
+                    badge.textContent = 'TMDB Only';
+                    badge.className = 'status-badge text-xs badge bg-info';
+                }
+                return;
+            }
+            
             fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`)
                 .then(response => response.json())
                 .then(data => {

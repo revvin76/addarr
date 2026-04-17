@@ -29,7 +29,7 @@
     <!-- Placeholder function - will be overridden by main.js -->
     <script>
         if (typeof showDetails === 'undefined') {
-            window.showDetails = function(mediaType, mediaId) {
+            window.showDetails = function(mediaType, mediaId, tmdbOnly = false) {
                 console.warn('showDetails not yet loaded from main.js');
                 const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
                 document.getElementById('detailsContent').innerHTML = '<p class="text-center">Loading...</p>';
@@ -37,7 +37,7 @@
                 // Retry after a short delay
                 setTimeout(() => {
                     if (typeof showDetails !== 'undefined') {
-                        showDetails(mediaType, mediaId);
+                        showDetails(mediaType, mediaId, tmdbOnly);
                     }
                 }, 500);
             };
