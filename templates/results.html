@@ -22,6 +22,27 @@
     <!-- Theme color -->
     <meta name="theme-color" content="#1a1a1a" />
     <script src="https://www.youtube.com/iframe_api"></script>
+    
+    <!-- Load main.js early to ensure showDetails is available -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Placeholder function - will be overridden by main.js -->
+    <script>
+        if (typeof showDetails === 'undefined') {
+            window.showDetails = function(mediaType, mediaId) {
+                console.warn('showDetails not yet loaded from main.js');
+                const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+                document.getElementById('detailsContent').innerHTML = '<p class="text-center">Loading...</p>';
+                modal.show();
+                // Retry after a short delay
+                setTimeout(() => {
+                    if (typeof showDetails !== 'undefined') {
+                        showDetails(mediaType, mediaId);
+                    }
+                }, 500);
+            };
+        }
+    </script>
 </head>
 <body>
     <!-- Logo and Header -->
@@ -174,7 +195,6 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>    
     
     <script>
     // Simplified - No lazy loading, check all items on page load
