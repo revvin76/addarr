@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.17] - 2026-04-16
+### Fixed
+- Fixed status badges not updating with real-time information from Radarr/Sonarr
+- Added comprehensive logging to checkLibraryStatus for debugging badge updates
+- Fixed race condition where badge updates might occur before API responses
+- Improved error handling and validation in library status checking
+- Increased badge refresh delay after adding item from 500ms to 1000ms for API sync
+- Added proper error messages in addItem notifications
+
+---
 ## [1.1.16] - 2026-04-16
 ### Fixed
 - Fixed search results page not updating status badges on page load - was reading data attributes from wrong element

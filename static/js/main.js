@@ -33,39 +33,55 @@ function addItem(mediaType, mediaId) {
     btn.disabled = true;
     btn.textContent = 'Adding...';
     
+    console.log(`[addItem] Adding ${mediaType} ID: ${mediaId}`);
+    
     fetch('/add', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ media_type: mediaType, media_id: mediaId })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log(`[addItem] Response:`, data);
+        
         if (data.success) {
             showNotification('Added successfully!', 'success');
             
-            // Refresh the status badge for this item after a short delay
+            // Refresh the status badge for this item after delay (gives Radarr/Sonarr time to update)
             setTimeout(() => {
-                // Find the result item by matching media type and ID
+                console.log(`[addItem] Refreshing badge after 1000ms delay`);
+                
+                // Try to find and update status badge wherever it might be
                 const resultItem = document.querySelector(
                     `.result-item[data-media-type="${mediaType}"][data-media-id="${mediaId}"]`
                 );
+                
                 if (resultItem) {
                     const card = resultItem.querySelector('.search-result-card');
-                    if (card) {
-                        // Re-check library status to update the badge
+                    if (card && typeof checkLibraryStatus === 'function') {
+                        console.log(`[addItem] Found card, calling checkLibraryStatus`);
                         checkLibraryStatus(mediaType, mediaId, card);
+                    } else {
+                        console.warn(`[addItem] Card or checkLibraryStatus function not available`);
                     }
+                } else {
+                    console.warn(`[addItem] Result item not found for ${mediaType} ${mediaId}`);
                 }
-            }, 500);
+            }, 1000); // Increased delay to 1000ms for Radarr/Sonarr to process
         } else {
-            showNotification('Error adding item', 'error');
+            showNotification('Error adding item: ' + (data.error || 'Unknown error'), 'error');
         }
         btn.disabled = false;
         btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`;
     })
     .catch(error => {
-        console.error('Error:', error);
-        showNotification('Error adding item', 'error');
+        console.error('[addItem] Error:', error);
+        showNotification('Error adding item: ' + error.message, 'error');
         btn.disabled = false;
         btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`;
     });
