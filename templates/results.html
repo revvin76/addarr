@@ -119,7 +119,7 @@
                             </div>
                             
                             <!-- Status Badge with Delete Button -->
-                            <div class="media-status-section d-flex justify-content-between align-items-center mt-2 gap-2">
+                            <div class="media-status-section d-flex justify-content-between align-items-start mt-2 gap-2">
                                 <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
                                 <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
                                     <i class="fas fa-trash"></i>
@@ -177,6 +177,39 @@
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>    
     
     <script>
+    // Show details in modal - will be overridden by main.js if available
+    function showDetails(mediaType, mediaId) {
+        const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+        const detailsContent = document.getElementById('detailsContent');
+        detailsContent.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+        
+        // Fetch library status and details
+        Promise.all([
+            fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`).then(r => r.json()),
+            fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`).then(r => r.json()).catch(() => ({}))
+        ])
+        .then(([statusData, detailsData]) => {
+            const itemData = detailsData.data || detailsData || {};
+            const title = itemData.title || 'Unknown';
+            const overview = itemData.overview || 'No description available';
+            
+            detailsContent.innerHTML = `
+                <h4 class="mb-3">${title}</h4>
+                <p class="mb-3">${overview}</p>
+                ${statusData.in_library ? '<div class="alert alert-success mb-3">✓ Already in Library</div>' : ''}
+                <button class="btn btn-primary" onclick="addItem('${mediaType}', ${mediaId})">
+                    Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}
+                </button>
+            `;
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error fetching details:', error);
+            detailsContent.innerHTML = '<div class="alert alert-danger">Error loading details. Please try again.</div>';
+            modal.show();
+        });
+    }
+
     // Simplified - No lazy loading, check all items on page load
     document.addEventListener('DOMContentLoaded', function() {
         // Filter functionality
