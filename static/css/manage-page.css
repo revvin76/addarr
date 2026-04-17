@@ -1,0 +1,184 @@
+/* Manage Page Specific Styles */
+
+/* Manage Result Card Layout */
+.media-item {
+    display: flex;
+    align-items: stretch;
+}
+
+.manage-result-card {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.manage-result-card:hover {
+    box-shadow: 0 4px 8px rgba(94, 214, 64, 0.2);
+    border-color: var(--accent-green);
+}
+
+/* Card Header - Thumbnail + Title Section */
+.manage-result-card > .d-flex {
+    padding: 0.75rem;
+    gap: 0.75rem;
+}
+
+.manage-result-thumbnail-container {
+    flex-shrink: 0;
+    width: 80px;
+    aspect-ratio: 2/3;
+    overflow: hidden;
+    border-radius: 4px;
+}
+
+.manage-result-content {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.manage-result-content h5 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+    margin-bottom: 0.25rem;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.manage-result-content > div {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+/* Status Section */
+.media-status-section {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 0.5rem;
+}
+
+/* Badge Row */
+.d-flex.align-items-center.gap-1.mb-2.flex-wrap {
+    align-items: center;
+    gap: 0.5rem !important;
+    flex-wrap: wrap;
+}
+
+/* Status Badge */
+.status-badge {
+    font-size: 0.7rem !important;
+    padding: 0.25rem 0.5rem !important;
+    white-space: nowrap;
+}
+
+/* Extra Badges Container */
+.media-extra-badges {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.media-extra-badges .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap;
+}
+
+/* Manage Controls */
+.manage-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.manage-controls .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    height: 28px;
+    display: flex;
+    align-items: center;
+}
+
+.manage-controls .delete-btn {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.manage-controls .delete-btn:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* Responsive for manage page grid */
+@media (max-width: 768px) {
+    .manage-result-card > .d-flex {
+        padding: 0.5rem;
+        gap: 0.5rem;
+    }
+    
+    .manage-result-thumbnail-container {
+        width: 60px;
+        min-height: 90px;
+    }
+    
+    .manage-result-content h5 {
+        font-size: 0.85rem;
+    }
+    
+    .media-status-section {
+        padding: 0.35rem 0.5rem;
+    }
+    
+    .status-badge {
+        font-size: 0.65rem !important;
+        padding: 0.2rem 0.4rem !important;
+    }
+}
+
+/* Ensure the card doesn't exceed reasonable height */
+.col-12.mb-3.media-item {
+    min-height: 120px;
+    max-height: 200px;
+}
+
+.manage-result-card {
+    max-height: 100%;
+}
+
+/* Badge colors */
+.badge.bg-success {
+    background-color: #28a745 !important;
+    color: white !important;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #111 !important;
+}
+
+.badge.bg-info {
+    background-color: #17a2b8 !important;
+    color: white !important;
+}
+
+.badge.bg-secondary {
+    background-color: #6c757d !important;
+    color: white !important;
+}
+
+.badge.bg-danger {
+    background-color: #dc3545 !important;
+    color: white !important;
+}

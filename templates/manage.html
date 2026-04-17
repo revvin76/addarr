@@ -6,6 +6,7 @@
     <title>Manage Media - Addarr</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/styles.css" rel="stylesheet">
+    <link href="/static/css/manage-page.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
 
@@ -161,8 +162,8 @@
                     data-id="{% if item.media_type == 'movie' %}{{ item.tmdbId }}{% else %}{{ item.tvdbId }}{% endif %}" 
                     onclick="showManageDetails('{{ item.media_type }}', {% if item.media_type == 'movie' %}{{ item.tmdbId }}{% else %}{{ item.tvdbId }}{% endif %}, {{ item.id }})">
                     
-                    <div class="manage-result-card h-100 d-flex {% if item.media_type == 'movie' %}movie-card{% else %}tv-card{% endif %}">
-                            <!-- Watermark Icon -->
+                    <div class="manage-result-card h-100 d-flex flex-column {% if item.media_type == 'movie' %}movie-card{% else %}tv-card{% endif %}">
+                        <!-- Watermark Icon -->
                         <div class="watermark-icon position-absolute">
                             {% if item.media_type == 'movie' %}
                                 <i class="fas fa-film"></i>
@@ -171,35 +172,53 @@
                             {% endif %}
                         </div>
 
-                        <!-- Thumbnail container - smaller on left -->
-                        <div class="manage-result-thumbnail-container me-3" style="width: 100px; flex-shrink: 0;">
-                            <img data-src="{% if item.images %}{% for image in item.images %}{% if image.coverType == 'poster' %}{{ image.remoteUrl }}{% endif %}{% endfor %}{% endif %}{% if not item.images or not item.images|selectattr('coverType', 'equalto', 'poster')|list %}/static/images/apple-touch-icon.png{% endif %}" 
-                                src="/static/images/placeholder.png"  
-                                class="manage-result-thumbnail h-100 w-100 object-fit-cover"
-                                alt="{{ item.title }}"
-                                onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                        </div>
-                        
-                        <!-- Card content - on right of thumbnail -->
-                        <div class="manage-result-content flex-grow-1 d-flex flex-column justify-content-between">
-                            <div>
-                                <h5 class="text-white mb-1">
-                                    {{ item.title }}
-                                </h5>
-                                <div class="d-flex align-items-center mb-1">
-                                    <span class="text-xs me-2">{{ item.year }}</span>
-                                    {% if item.certification %}
-                                    <span class="badge bg-dark text-white me-2">{{ item.certification }}</span>
-                                    {% endif %}
-                                    <span class="text-xs">
-                                        {% if item.media_type == 'movie' %}
-                                            {{ item.runtime }} min
-                                        {% else %}
-                                            {{ item.statistics.seasonCount }} seasons
+                        <!-- Card Header Section - Thumbnail + Title + Info -->
+                        <div class="d-flex" style="min-height: 120px;">
+                            <!-- Thumbnail container - smaller on left -->
+                            <div class="manage-result-thumbnail-container me-3" style="width: 80px; flex-shrink: 0;">
+                                <img data-src="{% if item.images %}{% for image in item.images %}{% if image.coverType == 'poster' %}{{ image.remoteUrl }}{% endif %}{% endfor %}{% endif %}{% if not item.images or not item.images|selectattr('coverType', 'equalto', 'poster')|list %}/static/images/apple-touch-icon.png{% endif %}" 
+                                    src="/static/images/placeholder.png"  
+                                    class="manage-result-thumbnail h-100 w-100 object-fit-cover"
+                                    alt="{{ item.title }}"
+                                    onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
+                            </div>
+                            
+                            <!-- Card content - on right of thumbnail -->
+                            <div class="manage-result-content flex-grow-1 d-flex flex-column justify-content-between" style="min-width: 0;">
+                                <div>
+                                    <h5 class="text-white mb-1 text-truncate" style="font-size: 0.95rem;">
+                                        {{ item.title }}
+                                    </h5>
+                                    <div class="d-flex align-items-center mb-1 flex-wrap" style="gap: 0.25rem;">
+                                        <span class="text-xs me-1">{{ item.year }}</span>
+                                        {% if item.certification %}
+                                        <span class="badge bg-dark text-white" style="font-size: 0.7rem;">{{ item.certification }}</span>
                                         {% endif %}
-                                    </span>
+                                        <span class="text-xs">
+                                            {% if item.media_type == 'movie' %}
+                                                {{ item.runtime }} min
+                                            {% else %}
+                                                {{ item.statistics.seasonCount }} seasons
+                                            {% endif %}
+                                        </span>
+                                    </div>
                                 </div>
-                                <p class="text-xs mb-2 line-clamp-2">{{ item.overview|truncate(120) }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Status and Controls Section -->
+                        <div class="media-status-section mt-2 pt-2 border-top" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                            <!-- Status Badges Row -->
+                            <div class="d-flex align-items-center gap-1 mb-2 flex-wrap">
+                                <span class="status-badge text-xs badge bg-secondary">Not Added</span>
+                                <div class="media-extra-badges" style="display: none;">
+                                    <!-- "On disk"/"Missing" badge will be inserted here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Manage Controls Row -->
+                            <div class="manage-controls" style="display: none;">
+                                <!-- Manage info and buttons will be inserted here -->
                             </div>
                         </div>
                     </div>

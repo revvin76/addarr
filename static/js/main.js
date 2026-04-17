@@ -2622,26 +2622,33 @@ function checkLibraryStatus(mediaType, mediaId, card) {
     fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`)
         .then(response => response.json())
         .then(data => {
-            const statusSection = card.querySelector('.media-status-section');
             const statusBadge = card.querySelector('.status-badge');
+            const extraBadges = card.querySelector('.media-extra-badges');
             const manageControls = card.querySelector('.manage-controls');
             
             if (data.in_library) {
+                // Update the main "In Library" badge
                 statusBadge.textContent = 'In Library';
                 statusBadge.className = 'status-badge text-xs badge bg-success';
                 
-                // Get internal ID and update the card
+                // Get internal ID and update the card with extra badges and controls
                 fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
                     .then(response => response.json())
                     .then(details => {
                         const itemData = details.data || details;
                         const internalId = itemData.id;
                         
-                        // Update card with internal ID
-                        card.closest('.result-item').dataset.internalId = internalId;
+                        // Update card with internal ID if it has a parent
+                        const parentItem = card.closest('.media-item') || card.closest('.result-item');
+                        if (parentItem) {
+                            parentItem.dataset.internalId = internalId;
+                        }
                         
-                        // Show manage controls
-                        showManageControls(mediaType, mediaId, internalId, manageControls, false);
+                        // Update the extra badges (On disk / Missing)
+                        updateExtraBadges(mediaType, itemData, extraBadges);
+                        
+                        // Show manage controls with delete button
+                        showManageControls(mediaType, mediaId, internalId, manageControls, true, itemData);
                     })
                     .catch(error => {
                         console.error('Error fetching internal ID:', error);
@@ -2649,7 +2656,10 @@ function checkLibraryStatus(mediaType, mediaId, card) {
             } else {
                 statusBadge.textContent = 'Not Added';
                 statusBadge.className = 'status-badge text-xs badge bg-secondary';
+                extraBadges.style.display = 'none';
+                extraBadges.innerHTML = '';
                 manageControls.style.display = 'none';
+                manageControls.innerHTML = '';
             }
         })
         .catch(error => {
@@ -2660,94 +2670,68 @@ function checkLibraryStatus(mediaType, mediaId, card) {
         });
 }
 
+// Update extra badges for On disk / Missing status
+function updateExtraBadges(mediaType, itemData, extraBadgesContainer) {
+    let badgesHTML = '';
+    
+    if (mediaType === 'movie') {
+        const hasFile = itemData ? itemData.hasFile : false;
+        badgesHTML = `<span class="badge ${hasFile ? 'bg-success' : 'bg-warning'}">${hasFile ? 'On disk' : 'Missing'}</span>`;
+    } else {
+        const stats = itemData ? (itemData.statistics || {}) : {};
+        const hasEpisodes = (stats.episodeFileCount || 0) > 0;
+        const allDownloaded = stats.episodeFileCount === stats.episodeCount;
+        
+        if (allDownloaded) {
+            badgesHTML = `<span class="badge bg-success">On disk</span>`;
+        } else if (hasEpisodes) {
+            badgesHTML = `<span class="badge bg-info">Partial (${stats.episodeFileCount}/${stats.episodeCount})</span>`;
+        } else {
+            badgesHTML = `<span class="badge bg-warning">Missing</span>`;
+        }
+    }
+    
+    extraBadgesContainer.innerHTML = badgesHTML;
+    extraBadgesContainer.style.display = badgesHTML ? 'block' : 'none';
+}
+
 // Show manage controls for items in library
-function showManageControls(mediaType, mediaId, internalId, manageControls, isManagePage = false) {
-    // For manage page, we already have all the data in the initial render
-    // For other pages, we might need to fetch additional details
-    if (!isManagePage) {
+function showManageControls(mediaType, mediaId, internalId, manageControls, isManagePage = false, itemData = null) {
+    // For manage page, we already have all the data
+    if (isManagePage && itemData) {
+        updateManageControlsHTML(mediaType, mediaId, internalId, manageControls, itemData);
+    } else {
+        // For other pages, fetch additional details
         fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
             .then(response => response.json())
             .then(details => {
-                updateManageControlsHTML(mediaType, mediaId, internalId, manageControls, details);
+                const data = details.data || details;
+                updateManageControlsHTML(mediaType, mediaId, internalId, manageControls, data);
             })
             .catch(error => {
                 console.error('Error fetching manage details:', error);
             });
-    } else {
-        // For manage page, we can construct basic info from existing data
-        const card = manageControls.closest('.search-result-card');
-        const statusBadge = card.querySelector('.status-badge');
-        updateManageControlsHTML(mediaType, mediaId, internalId, manageControls, null);
     }
 }
 
-// Update manage controls HTML
-function updateManageControlsHTML(mediaType, mediaId, internalId, manageControls, details) {
-    const itemData = details ? (details.data || details) : null;
-    
-    let manageHTML = '';
-    if (mediaType === 'movie') {
-        const hasFile = itemData ? itemData.hasFile : false;
-        const monitored = itemData ? itemData.monitored : true;
-        
-        manageHTML = `
-            <div class="manage-info">
-                <small class="text-xs">
-                    <i class="fas fa-hdd me-1"></i>
-                    ${hasFile ? 'On Disk' : 'Missing'}
-                </small>
-                <div class="form-check form-switch mt-1">
-                    <input class="form-check-input monitor-toggle" 
-                           type="checkbox" 
-                           ${monitored ? 'checked' : ''}
-                           data-media-type="${mediaType}"
-                           data-internal-id="${internalId}">
-                    <label class="form-check-label text-xs">Monitored</label>
-                </div>
-            </div>
-        `;
-    } else {
-        const stats = itemData ? (itemData.statistics || {}) : {};
-        const monitored = itemData ? itemData.monitored : true;
-        
-        manageHTML = `
-            <div class="manage-info">
-                <small class="text-xs">
-                    <i class="fas fa-hdd me-1"></i>
-                    ${stats.episodeFileCount || 0}/${stats.episodeCount || 0} episodes
-                </small>
-                <div class="form-check form-switch mt-1">
-                    <input class="form-check-input monitor-toggle" 
-                           type="checkbox" 
-                           ${monitored ? 'checked' : ''}
-                           data-media-type="${mediaType}"
-                           data-internal-id="${internalId}">
-                    <label class="form-check-label text-xs">Monitored</label>
-                </div>
-            </div>
-        `;
-    }
-    
-    // Add action buttons
-    manageHTML += `
-        <div class="action-buttons mt-2">
-            <button class="btn btn-sm btn-outline-warning search-btn me-1" 
-                    data-media-type="${mediaType}"
-                    data-internal-id="${internalId}">
-                <i class="fas fa-search"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-danger delete-btn" 
-                    data-media-type="${mediaType}"
-                    data-internal-id="${internalId}">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
+// Update manage controls HTML - just show delete button for manage page
+function updateManageControlsHTML(mediaType, mediaId, internalId, manageControls, itemData) {
+    // For manage page, just show a compact delete button
+    const deleteHTML = `
+        <button class="btn btn-sm btn-outline-danger delete-btn" 
+                title="Delete from library"
+                data-media-type="${mediaType}"
+                data-internal-id="${internalId}">
+            <i class="fas fa-trash"></i>
+        </button>
     `;
     
-    manageControls.innerHTML = manageHTML;
+    manageControls.innerHTML = deleteHTML;
     manageControls.style.display = 'block';
     
     // Add event listeners to new buttons
+    addManageEventListeners(manageControls);
+}
     addManageEventListeners(manageControls);
 }
 

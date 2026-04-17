@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.18] - 2026-04-17
+### Fixed
+- Refactored manage page badge layout to fix status badge transitions and card sizing issues
+- Fixed "In Library" badge to update existing "Not Added" badge instead of creating duplicate badges
+- "On disk" and "Missing" badges now appear as separate badges next to "In Library" badge
+- Fixed manage-controls div extending full card width - now compact delete button only
+- Improved responsive design for manage page thumbnails (80px desktop, 60px mobile)
+
+### Added
+- Created dedicated manage-page.css stylesheet for manage page specific styling
+- Added updateExtraBadges() function to properly display file status badges
+- Improved badge layout with proper flex containers and spacing
+
+---
 ## [1.1.17] - 2026-04-16
 ### Fixed
 - Fixed status badges not updating with real-time information from Radarr/Sonarr
