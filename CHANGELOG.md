@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.21] - 2026-04-17
+### Fixed
+- Restored full modal details (poster image, YouTube trailer, gallery) to search results and trending pages
+- Removed minimal inline showDetails function that was overriding the comprehensive main.js version
+- Modal now displays: poster from TMDB, YouTube trailers, image gallery, certification, ratings, genres, and overview
+- Added library status checking integration to the full modal view
+
+---
 ## [1.1.20] - 2026-04-17
 ### Fixed
 - Fixed "showDetails not defined" error when clicking on search result cards
