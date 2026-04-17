@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.20] - 2026-04-17
+### Fixed
+- Fixed "showDetails not defined" error when clicking on search result cards
+- Added missing showDetails function to results.html
+- Function now properly opens modal and displays media details
+
+---
 ## [1.1.19] - 2026-04-17
 ### Fixed
 - Simplified badge layout in search results and trending pages
