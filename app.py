@@ -458,6 +458,8 @@ def startup_sequence():
 
 def shutdown_sequence():
     global tunnel_process  # Add this line to access the global variable
+    global tunnel_should_run
+    tunnel_should_run = False
     
     logging.info("Shutting down application...")
     
