@@ -29,28 +29,28 @@
                 <img src="/static/images/logo.png" alt="Addarr Logo" height="40" class="me-2">
             </a>
             
-            <div class="d-flex gap-2">
-
-                <a href="/manage" class="btn btn-outline-radarr me-2"><i class="fas fa-film"></i></a>
-                <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#configModal">
-                    <i class="fas fa-cog"></i>
-                </button>                
-                <button id="infoToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#infoModal">
-                    <i class="fas fa-info-circle"></i>
+            <div class="dropdown">
+                <button class="btn btn-outline-radarr" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Menu">
+                    <i class="fas fa-bars"></i>
                 </button>
-
-                <!-- Authentication Button -->
-                {% if config.auth.enabled %}
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+                    <li><a class="dropdown-item" href="/manage"><i class="fas fa-film me-2"></i>Manage Library</a></li>
+                    <li><a class="dropdown-item" href="/links"><i class="fas fa-link me-2"></i>Service Links</a></li>
+                    {% if config.prowlarr.enabled %}<li><a class="dropdown-item" href="/prowlarr"><i class="fas fa-search me-2"></i>Prowlarr Search</a></li>{% endif %}
+                    {% if config.qbit.enabled %}<li><a class="dropdown-item" href="/downloads"><i class="fas fa-download me-2"></i>Downloads</a></li>{% endif %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#configModal"><i class="fas fa-cog me-2"></i>Settings</button></li>
+                    <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#infoModal"><i class="fas fa-info-circle me-2"></i>About</button></li>
+                    {% if config.auth.enabled %}
+                    <li><hr class="dropdown-divider"></li>
                     {% if session.get('authenticated') %}
-                        <a href="/logout" class="btn btn-outline-radarr me-2" title="Logout">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </a>
+                    <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
                     {% else %}
-                        <a href="/login" class="btn btn-outline-warning me-2" title="Login">
-                            <i class="fas fa-sign-in-alt"></i>
-                        </a>
+                    <li><a class="dropdown-item" href="/login"><i class="fas fa-sign-in-alt me-2"></i>Sign In</a></li>
                     {% endif %}
-                {% endif %}
+                    {% endif %}
+                </ul>
+            </div>
                                 
             </div>
         </div>
@@ -60,13 +60,13 @@
     <div class="container d-flex flex-column justify-content-center" style="min-height: calc(100vh - 120px);">
         <div class="text-center mb-4">
             <h3 class="text-light">Welcome to ADDARR</h3>
-            <p class="text-light">Search for movies and TV shows to add to your media library.</p>
+            <p class="text-light">Search for movies, TV shows{% if config.readarr.enabled %} and books{% endif %} to add to your media library.</p>
         </div>
         <div class="col-12 col-xs-12 col-md-8 col-lg-8 mb-2">
             <form action="/search" method="POST" onsubmit="return validateForm()">
                     <div class="col-12 mb-2">
                         <input type="text" class="form-control form-control-lg" 
-                            name="query" placeholder="Search movies and TV shows..." required>
+                            name="query" placeholder="Search movies, TV shows{% if config.readarr.enabled %} and books{% endif %}..." required>
                     </div>
                     <div class="col-12 mb-2">
                         <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
@@ -188,6 +188,124 @@
                                     <div class="col-12">
                                         <button type="button" class="btn btn-outline-info w-100 test-connection" 
                                                 id="testSonarr">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Readarr Settings -->
+                    <div class="mb-4">
+                        <h5 class="mb-3" style="color: #c0392b;">
+                            <i class="fas fa-book me-2"></i>Readarr Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="readarrUrl" class="form-label">Readarr URL</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="readarrUrl" name="READARR_URL" value="{{ config.readarr.url }}"
+                                            placeholder="http://localhost:8787">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="readarrApiKey" class="form-label">API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="readarrApiKey" name="READARR_API_KEY" value="{{ config.readarr.api_key }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="readarrRootFolder" class="form-label">Root Folder</label>
+                                        <select class="form-control bg-dark text-light border-secondary"
+                                                id="readarrRootFolder" name="READARR_ROOT_FOLDER">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="readarrQualityProfile" class="form-label">Quality Profile</label>
+                                        <select class="form-control bg-dark text-light border-secondary"
+                                                id="readarrQualityProfile" name="READARR_QUALITY_PROFILE">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="readarrMetadataProfile" class="form-label">Metadata Profile</label>
+                                        <select class="form-control bg-dark text-light border-secondary"
+                                                id="readarrMetadataProfile" name="READARR_METADATA_PROFILE">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-info w-100"
+                                                id="testReadarr">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Prowlarr Settings -->
+                    <div class="mb-4">
+                        <h5 class="mb-3" style="color: #ff6b35;">
+                            <i class="fas fa-search me-2"></i>Prowlarr Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="prowlarrUrl" class="form-label">Prowlarr URL</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="prowlarrUrl" name="PROWLARR_URL" value="{{ config.prowlarr.url }}"
+                                            placeholder="http://localhost:9696">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="prowlarrApiKey" class="form-label">API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="prowlarrApiKey" name="PROWLARR_API_KEY" value="{{ config.prowlarr.api_key }}">
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-info w-100"
+                                                id="testProwlarr">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- qBittorrent Settings -->
+                    <div class="mb-4">
+                        <h5 class="mb-3" style="color: #8e44ad;">
+                            <i class="fas fa-download me-2"></i>qBittorrent Settings
+                        </h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <small class="text-muted">qBittorrent WebUI connection. Used by the Prowlarr search panel to add downloads directly.</small>
+                                    <div class="col-md-4">
+                                        <label for="qbitUrl" class="form-label">qBittorrent URL</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="qbitUrl" name="QBIT_URL" value="{{ config.qbit.url }}"
+                                            placeholder="http://localhost:8080">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="qbitUsername" class="form-label">Username</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="qbitUsername" name="QBIT_USERNAME" value="{{ config.qbit.username }}"
+                                            placeholder="admin">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="qbitPassword" class="form-label">Password</label>
+                                        <input type="password" class="form-control bg-dark text-light border-secondary"
+                                            id="qbitPassword" name="QBIT_PASSWORD" value="{{ config.qbit.password }}">
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-info w-100"
+                                                id="testQbit">
                                             <i class="fas fa-plug me-2"></i>Test Connection
                                         </button>
                                     </div>
@@ -983,11 +1101,63 @@ function fetchSonarrData() {
         .catch(error => console.error('Error loading Sonarr language profiles:', error));
     }
 
+function fetchReadarrData() {
+    const readarrUrl = document.getElementById('readarrUrl').value;
+    if (!readarrUrl) return;
+
+    fetch('/api/readarr/rootfolders')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('readarrRootFolder');
+            select.innerHTML = '';
+            const current = "{{ config.readarr.root_folder }}";
+            (Array.isArray(data) ? data : []).forEach(folder => {
+                const opt = document.createElement('option');
+                opt.value = folder.path;
+                opt.textContent = folder.path;
+                if (folder.path === current) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }).catch(() => {});
+
+    fetch('/api/readarr/qualityprofile')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('readarrQualityProfile');
+            select.innerHTML = '';
+            const current = "{{ config.readarr.quality_profile_id }}";
+            (Array.isArray(data) ? data : []).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.id.toString() === current.toString()) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }).catch(() => {});
+
+    fetch('/api/readarr/metadataprofile')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('readarrMetadataProfile');
+            select.innerHTML = '';
+            const current = "{{ config.readarr.metadata_profile_id }}";
+            (Array.isArray(data) ? data : []).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.id.toString() === current.toString()) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }).catch(() => {});
+}
+
 function loadConfigurationData() {
     // Load Radarr data
     fetchRadarrData();
     // Load Sonarr data
     fetchSonarrData();
+    // Load Readarr data (if URL configured)
+    fetchReadarrData();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1099,6 +1269,78 @@ document.getElementById('testRadarr').addEventListener('click', function() {
 
 document.getElementById('testSonarr').addEventListener('click', function() {
     testConnection('sonarr');
+});
+
+document.getElementById('testReadarr').addEventListener('click', function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Testing...';
+    fetch('/api/readarr/test')
+        .then(r => r.json())
+        .then(data => {
+            btn.innerHTML = data.success
+                ? '<i class="fas fa-check me-1"></i>Connection OK'
+                : '<i class="fas fa-times me-1"></i>Connection Failed';
+            btn.classList.add(data.success ? 'btn-success' : 'btn-danger');
+        }).catch(() => {
+            btn.innerHTML = '<i class="fas fa-times me-1"></i>Connection Failed';
+            btn.classList.add('btn-danger');
+        }).finally(() => {
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-plug me-2"></i>Test Connection';
+                btn.classList.remove('btn-success', 'btn-danger');
+                btn.disabled = false;
+            }, 3000);
+        });
+});
+
+document.getElementById('testProwlarr').addEventListener('click', function() {
+    const prowlarrUrl = document.getElementById('prowlarrUrl').value;
+    const prowlarrKey = document.getElementById('prowlarrApiKey').value;
+    const btn = this;
+    if (!prowlarrUrl) { alert('Please enter a Prowlarr URL first'); return; }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Testing...';
+    fetch(`${prowlarrUrl}/api/v1/system/status?apikey=${prowlarrKey}`)
+        .then(r => {
+            btn.innerHTML = r.ok
+                ? '<i class="fas fa-check me-1"></i>Connection OK'
+                : '<i class="fas fa-times me-1"></i>Connection Failed';
+            btn.classList.add(r.ok ? 'btn-success' : 'btn-danger');
+        }).catch(() => {
+            btn.innerHTML = '<i class="fas fa-times me-1"></i>Connection Failed';
+            btn.classList.add('btn-danger');
+        }).finally(() => {
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-plug me-2"></i>Test Connection';
+                btn.classList.remove('btn-success', 'btn-danger');
+                btn.disabled = false;
+            }, 3000);
+        });
+});
+
+document.getElementById('testQbit').addEventListener('click', function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Testing...';
+    fetch('/api/qbit/test')
+        .then(r => r.json())
+        .then(data => {
+            const ok = data.status === 'ok';
+            btn.innerHTML = ok
+                ? '<i class="fas fa-check me-1"></i>Connection OK'
+                : `<i class="fas fa-times me-1"></i>${data.message || 'Connection Failed'}`;
+            btn.classList.add(ok ? 'btn-success' : 'btn-danger');
+        }).catch(() => {
+            btn.innerHTML = '<i class="fas fa-times me-1"></i>Connection Failed';
+            btn.classList.add('btn-danger');
+        }).finally(() => {
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-plug me-2"></i>Test Connection';
+                btn.classList.remove('btn-success', 'btn-danger');
+                btn.disabled = false;
+            }, 3000);
+        });
 });
 
 // Save configuration with reusable notification modal

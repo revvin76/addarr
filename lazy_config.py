@@ -87,6 +87,25 @@ class LazyConfig:
                 'enabled': os.getenv('TUNNEL_ENABLED', 'false').lower() == 'true',
                 'auth_token': os.getenv('PINGGY_AUTH_TOKEN', ''),
                 'reserved_subdomain': os.getenv('PINGGY_RESERVED_SUBDOMAIN', '')
+            },
+            'readarr': {
+                'url': os.getenv('READARR_URL', ''),
+                'api_key': os.getenv('READARR_API_KEY', ''),
+                'root_folder': os.getenv('READARR_ROOT_FOLDER', ''),
+                'quality_profile_id': os.getenv('READARR_QUALITY_PROFILE', ''),
+                'metadata_profile_id': os.getenv('READARR_METADATA_PROFILE', ''),
+                'enabled': bool(os.getenv('READARR_URL', ''))
+            },
+            'prowlarr': {
+                'url': os.getenv('PROWLARR_URL', ''),
+                'api_key': os.getenv('PROWLARR_API_KEY', ''),
+                'enabled': bool(os.getenv('PROWLARR_URL', ''))
+            },
+            'qbit': {
+                'url': os.getenv('QBIT_URL', ''),
+                'username': os.getenv('QBIT_USERNAME', ''),
+                'password': os.getenv('QBIT_PASSWORD', ''),
+                'enabled': bool(os.getenv('QBIT_URL', ''))
             }
         }
         

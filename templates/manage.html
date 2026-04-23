@@ -103,22 +103,24 @@
                 <img src="/static/images/logo.png" alt="Addarr Logo" height="40" class="me-2">
             </a>
             
-            <div class="d-flex gap-2">
-
-                <a href="/" class="btn btn-outline-radarr me-2"><i class="fas fa-arrow-left"></i></a>
-
-                <!-- Authentication Button -->
-                {% if config.auth.enabled %}
+            <div class="dropdown">
+                <button class="btn btn-outline-radarr" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+                    <li><a class="dropdown-item" href="/"><i class="fas fa-home me-2"></i>Home</a></li>
+                    <li><a class="dropdown-item" href="/links"><i class="fas fa-link me-2"></i>Service Links</a></li>
+                    {% if config.prowlarr.enabled %}<li><a class="dropdown-item" href="/prowlarr"><i class="fas fa-search me-2"></i>Prowlarr Search</a></li>{% endif %}
+                    {% if config.qbit.enabled %}<li><a class="dropdown-item" href="/downloads"><i class="fas fa-download me-2"></i>Downloads</a></li>{% endif %}
+                    {% if config.auth.enabled %}
+                    <li><hr class="dropdown-divider"></li>
                     {% if session.get('authenticated') %}
-                        <a href="/logout" class="btn btn-outline-radarr me-2" title="Logout">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </a>
+                    <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
                     {% else %}
-                        <a href="/login" class="btn btn-outline-warning me-2" title="Login">
-                            <i class="fas fa-sign-in-alt"></i>
-                        </a>
+                    <li><a class="dropdown-item" href="/login"><i class="fas fa-sign-in-alt me-2"></i>Sign In</a></li>
                     {% endif %}
-                {% endif %}                
+                    {% endif %}
+                </ul>
             </div>
         </div>
     </div>
@@ -136,6 +138,7 @@
                         <option value="all">All Media</option>
                         <option value="movie">Movies Only</option>
                         <option value="tv">TV Shows Only</option>
+                        {% if readarr_enabled %}<option value="book">Books Only</option>{% endif %}
                     </select>
                 </div>
             </div>
@@ -157,16 +160,25 @@
         <!-- Media Grid -->
         <div class="row" id="mediaGrid">
             {% for item in media %}
-                <div class="col-12 mb-3 media-item {% if item.media_type == 'movie' %}movie-item{% else %}tv-item{% endif %}" 
-                    data-title="{{ item.title|lower }}" 
-                    data-id="{% if item.media_type == 'movie' %}{{ item.tmdbId }}{% else %}{{ item.tvdbId }}{% endif %}" 
-                    onclick="showManageDetails('{{ item.media_type }}', {% if item.media_type == 'movie' %}{{ item.tmdbId }}{% else %}{{ item.tvdbId }}{% endif %}, {{ item.id }})">
-                    
-                    <div class="manage-result-card h-100 d-flex flex-column {% if item.media_type == 'movie' %}movie-card{% else %}tv-card{% endif %}">
+                {% if item.media_type == 'movie' %}
+                    {% set item_id = item.tmdbId %}
+                {% elif item.media_type == 'book' %}
+                    {% set item_id = item.foreignBookId %}
+                {% else %}
+                    {% set item_id = item.tvdbId %}
+                {% endif %}
+                <div class="col-12 mb-3 media-item {{ item.media_type }}-item"
+                    data-title="{{ item.title|lower }}"
+                    data-id="{{ item_id }}"
+                    onclick="showManageDetails('{{ item.media_type }}', {{ item_id }}, {{ item.id }})">
+
+                    <div class="manage-result-card h-100 d-flex flex-column {{ item.media_type }}-card">
                         <!-- Watermark Icon -->
                         <div class="watermark-icon position-absolute">
                             {% if item.media_type == 'movie' %}
                                 <i class="fas fa-film"></i>
+                            {% elif item.media_type == 'book' %}
+                                <i class="fas fa-book"></i>
                             {% else %}
                                 <i class="fas fa-tv"></i>
                             {% endif %}
@@ -176,13 +188,13 @@
                         <div class="d-flex" style="min-height: 120px;">
                             <!-- Thumbnail container - smaller on left -->
                             <div class="manage-result-thumbnail-container me-3" style="width: 80px; flex-shrink: 0;">
-                                <img data-src="{% if item.images %}{% for image in item.images %}{% if image.coverType == 'poster' %}{{ image.remoteUrl }}{% endif %}{% endfor %}{% endif %}{% if not item.images or not item.images|selectattr('coverType', 'equalto', 'poster')|list %}/static/images/apple-touch-icon.png{% endif %}" 
-                                    src="/static/images/placeholder.png"  
+                                <img data-src="{% if item.images %}{% for image in item.images %}{% if image.coverType == 'poster' %}{{ image.remoteUrl }}{% endif %}{% endfor %}{% endif %}{% if not item.images or not item.images|selectattr('coverType', 'equalto', 'poster')|list %}/static/images/apple-touch-icon.png{% endif %}"
+                                    src="/static/images/placeholder.png"
                                     class="manage-result-thumbnail h-100 w-100 object-fit-cover"
                                     alt="{{ item.title }}"
                                     onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
                             </div>
-                            
+
                             <!-- Card content - on right of thumbnail -->
                             <div class="manage-result-content flex-grow-1 d-flex flex-column justify-content-between" style="min-width: 0;">
                                 <div>
@@ -197,6 +209,8 @@
                                         <span class="text-xs">
                                             {% if item.media_type == 'movie' %}
                                                 {{ item.runtime }} min
+                                            {% elif item.media_type == 'book' %}
+                                                {% if item.author %}{{ item.author.authorName }}{% endif %}
                                             {% else %}
                                                 {{ item.statistics.seasonCount }} seasons
                                             {% endif %}
@@ -215,7 +229,7 @@
                                     <!-- "On disk"/"Missing" badge will be inserted here -->
                                 </div>
                             </div>
-                            
+
                             <!-- Manage Controls Row -->
                             <div class="manage-controls" style="display: none;">
                                 <!-- Manage info and buttons will be inserted here -->

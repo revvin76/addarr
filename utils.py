@@ -46,16 +46,28 @@ class SharedUtils:
             return {'movies': [], 'tv_shows': []}
     
     def search_radarr(self, query):
-        url = f"{self.config.radarr.url}/api/v3/movie/lookup"
-        params = {'term': query, 'apikey': self.config.radarr.api_key}
-        response = requests.get(url, params=params)
-        return response.json()
-    
+        try:
+            url = f"{self.config.radarr.url}/api/v3/movie/lookup"
+            logging.info(f"[Radarr] searching: {url!r} term={query!r}")
+            response = requests.get(url, params={'term': query, 'apikey': self.config.radarr.api_key}, timeout=10)
+            results = response.json()
+            logging.info(f"[Radarr] search HTTP {response.status_code}, {len(results) if isinstance(results, list) else 'error'} results")
+            return results
+        except Exception as e:
+            logging.error(f"[Radarr] search error: {str(e)}", exc_info=True)
+            return []
+
     def search_sonarr(self, query):
-        url = f"{self.config.sonarr.url}/api/v3/series/lookup"
-        params = {'term': query, 'apikey': self.config.sonarr.api_key}
-        response = requests.get(url, params=params)
-        return response.json()
+        try:
+            url = f"{self.config.sonarr.url}/api/v3/series/lookup"
+            logging.info(f"[Sonarr] searching: {url!r} term={query!r}")
+            response = requests.get(url, params={'term': query, 'apikey': self.config.sonarr.api_key}, timeout=10)
+            results = response.json()
+            logging.info(f"[Sonarr] search HTTP {response.status_code}, {len(results) if isinstance(results, list) else 'error'} results")
+            return results
+        except Exception as e:
+            logging.error(f"[Sonarr] search error: {str(e)}", exc_info=True)
+            return []
 
     def add_to_radarr(self, tmdb_id):
         url = f"{self.config.radarr.url}/api/v3/movie"
@@ -203,7 +215,7 @@ class SharedUtils:
                 'data': lookup[0],
                 'on_disk': False,
                 'monitored': False,
-                'status': lookup[0].get('status', 'unknown')
+                'series_status': lookup[0].get('status', 'unknown')
             }
         
         return {'error': 'Series not found'}
@@ -243,6 +255,232 @@ class SharedUtils:
         )
         
         return result
+
+    # ============ READARR METHODS ============
+
+    def search_readarr(self, query):
+        """Search Readarr for books"""
+        if not self.config.readarr.url:
+            logging.warning("[Readarr] search skipped — READARR_URL not configured")
+            return []
+        try:
+            url = f"{self.config.readarr.url}/api/v1/book/lookup"
+            params = {'term': query, 'apikey': self.config.readarr.api_key}
+            logging.info(f"[Readarr] searching: {url!r} term={query!r}")
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code != 200:
+                logging.error(f"[Readarr] search HTTP {response.status_code}: {response.text[:200]}")
+                return []
+            data = response.json()
+            if not isinstance(data, list):
+                logging.error(f"[Readarr] unexpected response type: {type(data).__name__} — {str(data)[:200]}")
+                return []
+            logging.info(f"[Readarr] search HTTP {response.status_code}, {len(data)} results")
+            return data
+        except Exception as e:
+            logging.error(f"[Readarr] search error: {str(e)}", exc_info=True)
+            return []
+
+    def add_to_readarr(self, foreign_book_id):
+        """Add a book to Readarr by looking up the author then adding via author endpoint"""
+        logging.info(f"[Readarr] adding book foreignBookId={foreign_book_id}")
+        try:
+            # Look up the book to get author data
+            lookup_url = f"{self.config.readarr.url}/api/v1/book/lookup"
+            params = {'term': f'goodreads:{foreign_book_id}', 'apikey': self.config.readarr.api_key}
+            lookup_res = requests.get(lookup_url, params=params, timeout=10)
+
+            if lookup_res.status_code != 200:
+                return False
+
+            results = lookup_res.json()
+            if not results:
+                return False
+
+            book_data = results[0]
+            author_data = book_data.get('author', {})
+
+            if not author_data:
+                return False
+
+            # Add author with specific book monitored
+            author_data.update({
+                'monitored': True,
+                'rootFolderPath': self.config.readarr.root_folder,
+                'qualityProfileId': int(self.config.readarr.quality_profile_id) if self.config.readarr.quality_profile_id else 1,
+                'metadataProfileId': int(self.config.readarr.metadata_profile_id) if self.config.readarr.metadata_profile_id else 1,
+                'addOptions': {
+                    'monitor': 'specific',
+                    'booksToMonitor': [foreign_book_id],
+                    'searchForMissingBooks': True
+                }
+            })
+
+            response = requests.post(
+                f"{self.config.readarr.url}/api/v1/author",
+                json=author_data,
+                params={'apikey': self.config.readarr.api_key},
+                timeout=15
+            )
+            return response.status_code in [200, 201]
+
+        except Exception as e:
+            logging.error(f"Error adding to Readarr: {str(e)}")
+            return False
+
+    def get_readarr_books(self):
+        """Get all books from Readarr library"""
+        if not self.config.readarr.url:
+            logging.warning("[Readarr] get_readarr_books skipped — READARR_URL not configured")
+            return []
+        try:
+            url = f"{self.config.readarr.url}/api/v1/book"
+            logging.info(f"[Readarr] fetching library from {url!r}")
+            response = requests.get(url, params={'apikey': self.config.readarr.api_key}, timeout=10)
+            books = response.json()
+            # Normalise image field: Readarr uses 'url' not 'remoteUrl'
+            for book in books:
+                for img in book.get('images', []):
+                    if 'url' in img and 'remoteUrl' not in img:
+                        img['remoteUrl'] = img['url']
+                    # Normalise coverType: Readarr uses 'cover' instead of 'poster'
+                    if img.get('coverType') == 'cover':
+                        img['coverType'] = 'poster'
+            return books
+        except Exception as e:
+            logging.error(f"Error fetching Readarr books: {str(e)}")
+            return []
+
+    def get_readarr_details(self, foreign_book_id):
+        """Get details for a specific book from Readarr"""
+        try:
+            # Check if it's in the library first
+            library_url = f"{self.config.readarr.url}/api/v1/book"
+            existing = requests.get(library_url, params={'apikey': self.config.readarr.api_key}, timeout=10).json()
+
+            for book in existing:
+                if str(book.get('foreignBookId')) == str(foreign_book_id):
+                    # Normalise images
+                    for img in book.get('images', []):
+                        if 'url' in img and 'remoteUrl' not in img:
+                            img['remoteUrl'] = img['url']
+                        if img.get('coverType') == 'cover':
+                            img['coverType'] = 'poster'
+                    return {
+                        'status': 'existing',
+                        'data': book,
+                        'on_disk': (book.get('statistics', {}).get('sizeOnDisk', 0) > 0),
+                        'monitored': book.get('monitored', False)
+                    }
+
+            # Not in library — look it up
+            lookup_url = f"{self.config.readarr.url}/api/v1/book/lookup"
+            lookup = requests.get(lookup_url, params={
+                'term': f'goodreads:{foreign_book_id}',
+                'apikey': self.config.readarr.api_key
+            }, timeout=10).json()
+
+            if lookup:
+                book = lookup[0]
+                for img in book.get('images', []):
+                    if 'url' in img and 'remoteUrl' not in img:
+                        img['remoteUrl'] = img['url']
+                    if img.get('coverType') == 'cover':
+                        img['coverType'] = 'poster'
+                return {
+                    'status': 'not_added',
+                    'data': book,
+                    'on_disk': False,
+                    'monitored': False
+                }
+
+            return {'error': 'Book not found'}
+
+        except Exception as e:
+            logging.error(f"Error fetching Readarr details: {str(e)}")
+            return {'error': str(e)}
+
+    # ============ PROWLARR METHODS ============
+
+    def search_prowlarr(self, query):
+        """Search Prowlarr across all indexers"""
+        try:
+            url = f"{self.config.prowlarr.url}/api/v1/search"
+            params = {
+                'query': query,
+                'type': 'search',
+                'limit': 100,
+                'offset': 0,
+                'apikey': self.config.prowlarr.api_key
+            }
+            logging.info(f"[Prowlarr] searching: term={query!r}")
+            response = requests.get(url, params=params, timeout=20)
+            if response.status_code != 200:
+                logging.error(f"[Prowlarr] search HTTP {response.status_code}: {response.text[:200]}")
+                return []
+            data = response.json()
+            logging.info(f"[Prowlarr] search returned {len(data)} results")
+            return data
+        except Exception as e:
+            logging.error(f"[Prowlarr] search error: {str(e)}", exc_info=True)
+            return []
+
+    # ============ QBITTORRENT METHODS ============
+
+    def _qbit_login(self):
+        """Login to qBittorrent and return a session cookie (SID)"""
+        url = f"{self.config.qbit.url}/api/v2/auth/login"
+        response = requests.post(url, data={
+            'username': self.config.qbit.username,
+            'password': self.config.qbit.password
+        }, timeout=10)
+        if response.text.strip().lower() == 'ok.':
+            return response.cookies.get('SID')
+        raise Exception(f"qBittorrent login failed: {response.text[:100]}")
+
+    def qbit_test(self):
+        """Test qBittorrent connection"""
+        try:
+            sid = self._qbit_login()
+            if not sid:
+                return {'status': 'error', 'message': 'Login failed — check credentials'}
+            url = f"{self.config.qbit.url}/api/v2/app/version"
+            r = requests.get(url, cookies={'SID': sid}, timeout=10)
+            if r.status_code == 200:
+                return {'status': 'ok', 'version': r.text.strip()}
+            return {'status': 'error', 'message': f'HTTP {r.status_code}'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+
+    def qbit_add_torrent(self, torrent_url, category=''):
+        """Add a torrent to qBittorrent by URL"""
+        try:
+            sid = self._qbit_login()
+            url = f"{self.config.qbit.url}/api/v2/torrents/add"
+            data = {'urls': torrent_url}
+            if category:
+                data['category'] = category
+            r = requests.post(url, data=data, cookies={'SID': sid}, timeout=15)
+            if r.status_code == 200 and r.text.strip().lower() == 'ok.':
+                return {'success': True}
+            return {'success': False, 'message': r.text[:200]}
+        except Exception as e:
+            logging.error(f"[qBit] add torrent error: {str(e)}", exc_info=True)
+            return {'success': False, 'message': str(e)}
+
+    def qbit_get_torrents(self):
+        """Get all torrents from qBittorrent"""
+        try:
+            sid = self._qbit_login()
+            url = f"{self.config.qbit.url}/api/v2/torrents/info"
+            r = requests.get(url, cookies={'SID': sid}, timeout=10)
+            if r.status_code == 200:
+                return r.json()
+            logging.error(f"[qBit] get torrents HTTP {r.status_code}")
+            return []
+        except Exception as e:
+            logging.error(f"[qBit] get torrents error: {str(e)}", exc_info=True)
+            return []
 
     def check_auth(self, username, password):
         """Check authentication"""

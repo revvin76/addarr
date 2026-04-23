@@ -861,6 +861,10 @@ input:checked + .toggle-slider:before {
     border-left: 4px solid var(--tv-accent) !important;
 }
 
+.book-card {
+    border-left: 4px solid #c0392b !important;
+}
+
 /* Hover effects for different media types */
 .movie-item:hover .manage-result-card {
     box-shadow: 0 4px 8px rgba(94, 214, 64, 0.3);
@@ -868,6 +872,10 @@ input:checked + .toggle-slider:before {
 
 .tv-item:hover .manage-result-card {
     box-shadow: 0 4px 8px rgba(75, 154, 250, 0.3);
+}
+
+.book-item:hover .manage-result-card {
+    box-shadow: 0 4px 8px rgba(192, 57, 43, 0.3);
 }
 
 /* Line clamp utility for text truncation */
@@ -937,6 +945,10 @@ input:checked + .toggle-slider:before {
 
 .search-result-card.tv-card {
     border-left: 4px solid var(--tv-accent) !important;
+}
+
+.search-result-card.book-card {
+    border-left: 4px solid #c0392b !important;
 }
 
 /* Filter button styles */

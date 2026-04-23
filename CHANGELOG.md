@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.24] - 2026-04-23
+
+### Added
+- **Prowlarr control panel** (`/prowlarr`) — search across all configured indexers with results showing title, indexer, size, seeders, leechers, and age. "Add" button opens a category picker (radarr, tv-sonarr, readarr, games, uncategorised) and sends the torrent directly to qBittorrent.
+- **Downloads page** (`/downloads`) — live view of all qBittorrent torrents with category-coloured left-border cards (radarr=green, tv-sonarr=cyan, readarr=dark red, games=purple, uncategorised=grey). Shows name, progress bar, download/upload speed, seeds/peers, ratio, ETA, and state. Filter tabs for downloading/seeding/paused. Auto-refreshes every 10 seconds.
+- **qBittorrent config section** in the Settings modal — URL, username, and password fields with a Test Connection button.
+- **Readarr support** — full search, add, and library management for books via Readarr. Books appear in search results, manage page, and trending alongside movies and TV shows.
+- **Links page** (`/links`) — service cards for Radarr, Sonarr, Readarr, and Prowlarr with a toggle to switch between local LAN and Pinggy tunnel addresses.
+- **qBittorrent utilities** in `utils.py` — `_qbit_login()`, `qbit_test()`, `qbit_add_torrent()`, `qbit_get_torrents()`.
+- **Prowlarr search utility** in `utils.py` — `search_prowlarr()` proxies queries to Prowlarr's `/api/v1/search`.
+- **New env vars**: `QBIT_URL`, `QBIT_USERNAME`, `QBIT_PASSWORD` — added to `lazy_config.py`, `.env`, and `demo_env`.
+- **Navbar icons** for Prowlarr search and Downloads visible on all pages when the respective services are configured.
+
+### Changed
+- Book highlight colour updated from amber (`#e8a838`) to dark red (`#c0392b`) across `styles.css`, `routes.py`, and `index.html`.
+- Readarr service card in links page now uses the dark red accent colour to match.
+- Replaced the navbar icon row with a single hamburger menu (`☰`) across all pages (index, results, manage, links, trending, prowlarr, downloads). The dropdown shows labelled items with icons, is context-aware per page (Settings/About only on home, conditional Prowlarr/Downloads entries, auth divider when auth is enabled), and prevents nav icons from being pushed off screen on smaller viewports.
+
+### Fixed
+- `search_readarr` was calling `response.json()` twice — second call could crash on non-JSON error responses. Now stores result in a variable, checks HTTP status, and validates the response is a list before returning.
+- Added detailed error logging to `search_readarr` — non-200 responses now log the status code and response body for easier debugging.
+- Duplicate `'status'` key in `get_sonarr_details` return dict (second entry silently overwrote the first) — renamed to `series_status`.
+
+---
 ## [1.1.23] - 2026-04-17
 ### Fixed
 - Fixed SyntaxError in main.js (line 2736) caused by duplicate function call and closing brace

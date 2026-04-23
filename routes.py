@@ -29,20 +29,26 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     # Library status cache with 60s TTL
     library_cache = {
         'movies': {'data': None, 'timestamp': 0},
-        'series': {'data': None, 'timestamp': 0}
+        'series': {'data': None, 'timestamp': 0},
+        'books': {'data': None, 'timestamp': 0}
     }
     CACHE_TTL = 60  # 60 seconds
-    
+
     def get_cached_library(media_type):
         """Get library from cache or fetch fresh if expired (60s TTL)"""
-        cache_key = 'movies' if media_type == 'movie' else 'series'
+        if media_type == 'movie':
+            cache_key = 'movies'
+        elif media_type == 'book':
+            cache_key = 'books'
+        else:
+            cache_key = 'series'
         cache_entry = library_cache[cache_key]
         current_time = time.time()
-        
+
         # Check if cache is still valid
         if cache_entry['data'] is not None and (current_time - cache_entry['timestamp']) < CACHE_TTL:
             return cache_entry['data']
-        
+
         # Fetch fresh data
         try:
             if media_type == 'movie':
@@ -50,12 +56,17 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     f"{CONFIG.radarr.url}/api/v3/movie",
                     params={'apikey': CONFIG.radarr.api_key}
                 )
+            elif media_type == 'book':
+                response = requests.get(
+                    f"{CONFIG.readarr.url}/api/v1/book",
+                    params={'apikey': CONFIG.readarr.api_key}
+                )
             else:
                 response = requests.get(
                     f"{CONFIG.sonarr.url}/api/v3/series",
                     params={'apikey': CONFIG.sonarr.api_key}
                 )
-            
+
             data = response.json()
             # Update cache
             cache_entry['data'] = data
@@ -171,95 +182,141 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @requires_auth
     def search():
         query = request.args.get('q') or request.form.get('query')
-        logging.info(f"Searching for: {query}")
-        
+        readarr_enabled = CONFIG.readarr.enabled
+        logging.info(f"[SEARCH] query='{query}' | radarr={bool(CONFIG.radarr.url)} sonarr={bool(CONFIG.sonarr.url)} readarr={readarr_enabled}")
+
         try:
-            # Search Radarr and Sonarr concurrently using ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=2) as executor:
+            max_workers = 3 if readarr_enabled else 2
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 movie_future = executor.submit(utils.search_radarr, query)
                 tv_future = executor.submit(utils.search_sonarr, query)
-                
+                book_future = executor.submit(utils.search_readarr, query) if readarr_enabled else None
+
                 movie_results = movie_future.result()
                 tv_results = tv_future.result()
-            
+                book_results = book_future.result() if book_future else []
+
             movie_results = movie_results if isinstance(movie_results, list) else []
             tv_results = tv_results if isinstance(tv_results, list) else []
-            
+            book_results = book_results if isinstance(book_results, list) else []
+
+            logging.info(f"[SEARCH] results: {len(movie_results)} movies, {len(tv_results)} TV, {len(book_results)} books")
+
             for movie in movie_results:
                 movie['media_type'] = 'movie'
             for tv_show in tv_results:
                 tv_show['media_type'] = 'tv'
-                
+            for book in book_results:
+                book['media_type'] = 'book'
+                # Normalise cover image field
+                for img in book.get('images', []):
+                    if 'url' in img and 'remoteUrl' not in img:
+                        img['remoteUrl'] = img['url']
+                    if img.get('coverType') == 'cover':
+                        img['coverType'] = 'poster'
+                # Set a top-level remotePoster for template convenience
+                if not book.get('remotePoster'):
+                    for img in book.get('images', []):
+                        if img.get('coverType') == 'poster':
+                            book['remotePoster'] = img.get('remoteUrl', '')
+                            break
+                # Set year from releaseDate
+                if not book.get('year') and book.get('releaseDate'):
+                    try:
+                        book['year'] = book['releaseDate'][:4]
+                    except Exception:
+                        pass
+
+            # Interleave results: TV, Movie, Book
             combined_results = []
-            max_length = max(len(movie_results), len(tv_results))
-            
+            max_length = max(len(movie_results), len(tv_results), len(book_results)) if (movie_results or tv_results or book_results) else 0
             for i in range(max_length):
                 if i < len(tv_results):
                     combined_results.append(tv_results[i])
                 if i < len(movie_results):
                     combined_results.append(movie_results[i])
-            
-            logging.info(f"Found {len(movie_results)} movies and {len(tv_results)} TV shows")
-                
+                if i < len(book_results):
+                    combined_results.append(book_results[i])
+
             return render_template(
                 'results.html',
                 results=combined_results,
                 media_type='combined',
                 movies=len(movie_results),
                 tv_shows=len(tv_results),
+                books=len(book_results),
                 all_results=len(combined_results),
                 query=query,
-                config=CONFIG._config
+                config=CONFIG._config,
+                readarr_enabled=readarr_enabled
             )
-            
+
         except Exception as e:
-            logging.error(f"Search error: {str(e)}")
+            logging.error(f"[SEARCH] error for '{query}': {str(e)}", exc_info=True)
             return render_template('error.html', error=str(e))
 
     @app.route('/add', methods=['POST'])
     @conditional_debug_log
-    @requires_auth  
+    @requires_auth
     def add_to_arr():
         data = request.json
         media_type = data['media_type']
         media_id = data['media_id']
-        
+
         if media_type == 'movie':
             success = utils.add_to_radarr(media_id)
+        elif media_type == 'book':
+            success = utils.add_to_readarr(media_id)
         else:
             success = utils.add_to_sonarr(media_id)
-        
+
         return jsonify({'success': success})
 
     @app.route('/manage')
     @conditional_debug_log
-    @requires_auth  
+    @requires_auth
     def manage_media():
         try:
-            # Fetch movies and series concurrently using ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=2) as executor:
+            readarr_enabled = CONFIG.readarr.enabled
+            max_workers = 3 if readarr_enabled else 2
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 movies_future = executor.submit(utils.get_radarr_movies)
                 series_future = executor.submit(utils.get_sonarr_series)
-                
+                books_future = executor.submit(utils.get_readarr_books) if readarr_enabled else None
+
                 movies = movies_future.result()
                 series = series_future.result()
-            
+                books = books_future.result() if books_future else []
+
             combined_media = []
-            
+
             for movie in movies:
                 movie['media_type'] = 'movie'
                 combined_media.append(movie)
-            
+
             for show in series:
                 show['media_type'] = 'tv'
                 combined_media.append(show)
-            
+
+            for book in books:
+                book['media_type'] = 'book'
+                # Set year from releaseDate
+                if not book.get('year') and book.get('releaseDate'):
+                    try:
+                        book['year'] = book['releaseDate'][:4]
+                    except Exception:
+                        pass
+                combined_media.append(book)
+
             combined_media.sort(key=lambda x: x.get('title', '').lower())
-            
+
             return render_template(
                 'manage.html',
                 media=combined_media,
-                config=CONFIG._config
+                config=CONFIG._config,
+                readarr_enabled=readarr_enabled
             )
         except Exception as e:
             logging.error(f"Error fetching media: {str(e)}")
@@ -273,9 +330,11 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         media_id = request.args.get('id')
 
         logging.info(f"Fetching details for {media_type} with ID: {media_id}")
-        
+
         if media_type == 'movie':
             return jsonify(utils.get_radarr_details(media_id))
+        elif media_type == 'book':
+            return jsonify(utils.get_readarr_details(media_id))
         else:
             return jsonify(utils.get_sonarr_details(media_id))
 
@@ -373,40 +432,187 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             logging.error(f"Error fetching Sonarr language profiles: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
+    # ============ READARR API ROUTES ============
+
+    @app.route('/api/readarr/rootfolders')
+    @conditional_debug_log
+    @requires_auth
+    def get_readarr_rootfolders():
+        """Get Readarr root folders"""
+        try:
+            url = f"{CONFIG.readarr.url}/api/v1/rootfolder"
+            response = requests.get(url, params={'apikey': CONFIG.readarr.api_key}, timeout=10)
+            return jsonify(response.json())
+        except Exception as e:
+            logging.error(f"Error fetching Readarr root folders: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/readarr/qualityprofile')
+    @conditional_debug_log
+    @requires_auth
+    def get_readarr_qualityprofile():
+        """Get Readarr quality profiles"""
+        try:
+            url = f"{CONFIG.readarr.url}/api/v1/qualityprofile"
+            response = requests.get(url, params={'apikey': CONFIG.readarr.api_key}, timeout=10)
+            return jsonify(response.json())
+        except Exception as e:
+            logging.error(f"Error fetching Readarr quality profiles: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/readarr/metadataprofile')
+    @conditional_debug_log
+    @requires_auth
+    def get_readarr_metadataprofile():
+        """Get Readarr metadata profiles"""
+        try:
+            url = f"{CONFIG.readarr.url}/api/v1/metadataprofile"
+            response = requests.get(url, params={'apikey': CONFIG.readarr.api_key}, timeout=10)
+            return jsonify(response.json())
+        except Exception as e:
+            logging.error(f"Error fetching Readarr metadata profiles: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/readarr/test')
+    @conditional_debug_log
+    @requires_auth
+    def test_readarr_connection():
+        """Test Readarr connection"""
+        try:
+            url = f"{CONFIG.readarr.url}/api/v1/system/status"
+            response = requests.get(url, params={'apikey': CONFIG.readarr.api_key}, timeout=10)
+            if response.status_code == 200:
+                return jsonify({'success': True, 'status': response.json()})
+            return jsonify({'success': False, 'error': f'HTTP {response.status_code}'}), response.status_code
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # ============ LINKS PAGE ============
+
+    @app.route('/links')
+    @conditional_debug_log
+    @requires_auth
+    def links_page():
+        """Service links dashboard"""
+        try:
+            return render_template('links.html', config=CONFIG._config)
+        except Exception as e:
+            logging.error(f"Error loading links page: {str(e)}")
+            return render_template('error.html', error="Failed to load links page")
+
+    @app.route('/api/links/services')
+    @conditional_debug_log
+    @requires_auth
+    def get_links_services():
+        """Return service URLs and network info for the links page"""
+        try:
+            from urllib.parse import urlparse
+            net = network_info_func() if network_info_func else {}
+            local_ip = net.get('local_ip', '127.0.0.1')
+            tunnel_url = net.get('tunnel_url', '') or ''
+            tunnel_enabled = CONFIG.tunnel.enabled
+            tunnel_active = net.get('tunnel_active', False)
+
+            # Extract Pinggy hostname/scheme for per-service URL substitution
+            pinggy_host = ''
+            pinggy_scheme = 'https'
+            if tunnel_url:
+                try:
+                    p = urlparse(tunnel_url)
+                    pinggy_host = p.netloc   # e.g. abc.a.pinggy.io
+                    pinggy_scheme = p.scheme  # https
+                except Exception:
+                    pass
+
+            def make_urls(svc_url):
+                """Given a service URL like http://localhost:7878, return local + pinggy variants.
+                   local  = http://[LAN-IP]:[port]
+                   pinggy = https://[pinggy-host]:[port]  (same port, different host)
+                """
+                if not svc_url:
+                    return {'local': '', 'pinggy': ''}
+                try:
+                    parsed = urlparse(svc_url)
+                    svc_port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+                    local = f"http://{local_ip}:{svc_port}"
+                    if pinggy_host:
+                        pinggy = f"{pinggy_scheme}://{pinggy_host}:{svc_port}"
+                    else:
+                        pinggy = ''
+                    return {'local': local, 'pinggy': pinggy}
+                except Exception:
+                    return {'local': svc_url, 'pinggy': ''}
+
+            services = [
+                {
+                    'name': 'Radarr',
+                    'icon': 'fas fa-film',
+                    'color': '#6ab759',
+                    'configured': bool(CONFIG.radarr.url),
+                    **make_urls(CONFIG.radarr.url)
+                },
+                {
+                    'name': 'Sonarr',
+                    'icon': 'fas fa-tv',
+                    'color': '#35c5f4',
+                    'configured': bool(CONFIG.sonarr.url),
+                    **make_urls(CONFIG.sonarr.url)
+                },
+                {
+                    'name': 'Readarr',
+                    'icon': 'fas fa-book',
+                    'color': '#c0392b',
+                    'configured': bool(CONFIG.readarr.url),
+                    **make_urls(CONFIG.readarr.url)
+                },
+                {
+                    'name': 'Prowlarr',
+                    'icon': 'fas fa-search',
+                    'color': '#ff6b35',
+                    'configured': bool(CONFIG.prowlarr.url),
+                    **make_urls(CONFIG.prowlarr.url)
+                },
+            ]
+
+            return jsonify({
+                'services': services,
+                'tunnel_enabled': tunnel_enabled,
+                'tunnel_active': tunnel_active,
+                'tunnel_url': tunnel_url,
+                'local_ip': local_ip
+            })
+        except Exception as e:
+            logging.error(f"Error building links services: {str(e)}", exc_info=True)
+            return jsonify({'error': str(e)}), 500
+
     @app.route('/check_library_status')
     @conditional_debug_log
-    @requires_auth  
+    @requires_auth
     def check_library_status():
         media_type = request.args.get('type')
         media_id = request.args.get('id')
         source = request.args.get('source', 'tvdb' if media_type == 'tv' else 'tmdb')
-        
+
         # Use cached library data (60s TTL)
         existing = get_cached_library(media_type)
-        
-        match= None
+
+        match = None
         if media_type == 'movie':
-            # Radarr almost exclusively uses tmdbId
-            # in_library = any(str(m.get('tmdbId')) == str(media_id) for m in existing)
             match = next((m for m in existing if str(m.get('tmdbId')) == str(media_id)), None)
+        elif media_type == 'book':
+            match = next((b for b in existing if str(b.get('foreignBookId')) == str(media_id)), None)
         else:
             target_key = 'tmdbId' if source == 'tmdb' else 'tvdbId'
             match = next((s for s in existing if str(s.get(target_key)) == str(media_id)), None)
-            
-            # if source == 'tmdb':
-            #     in_library = any(str(s.get('tmdbId')) == str(media_id) for s in existing)
-            # else:
-            #     in_library = any(str(s.get('tvdbId')) == str(media_id) for s in existing)
-        
+
         if match:
-            # If found, return the actual statistics from the Sonarr/Radarr database
             return jsonify({
                 'in_library': True,
                 'statistics': match.get('statistics', {}),
                 'path': match.get('path'),
                 'status': match.get('status')
             })
-    
+
         return jsonify({'in_library': False})
 
     @app.route('/api/update/dismiss', methods=['POST'])
@@ -727,6 +933,75 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         except Exception as e:
             logging.error(f"Error saving configuration: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
+
+    # ============ PROWLARR ROUTES ============
+
+    @app.route('/prowlarr')
+    @conditional_debug_log
+    @requires_auth
+    def prowlarr_page():
+        if not CONFIG.prowlarr.enabled:
+            return redirect('/')
+        return render_template('prowlarr.html',
+                               config=CONFIG._config,
+                               qbit_enabled=CONFIG.qbit.enabled,
+                               readarr_enabled=CONFIG.readarr.enabled)
+
+    @app.route('/api/prowlarr/search')
+    @conditional_debug_log
+    @requires_auth
+    def prowlarr_search():
+        query = request.args.get('q', '').strip()
+        if not query:
+            return jsonify({'error': 'No query provided'}), 400
+        if not CONFIG.prowlarr.enabled:
+            return jsonify({'error': 'Prowlarr not configured'}), 503
+        results = utils.search_prowlarr(query)
+        return jsonify({'results': results})
+
+    @app.route('/api/prowlarr/download', methods=['POST'])
+    @conditional_debug_log
+    @requires_auth
+    def prowlarr_download():
+        data = request.json or {}
+        torrent_url = data.get('url', '').strip()
+        category = data.get('category', '')
+        if not torrent_url:
+            return jsonify({'success': False, 'message': 'No URL provided'}), 400
+        if not CONFIG.qbit.enabled:
+            return jsonify({'success': False, 'message': 'qBittorrent not configured'}), 503
+        result = utils.qbit_add_torrent(torrent_url, category)
+        return jsonify(result)
+
+    # ============ QBITTORRENT ROUTES ============
+
+    @app.route('/api/qbit/test')
+    @conditional_debug_log
+    @requires_auth
+    def qbit_test():
+        if not CONFIG.qbit.enabled:
+            return jsonify({'status': 'error', 'message': 'qBittorrent not configured'}), 503
+        result = utils.qbit_test()
+        return jsonify(result)
+
+    @app.route('/downloads')
+    @conditional_debug_log
+    @requires_auth
+    def downloads_page():
+        if not CONFIG.qbit.enabled:
+            return redirect('/')
+        return render_template('downloads.html',
+                               config=CONFIG._config,
+                               qbit_enabled=CONFIG.qbit.enabled)
+
+    @app.route('/api/downloads')
+    @conditional_debug_log
+    @requires_auth
+    def api_downloads():
+        if not CONFIG.qbit.enabled:
+            return jsonify({'error': 'qBittorrent not configured'}), 503
+        torrents = utils.qbit_get_torrents()
+        return jsonify({'torrents': torrents})
 
     # Error handlers
     @app.errorhandler(404)

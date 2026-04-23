@@ -77,13 +77,13 @@ function addItem(mediaType, mediaId) {
             showNotification('Error adding item: ' + (data.error || 'Unknown error'), 'error');
         }
         btn.disabled = false;
-        btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`;
+        btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}`;
     })
     .catch(error => {
         console.error('[addItem] Error:', error);
         showNotification('Error adding item: ' + error.message, 'error');
         btn.disabled = false;
-        btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`;
+        btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}`;
     });
 }
 
@@ -197,16 +197,102 @@ function showManageDetails(mediaType, externalId, internalId) {
 // Function to populate modal with details for manage page
 function populateManageModalDetails(data, mediaType, internalId) {
     const detailsContent = document.getElementById('detailsContent');
-    
+
     // Extract the actual media data
     const mediaData = data.data || data;
-    
+
     if (mediaType === 'movie') {
         renderMovieDetails(mediaData, data, mediaType, internalId);
+    } else if (mediaType === 'book') {
+        renderBookDetails(mediaData, data, mediaType, internalId);
     } else {
         renderTVDetails(mediaData, data, mediaType, internalId);
     }
 }
+
+function renderBookDetails(mediaData, fullData, mediaType, internalId) {
+    const detailsContent = document.getElementById('detailsContent');
+
+    const posterImage = mediaData.images?.find(img => img.coverType === 'poster' || img.coverType === 'cover');
+    const posterUrl = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
+
+    const author = mediaData.author?.authorName || 'Unknown Author';
+    const releaseYear = mediaData.releaseDate ? mediaData.releaseDate.substring(0, 4) : 'N/A';
+    const pageCount = mediaData.pageCount ? `${mediaData.pageCount} pages` : '';
+    const overview = mediaData.overview || 'No description available.';
+    const sizeOnDisk = mediaData.statistics?.sizeOnDisk
+        ? formatFileSize(mediaData.statistics.sizeOnDisk)
+        : 'N/A';
+    const onDisk = fullData.on_disk || false;
+    const monitored = fullData.monitored || false;
+
+    const html = `
+        <div class="row mb-3">
+            <div class="col-4 pe-0">
+                <img src="${posterUrl}"
+                     class="img-fluid rounded w-100"
+                     alt="${mediaData.title}"
+                     onerror="this.src='/static/images/favicon.png'"
+                     style="max-width: 120px;">
+            </div>
+            <div class="col-8 ps-2">
+                <h4 class="mb-1">${mediaData.title || 'Unknown Title'}</h4>
+                <div class="text-muted mb-1" style="font-size:0.9rem;">${author}</div>
+                <div class="d-flex align-items-center flex-wrap mb-2">
+                    <span class="me-2">${releaseYear}</span>
+                    ${pageCount ? `<span>${pageCount}</span>` : ''}
+                </div>
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    <span class="badge ${onDisk ? 'bg-success' : 'bg-warning'}">
+                        ${onDisk ? 'Downloaded' : 'Missing'}
+                    </span>
+                    <span class="badge ${monitored ? 'bg-success' : 'bg-secondary'}">
+                        ${monitored ? 'Monitored' : 'Not Monitored'}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header"><h6 class="mb-0">BOOK DETAILS</h6></div>
+            <div class="card-body p-2">
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Author</strong></div>
+                    <div class="col-8">${author}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Published</strong></div>
+                    <div class="col-8">${mediaData.releaseDate ? mediaData.releaseDate.substring(0, 10) : 'N/A'}</div>
+                </div>
+                ${pageCount ? `
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Pages</strong></div>
+                    <div class="col-8">${mediaData.pageCount}</div>
+                </div>` : ''}
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Size on Disk</strong></div>
+                    <div class="col-8">${sizeOnDisk}</div>
+                </div>
+                ${mediaData.path ? `
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Path</strong></div>
+                    <div class="col-8"><code class="text-wrap d-block" style="font-size:0.8rem;">${mediaData.path}</code></div>
+                </div>` : ''}
+            </div>
+        </div>
+
+        ${overview ? `
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header"><h6 class="mb-0">OVERVIEW</h6></div>
+            <div class="card-body p-2">
+                <p class="mb-0" style="font-size:0.9rem;">${overview}</p>
+            </div>
+        </div>` : ''}
+    `;
+
+    detailsContent.innerHTML = html;
+}
+
 
 function renderMovieDetails(mediaData, fullData, mediaType, internalId) {
     const detailsContent = document.getElementById('detailsContent');
@@ -885,7 +971,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
     });
             
     modalEl.removeAttribute('aria-hidden');
-    modalTitle.textContent = `${mediaType === 'tv' ? 'TV Show' : 'Movie'} Details`;    
+    modalTitle.textContent = `${mediaType === 'tv' ? 'TV Show' : mediaType === 'book' ? 'Book' : 'Movie'} Details`;
     
     document.getElementById('detailsContent').innerHTML = `
         <div class="text-center my-4">
@@ -906,7 +992,9 @@ function showDetails(mediaType, mediaId, tmdb=false) {
             })
         : Promise.resolve(null); // Skip entirely when tmdb=true
     
-    const tmdbPromise = mediaType === 'tv' 
+    // Books are handled above and return early; this only runs for movies and TV.
+    // For TV shows fetch TMDB enrichment; movies rely on internal Radarr data.
+    const tmdbPromise = mediaType === 'tv'
         ? fetch(`/get_tmdb_details?type=tv&id=${mediaId}`)
             .then(response => response.json())
             .catch(error => {
@@ -922,7 +1010,26 @@ function showDetails(mediaType, mediaId, tmdb=false) {
             
             const hasTmdbData = tmdbData && !tmdbData.error;
             const hasInternalData = tmdb === false && internalData && !internalData.error;
-            
+
+            // Books: render dedicated view using Readarr data only
+            if (mediaType === 'book') {
+                if (internalData && !internalData.error) {
+                    renderBookDetails(internalData.data || internalData, internalData, mediaType, null);
+                    // Append Add button if not already in library
+                    if (internalData.status !== 'existing') {
+                        const addDiv = document.createElement('div');
+                        addDiv.className = 'mt-3';
+                        addDiv.innerHTML = `<button class="btn btn-primary w-100" onclick="addItemFromModal('book', ${mediaId})">
+                            <i class="fas fa-book me-1"></i>Add to Readarr
+                        </button>`;
+                        document.getElementById('detailsContent').appendChild(addDiv);
+                    }
+                } else {
+                    document.getElementById('detailsContent').innerHTML = '<div class="alert alert-warning">Book details not available.</div>';
+                }
+                return;
+            }
+
             // If in TMDB-only mode, use ONLY TMDB data
             if (tmdb === true) {
                 // TMDB-ONLY MODE: Use only TMDB data
@@ -1067,7 +1174,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                                     <button class="btn btn-primary w-100" 
                                             id="modalAddButton"
                                             onclick="addItemFromModal('${mediaType}', ${mediaId})">
-                                        Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}
+                                        Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}
                                     </button>
                                 </div>
                             </div>
@@ -1276,7 +1383,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                                             id="modalAddButton"
                                             onclick="${alreadyAdded ? '' : `addItemFromModal('${mediaType}', ${mediaId})`}"
                                             ${alreadyAdded ? 'disabled' : ''}>
-                                        ${alreadyAdded ? '✓ Already in Library' : `Add to ${mediaType === 'tv' ? 'Sonarr' : 'Radarr'}`}
+                                        ${alreadyAdded ? '✓ Already in Library' : `Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}`}
                                     </button>
                                 </div>
                             </div>
