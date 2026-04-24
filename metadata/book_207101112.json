@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "207101112",
+  "title": "Breeding the Nanny",
+  "author": {
+    "authorName": "Darcy Rose"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4636/cover.jpg?lastWrite=638394554940000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1703748183i/201953940.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

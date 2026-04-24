@@ -1,5 +1,5 @@
 # routes.py
-from flask import render_template, request, jsonify, Response, session, redirect, url_for, send_from_directory
+from flask import render_template, request, jsonify, Response, session, redirect, url_for, send_from_directory, send_file
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 import logging
@@ -183,19 +183,29 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     def search():
         query = request.args.get('q') or request.form.get('query')
         readarr_enabled = CONFIG.readarr.enabled
-        logging.info(f"[SEARCH] query='{query}' | radarr={bool(CONFIG.radarr.url)} sonarr={bool(CONFIG.sonarr.url)} readarr={readarr_enabled}")
+        apify_enabled   = CONFIG.apify.enabled
+        logging.info(
+            f"[SEARCH] query='{query}' | radarr={bool(CONFIG.radarr.url)} "
+            f"sonarr={bool(CONFIG.sonarr.url)} readarr={readarr_enabled} apify={apify_enabled}"
+        )
 
         try:
-            max_workers = 3 if readarr_enabled else 2
+            book_search_enabled = readarr_enabled or apify_enabled
+            max_workers = 3 if book_search_enabled else 2
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 movie_future = executor.submit(utils.search_radarr, query)
-                tv_future = executor.submit(utils.search_sonarr, query)
-                book_future = executor.submit(utils.search_readarr, query) if readarr_enabled else None
+                tv_future    = executor.submit(utils.search_sonarr, query)
+                if apify_enabled:
+                    book_future = executor.submit(utils.search_goodreads_apify, query)
+                elif readarr_enabled:
+                    book_future = executor.submit(utils.search_readarr, query)
+                else:
+                    book_future = None
 
                 movie_results = movie_future.result()
-                tv_results = tv_future.result()
-                book_results = book_future.result() if book_future else []
+                tv_results    = tv_future.result()
+                book_results  = book_future.result() if book_future else []
 
             movie_results = movie_results if isinstance(movie_results, list) else []
             tv_results = tv_results if isinstance(tv_results, list) else []
@@ -249,7 +259,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 all_results=len(combined_results),
                 query=query,
                 config=CONFIG._config,
-                readarr_enabled=readarr_enabled
+                readarr_enabled=readarr_enabled or apify_enabled
             )
 
         except Exception as e:
@@ -266,49 +276,32 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
 
         if media_type == 'movie':
             success = utils.add_to_radarr(media_id)
+            return jsonify({'success': success})
         elif media_type == 'book':
-            success = utils.add_to_readarr(media_id)
+            success, message = utils.add_to_readarr(media_id)
+            return jsonify({'success': success, 'message': message})
         else:
             success = utils.add_to_sonarr(media_id)
-
-        return jsonify({'success': success})
+            return jsonify({'success': success})
 
     @app.route('/manage')
     @conditional_debug_log
     @requires_auth
     def manage_media():
         try:
-            readarr_enabled = CONFIG.readarr.enabled
-            max_workers = 3 if readarr_enabled else 2
-
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            with ThreadPoolExecutor(max_workers=2) as executor:
                 movies_future = executor.submit(utils.get_radarr_movies)
                 series_future = executor.submit(utils.get_sonarr_series)
-                books_future = executor.submit(utils.get_readarr_books) if readarr_enabled else None
-
                 movies = movies_future.result()
                 series = series_future.result()
-                books = books_future.result() if books_future else []
 
             combined_media = []
-
             for movie in movies:
                 movie['media_type'] = 'movie'
                 combined_media.append(movie)
-
             for show in series:
                 show['media_type'] = 'tv'
                 combined_media.append(show)
-
-            for book in books:
-                book['media_type'] = 'book'
-                # Set year from releaseDate
-                if not book.get('year') and book.get('releaseDate'):
-                    try:
-                        book['year'] = book['releaseDate'][:4]
-                    except Exception:
-                        pass
-                combined_media.append(book)
 
             combined_media.sort(key=lambda x: x.get('title', '').lower())
 
@@ -316,11 +309,37 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 'manage.html',
                 media=combined_media,
                 config=CONFIG._config,
-                readarr_enabled=readarr_enabled
+                readarr_enabled=CONFIG.readarr.enabled
             )
         except Exception as e:
             logging.error(f"Error fetching media: {str(e)}")
             return render_template('error.html', error="Failed to load media library")
+
+    @app.route('/manage-books')
+    @conditional_debug_log
+    @requires_auth
+    def manage_books():
+        try:
+            if not CONFIG.readarr.enabled:
+                return render_template('error.html', error="Readarr is not configured")
+            books = utils.get_readarr_books()
+            # Only show books that have at least one file on disk
+            downloaded = [
+                b for b in books
+                if (b.get('statistics', {}).get('bookFileCount', 0) > 0
+                    or b.get('statistics', {}).get('sizeOnDisk', 0) > 0)
+            ]
+            downloaded.sort(key=lambda x: x.get('title', '').lower())
+            return render_template(
+                'manage-books.html',
+                books=downloaded,
+                config=CONFIG._config,
+                total_in_library=len(books),
+                total_downloaded=len(downloaded)
+            )
+        except Exception as e:
+            logging.error(f"Error fetching books: {str(e)}")
+            return render_template('error.html', error="Failed to load books")
 
     @app.route('/get_media_details')
     @conditional_debug_log
@@ -487,6 +506,73 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
 
+    @app.route('/api/book/metadata-cache')
+    @requires_auth
+    def book_metadata_cache():
+        """Return locally-cached author / poster data for a list of foreignBookIds.
+
+        Query string: ?ids=id1,id2,id3,...
+        Response: { foreignBookId: { authorName, posterUrl, title, overview } }
+
+        Fast: reads only disk-cached JSON files, no Readarr/Apify HTTP calls.
+        Used by manage-books.html to batch-patch cards on first load.
+        """
+        from utils import load_book_metadata
+        raw_ids = request.args.get('ids', '')
+        ids = [i.strip() for i in raw_ids.split(',') if i.strip()]
+        result = {}
+        for fid in ids:
+            cached = load_book_metadata(fid)
+            if not cached:
+                continue
+            author_obj  = cached.get('author') or {}
+            author_name = (
+                author_obj.get('authorName', '')
+                if isinstance(author_obj, dict)
+                else str(author_obj)
+            )
+            # Resolve poster URL: remotePoster > images[coverType=poster/cover]
+            poster_url = cached.get('remotePoster', '')
+            if not poster_url:
+                for img in cached.get('images', []):
+                    if img.get('coverType') in ('poster', 'cover'):
+                        poster_url = img.get('remoteUrl') or img.get('url', '')
+                        if poster_url:
+                            break
+            # Only return entries that actually have something useful
+            if author_name or poster_url:
+                result[fid] = {
+                    'authorName': author_name,
+                    'posterUrl':  poster_url,
+                    'title':      cached.get('title', ''),
+                    'overview':   cached.get('overview', ''),
+                }
+        return jsonify(result)
+
+    @app.route('/api/readarr/cover')
+    @requires_auth
+    def readarr_cover_proxy():
+        """Proxy a Readarr mediacover image so the browser doesn't need direct
+        access to the Readarr host (which may be localhost or an internal address).
+        Usage: /api/readarr/cover?path=/api/v1/mediacover/39/cover.jpg?lastWrite=...
+        """
+        path = request.args.get('path', '')
+        if not path or '/mediacover' not in path:
+            return '', 404
+        try:
+            # Strip the leading /api/v1 prefix — requests wants the full URL
+            readarr_url = CONFIG.readarr.url.rstrip('/')
+            full_url = readarr_url + path
+            r = requests.get(full_url, params={'apikey': CONFIG.readarr.api_key},
+                             timeout=10, stream=False)
+            if r.status_code == 200:
+                content_type = r.headers.get('content-type', 'image/jpeg')
+                return Response(r.content, content_type=content_type)
+            return '', r.status_code
+        except Exception as e:
+            logging.debug(f"[cover proxy] {e}")
+            return '', 500
+
     # ============ LINKS PAGE ============
 
     @app.route('/links')
@@ -525,21 +611,25 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     pass
 
             def make_urls(svc_url):
-                """Given a service URL like http://localhost:7878, return local + pinggy variants.
-                   local  = http://[LAN-IP]:[port]
-                   pinggy = https://[pinggy-host]:[port]  (same port, different host)
+                """Return the configured service URL as 'local'.
+                   Pinggy only tunnels Addarr's own port — individual service ports
+                   are NOT forwarded, so no Pinggy URL is provided for services.
+                   If the URL uses 'localhost' or '127.0.0.1', substitute the LAN IP
+                   so the link is reachable from the same device that opened the page.
                 """
                 if not svc_url:
                     return {'local': '', 'pinggy': ''}
                 try:
                     parsed = urlparse(svc_url)
-                    svc_port = parsed.port or (443 if parsed.scheme == 'https' else 80)
-                    local = f"http://{local_ip}:{svc_port}"
-                    if pinggy_host:
-                        pinggy = f"{pinggy_scheme}://{pinggy_host}:{svc_port}"
-                    else:
-                        pinggy = ''
-                    return {'local': local, 'pinggy': pinggy}
+                    host = parsed.hostname or 'localhost'
+                    port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+                    scheme = parsed.scheme or 'http'
+                    # Replace loopback address with the actual LAN IP so the
+                    # link works when opened from a browser on the same machine.
+                    if host in ('localhost', '127.0.0.1', '::1'):
+                        host = local_ip
+                    local = f"{scheme}://{host}:{port}"
+                    return {'local': local, 'pinggy': ''}
                 except Exception:
                     return {'local': svc_url, 'pinggy': ''}
 
@@ -956,7 +1046,10 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             return jsonify({'error': 'No query provided'}), 400
         if not CONFIG.prowlarr.enabled:
             return jsonify({'error': 'Prowlarr not configured'}), 503
-        results = utils.search_prowlarr(query)
+        # Optional category filter — comma-separated Newznab IDs, e.g. ?categories=2000,2010
+        raw_cats = request.args.get('categories', '').strip()
+        categories = [int(c) for c in raw_cats.split(',') if c.strip().isdigit()] if raw_cats else None
+        results = utils.search_prowlarr(query, categories=categories)
         return jsonify({'results': results})
 
     @app.route('/api/prowlarr/download', methods=['POST'])
@@ -1002,6 +1095,116 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             return jsonify({'error': 'qBittorrent not configured'}), 503
         torrents = utils.qbit_get_torrents()
         return jsonify({'torrents': torrents})
+
+    # ============ EBOOK READER ROUTES ============
+
+    @app.route('/read/<int:book_id>')
+    @requires_auth
+    def read_book(book_id):
+        """Serve the ebook reader page for a Readarr internal book ID."""
+        if not CONFIG.readarr.url:
+            return redirect('/')
+        file_path = utils.get_readarr_book_file_path(book_id)
+        if not file_path:
+            return render_template('error.html'), 404
+        ext = os.path.splitext(file_path)[1].lower()
+        file_type = 'epub' if ext == '.epub' else 'pdf' if ext == '.pdf' else None
+        if not file_type:
+            return render_template('error.html'), 415
+        return render_template('reader.html',
+                               book_id=book_id,
+                               file_type=file_type,
+                               config=CONFIG._config)
+
+    @app.route('/api/book/file/<int:book_id>')
+    @requires_auth
+    def book_file(book_id):
+        """Stream the ebook file for a given Readarr internal book ID.
+        epub.js fetches this as an ArrayBuffer (see reader.html) so we must
+        send the raw binary with correct MIME and permissive headers.
+        """
+        if not CONFIG.readarr.url:
+            return jsonify({'error': 'Readarr not configured'}), 503
+        file_path = utils.get_readarr_book_file_path(book_id)
+        if not file_path or not os.path.isfile(file_path):
+            logging.warning(f"[reader] book file not found: {file_path!r}")
+            return jsonify({'error': 'File not found'}), 404
+        ext = os.path.splitext(file_path)[1].lower()
+        mime = 'application/epub+zip' if ext == '.epub' else 'application/pdf'
+        try:
+            response = send_file(
+                file_path,
+                mimetype=mime,
+                as_attachment=False,
+                conditional=False,   # always send full file — no 304
+            )
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Cache-Control'] = 'no-store'
+            return response
+        except Exception as e:
+            logging.error(f"[reader] send_file error: {str(e)}", exc_info=True)
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/torrents/action', methods=['POST'])
+    @conditional_debug_log
+    @requires_auth
+    def torrent_action():
+        """Perform an action on one or more torrents.
+        Body: { "action": "resume"|"pause"|"delete"|"setForceStart", "hashes": "abc123" | ["abc","def"] }
+        """
+        if not CONFIG.qbit.enabled:
+            return jsonify({'error': 'qBittorrent not configured'}), 503
+        data = request.get_json(silent=True) or {}
+        action = data.get('action')
+        hashes = data.get('hashes')
+        if not action or not hashes:
+            return jsonify({'error': 'action and hashes are required'}), 400
+        if action not in ('resume', 'pause', 'delete', 'setForceStart'):
+            return jsonify({'error': f'Unknown action: {action}'}), 400
+        result = utils.qbit_action(action, hashes)
+        return jsonify(result)
+
+    @app.route('/api/<string:media_type>/<int:internal_id>', methods=['DELETE'])
+    @conditional_debug_log
+    @requires_auth
+    def delete_media(media_type, internal_id):
+        """Delete a movie, TV show, or book from the library (no file deletion)."""
+        try:
+            if media_type == 'movie':
+                if not CONFIG.radarr.enabled:
+                    return jsonify({'success': False, 'message': 'Radarr not configured'}), 503
+                r = requests.delete(
+                    f"{CONFIG.radarr.url}/api/v3/movie/{internal_id}",
+                    params={'apikey': CONFIG.radarr.api_key, 'deleteFiles': 'false', 'addImportExclusion': 'false'}
+                )
+            elif media_type == 'tv':
+                if not CONFIG.sonarr.enabled:
+                    return jsonify({'success': False, 'message': 'Sonarr not configured'}), 503
+                r = requests.delete(
+                    f"{CONFIG.sonarr.url}/api/v3/series/{internal_id}",
+                    params={'apikey': CONFIG.sonarr.api_key, 'deleteFiles': 'false'}
+                )
+            elif media_type == 'book':
+                if not CONFIG.readarr.enabled:
+                    return jsonify({'success': False, 'message': 'Readarr not configured'}), 503
+                r = requests.delete(
+                    f"{CONFIG.readarr.url}/api/v1/book/{internal_id}",
+                    params={'apikey': CONFIG.readarr.api_key, 'deleteFiles': 'false'}
+                )
+            else:
+                return jsonify({'success': False, 'message': f'Unknown media type: {media_type}'}), 400
+
+            if r.status_code in (200, 204):
+                logging.info(f"[delete_media] Deleted {media_type} id={internal_id}")
+                return jsonify({'success': True})
+            else:
+                msg = f"{media_type.capitalize()} API returned HTTP {r.status_code}: {r.text[:200]}"
+                logging.error(f"[delete_media] {msg}")
+                return jsonify({'success': False, 'message': msg}), r.status_code
+
+        except Exception as e:
+            logging.error(f"[delete_media] Error deleting {media_type} {internal_id}: {e}", exc_info=True)
+            return jsonify({'success': False, 'message': str(e)}), 500
 
     # Error handlers
     @app.errorhandler(404)

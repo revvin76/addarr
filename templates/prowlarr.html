@@ -42,40 +42,33 @@
         .no-qbit-note { font-size: 0.8rem; color: #aaa; }
     </style>
 </head>
+{% set current_page = 'prowlarr' %}
 <body>
-    <!-- Navbar -->
-    <div class="container-fluid bg-dark py-2">
-        <div class="container d-flex align-items-center">
-            <a href="/" class="d-flex align-items-center text-decoration-none me-auto">
-                <img src="/static/images/logo.png" alt="Addarr Logo" height="40" class="me-2">
-            </a>
-            <div class="dropdown">
-                <button class="btn btn-outline-radarr" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Menu">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
-                    <li><a class="dropdown-item" href="/"><i class="fas fa-home me-2"></i>Home</a></li>
-                    <li><a class="dropdown-item" href="/manage"><i class="fas fa-film me-2"></i>Manage Library</a></li>
-                    <li><a class="dropdown-item" href="/links"><i class="fas fa-link me-2"></i>Service Links</a></li>
-                    {% if qbit_enabled %}<li><a class="dropdown-item" href="/downloads"><i class="fas fa-download me-2"></i>Downloads</a></li>{% endif %}
-                    {% if config.auth.enabled %}
-                    <li><hr class="dropdown-divider"></li>
-                    {% if session.get('authenticated') %}
-                    <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
-                    {% else %}
-                    <li><a class="dropdown-item" href="/login"><i class="fas fa-sign-in-alt me-2"></i>Sign In</a></li>
-                    {% endif %}
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </div>
+    {% include 'partials/navbar.html' %}
 
     <div class="container mt-4">
         <!-- Header -->
         <div class="d-flex align-items-center mb-3">
             <i class="fas fa-search fa-lg prowlarr-accent me-2"></i>
             <h4 class="mb-0" style="color: #ff6b35;">Prowlarr Search</h4>
+        </div>
+
+        <!-- Category toggle -->
+        <div class="mb-3 d-flex flex-wrap gap-1" id="categoryToggle" role="group" aria-label="Category filter">
+            <input type="radio" class="btn-check" name="catFilter" id="cat-all"   value=""    autocomplete="off" checked>
+            <label class="btn btn-sm btn-outline-secondary" for="cat-all">All</label>
+
+            <input type="radio" class="btn-check" name="catFilter" id="cat-movie" value="2000" autocomplete="off">
+            <label class="btn btn-sm btn-outline-success"   for="cat-movie"><i class="fas fa-film me-1"></i>Movies</label>
+
+            <input type="radio" class="btn-check" name="catFilter" id="cat-tv"    value="5000" autocomplete="off">
+            <label class="btn btn-sm btn-outline-info"      for="cat-tv"><i class="fas fa-tv me-1"></i>TV</label>
+
+            <input type="radio" class="btn-check" name="catFilter" id="cat-book"  value="7000" autocomplete="off">
+            <label class="btn btn-sm btn-outline-danger"    for="cat-book"><i class="fas fa-book me-1"></i>Books</label>
+
+            <input type="radio" class="btn-check" name="catFilter" id="cat-apps"  value="4000" autocomplete="off">
+            <label class="btn btn-sm btn-outline-warning"   for="cat-apps"><i class="fas fa-desktop me-1"></i>Apps</label>
         </div>
 
         <!-- Search bar -->
@@ -226,7 +219,9 @@
         emptyState.style.display = 'none';
         resultsBody.innerHTML = '';
 
-        fetch(`/api/prowlarr/search?q=${encodeURIComponent(query)}`)
+        const selectedCat = document.querySelector('input[name="catFilter"]:checked')?.value || '';
+        const catParam = selectedCat ? `&categories=${encodeURIComponent(selectedCat)}` : '';
+        fetch(`/api/prowlarr/search?q=${encodeURIComponent(query)}${catParam}`)
             .then(r => r.json())
             .then(data => {
                 const results = data.results || [];

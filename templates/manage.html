@@ -95,35 +95,9 @@
     </script>
 </head>
 
+{% set current_page = 'manage' %}
 <body>
-    <!-- Logo and Header -->
-    <div class="container-fluid bg-dark py-2">
-        <div class="container d-flex align-items-center">
-            <a href="/" class="d-flex align-items-center text-decoration-none me-auto">
-                <img src="/static/images/logo.png" alt="Addarr Logo" height="40" class="me-2">
-            </a>
-            
-            <div class="dropdown">
-                <button class="btn btn-outline-radarr" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Menu">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
-                    <li><a class="dropdown-item" href="/"><i class="fas fa-home me-2"></i>Home</a></li>
-                    <li><a class="dropdown-item" href="/links"><i class="fas fa-link me-2"></i>Service Links</a></li>
-                    {% if config.prowlarr.enabled %}<li><a class="dropdown-item" href="/prowlarr"><i class="fas fa-search me-2"></i>Prowlarr Search</a></li>{% endif %}
-                    {% if config.qbit.enabled %}<li><a class="dropdown-item" href="/downloads"><i class="fas fa-download me-2"></i>Downloads</a></li>{% endif %}
-                    {% if config.auth.enabled %}
-                    <li><hr class="dropdown-divider"></li>
-                    {% if session.get('authenticated') %}
-                    <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
-                    {% else %}
-                    <li><a class="dropdown-item" href="/login"><i class="fas fa-sign-in-alt me-2"></i>Sign In</a></li>
-                    {% endif %}
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </div>
+    {% include 'partials/navbar.html' %}
 
     <div class="container mt-4">
 
@@ -138,7 +112,6 @@
                         <option value="all">All Media</option>
                         <option value="movie">Movies Only</option>
                         <option value="tv">TV Shows Only</option>
-                        {% if readarr_enabled %}<option value="book">Books Only</option>{% endif %}
                     </select>
                 </div>
             </div>
@@ -170,7 +143,8 @@
                 <div class="col-12 mb-3 media-item {{ item.media_type }}-item"
                     data-title="{{ item.title|lower }}"
                     data-id="{{ item_id }}"
-                    onclick="showManageDetails('{{ item.media_type }}', {{ item_id }}, {{ item.id }})">
+                    data-media-type="{{ item.media_type }}"
+                    onclick="showManageDetails('{{ item.media_type }}', '{{ item_id }}', {{ item.id }})">
 
                     <div class="manage-result-card h-100 d-flex flex-column {{ item.media_type }}-card">
                         <!-- Watermark Icon -->
@@ -324,8 +298,8 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log('DOM loaded, initializing manage page...');
         
-        initializeMediaGrid();
-        
+        initializeManageGrid();
+
         // Initialize lazy loading first
         initLazyLoading();
         

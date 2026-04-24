@@ -160,7 +160,8 @@ function showManageDetails(mediaType, externalId, internalId) {
         </div>`;
     
     // Set modal title based on media type
-    modalTitle.textContent = `${mediaType === 'tv' ? 'TV Show' : 'Movie'} Details`;
+    const typeLabel = mediaType === 'tv' ? 'TV Show' : mediaType === 'book' ? 'Book' : 'Movie';
+    modalTitle.textContent = `${typeLabel} Details`;
     
     // Add event listener to hide overlay when modal is closed
     const hideModalHandler = function() {
@@ -288,6 +289,11 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
                 <p class="mb-0" style="font-size:0.9rem;">${overview}</p>
             </div>
         </div>` : ''}
+
+        ${onDisk && mediaData.id ? `
+        <a href="/read/${mediaData.id}" class="btn btn-success w-100 mb-2" target="_blank">
+            <i class="fas fa-book-open me-2"></i>Read Now
+        </a>` : ''}
     `;
 
     detailsContent.innerHTML = html;
@@ -1013,10 +1019,27 @@ function showDetails(mediaType, mediaId, tmdb=false) {
 
             // Books: render dedicated view using Readarr data only
             if (mediaType === 'book') {
+                let bookData = null;
+                let bookFullData = null;
+
                 if (internalData && !internalData.error) {
-                    renderBookDetails(internalData.data || internalData, internalData, mediaType, null);
-                    // Append Add button if not already in library
-                    if (internalData.status !== 'existing') {
+                    // Fresh data from Readarr API — use it directly
+                    bookData = internalData.data || internalData;
+                    bookFullData = internalData;
+                } else {
+                    // API failed — fall back to the search-result cache populated by the template
+                    const cached = (window.bookCache || new Map()).get(String(mediaId));
+                    if (cached) {
+                        console.warn('[showDetails] Readarr API failed; rendering from search cache for', mediaId);
+                        bookData = cached;
+                        bookFullData = { on_disk: false, monitored: false, status: 'not_added' };
+                    }
+                }
+
+                if (bookData) {
+                    renderBookDetails(bookData, bookFullData, mediaType, null);
+                    // Append Add button if not in library
+                    if (!bookFullData || bookFullData.status !== 'existing') {
                         const addDiv = document.createElement('div');
                         addDiv.className = 'mt-3';
                         addDiv.innerHTML = `<button class="btn btn-primary w-100" onclick="addItemFromModal('book', ${mediaId})">
@@ -1025,7 +1048,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                         document.getElementById('detailsContent').appendChild(addDiv);
                     }
                 } else {
-                    document.getElementById('detailsContent').innerHTML = '<div class="alert alert-warning">Book details not available.</div>';
+                    document.getElementById('detailsContent').innerHTML = '<div class="alert alert-warning">Book details not available. Check Readarr connection.</div>';
                 }
                 return;
             }
@@ -2724,6 +2747,41 @@ function initializeMediaGrid() {
     });
 }
 
+// Initialize manage page grid — all items are already in the library so we skip
+// the library-status round-trip and go straight to fetching details.
+function initializeManageGrid() {
+    const mediaItems = document.querySelectorAll('.media-item');
+    if (!mediaItems.length) return;
+    mediaItems.forEach(item => {
+        const mediaType = item.dataset.mediaType;
+        const mediaId   = item.dataset.id;
+        const card      = item.querySelector('.manage-result-card');
+        if (!card || !mediaType || !mediaId) return;
+
+        const statusBadge   = card.querySelector('.status-badge');
+        const extraBadges   = card.querySelector('.media-extra-badges');
+        const manageControls = card.querySelector('.manage-controls');
+
+        // Mark as in-library immediately (all manage-page items are in library)
+        if (statusBadge) {
+            statusBadge.textContent = 'In Library';
+            statusBadge.className   = 'status-badge text-xs badge bg-success';
+        }
+
+        // Fetch details to get on-disk status + controls
+        fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
+            .then(r => r.json())
+            .then(details => {
+                if (details.error) return; // silently skip if lookup failed
+                const itemData   = details.data || details;
+                const internalId = itemData.id;
+                if (extraBadges)    updateExtraBadges(mediaType, itemData, extraBadges);
+                if (manageControls) showManageControls(mediaType, mediaId, internalId, manageControls, true, itemData);
+            })
+            .catch(err => console.error('[initializeManageGrid] details fetch error:', err));
+    });
+}
+
 // Fetch library status and update UI
 function checkLibraryStatus(mediaType, mediaId, card) {
     fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`)
@@ -2997,12 +3055,14 @@ function updateMediaDisplay() {
         const title = item.dataset.title;
         const isMovie = item.classList.contains('movie-item');
         const isTV = item.classList.contains('tv-item');
-                    
+        const isBook = item.classList.contains('book-item');
+
         const matchesSearch = searchTerm === '' || title.includes(searchTerm);
-        const matchesFilter = currentFilter === 'all' || 
-                            (currentFilter === 'movie' && isMovie) || 
-                            (currentFilter === 'tv' && isTV);
-        
+        const matchesFilter = currentFilter === 'all' ||
+                            (currentFilter === 'movie' && isMovie) ||
+                            (currentFilter === 'tv' && isTV) ||
+                            (currentFilter === 'book' && isBook);
+
         item.style.display = (matchesSearch && matchesFilter) ? 'block' : 'none';
     });
 }

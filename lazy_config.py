@@ -106,6 +106,11 @@ class LazyConfig:
                 'username': os.getenv('QBIT_USERNAME', ''),
                 'password': os.getenv('QBIT_PASSWORD', ''),
                 'enabled': bool(os.getenv('QBIT_URL', ''))
+            },
+            'apify': {
+                'token': os.getenv('APIFY_TOKEN', ''),
+                'actor': os.getenv('APIFY_ACTOR', 'petr_cermak~goodreads-books'),
+                'enabled': os.getenv('APIFY_ENABLED', '').lower() == 'true'
             }
         }
         
