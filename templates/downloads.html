@@ -16,22 +16,43 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a1a" />
     <style>
-        /* Category accent colours — left border */
-        .dl-card { border-radius: 6px; background: #2a2a2a; margin-bottom: 10px; border-left: 4px solid #555; }
-        .dl-card.cat-radarr    { border-left-color: #6ab759; }
-        .dl-card.cat-sonarr    { border-left-color: #00ccff; }
-        .dl-card.cat-readarr   { border-left-color: #c0392b; }
-        .dl-card.cat-games     { border-left-color: #8e44ad; }
-        .dl-card.cat-other     { border-left-color: #555; }
+        /* ── Category colours ── */
+        .dl-card { border-radius: 6px; background: #2a2a2a; margin-bottom: 6px; border-left: 4px solid #555; overflow: hidden; }
+        .dl-card.cat-radarr  { border-left-color: #6ab759; }
+        .dl-card.cat-sonarr  { border-left-color: #00ccff; }
+        .dl-card.cat-readarr { border-left-color: #c0392b; }
+        .dl-card.cat-games   { border-left-color: #8e44ad; }
+        .dl-card.cat-other   { border-left-color: #555;    }
 
-        .dl-name { font-size: 0.9rem; font-weight: 500; word-break: break-word; }
+        /* ── Compact header row ── */
+        .dl-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 10px; cursor: pointer; user-select: none;
+        }
+        .dl-header:hover { background: rgba(255,255,255,0.04); }
+        .dl-progress-mini { flex: 0 0 50px; height: 4px; border-radius: 2px; background: #444; overflow: hidden; }
+        .dl-progress-fill { height: 100%; border-radius: 2px; }
+        .fill-downloading { background: #6ab759; }
+        .fill-seeding     { background: #0d6efd; }
+        .fill-paused      { background: #ffc230; }
+        .fill-other       { background: #888; }
+        .dl-pct  { font-size: 0.72rem; color: #a0a0a0; flex: 0 0 36px; text-align: right; }
+        .dl-name { font-size: 0.85rem; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dl-state-badge { font-size: 0.65rem; padding: 2px 7px; border-radius: 10px; flex-shrink: 0; }
+        .state-downloading { color: #5ed640; background: rgba(94,214,64,0.12); border: 1px solid #5ed640; }
+        .state-seeding     { color: #5b9cf6; background: rgba(91,156,246,0.12); border: 1px solid #5b9cf6; }
+        .state-paused      { color: #ffc230; background: rgba(255,194,48,0.12);  border: 1px solid #ffc230; }
+        .state-error       { color: #e74c3c; background: rgba(231,76,60,0.12);   border: 1px solid #e74c3c; }
+        .state-other       { color: #a0a0a0; background: rgba(160,160,160,0.08); border: 1px solid #555; }
+        .dl-expand-icon { font-size: 0.7rem; color: #666; flex-shrink: 0; transition: transform 0.2s; }
+        .dl-card.expanded .dl-expand-icon { transform: rotate(90deg); }
+
+        /* ── Expanded details panel ── */
+        .dl-details { display: none; padding: 0 10px 10px; border-top: 1px solid rgba(255,255,255,0.07); }
+        .dl-card.expanded .dl-details { display: block; }
         .dl-meta { font-size: 0.75rem; color: #a0a0a0; }
-        .dl-speed { font-size: 0.8rem; }
-        .dl-speed .dl-arrow  { color: #5ed640; }
-        .dl-speed .ul-arrow  { color: #0d6efd; }
-        .dl-state { font-size: 0.7rem; text-transform: capitalize; }
-        .progress { height: 6px; border-radius: 3px; }
-        .eta-text { font-size: 0.75rem; color: #a0a0a0; }
+        .dl-speed .dl-arrow { color: #5ed640; }
+        .dl-speed .ul-arrow { color: #5b9cf6; }
         .cat-badge { font-size: 0.65rem; padding: 2px 7px; border-radius: 10px; }
         .cat-badge.cat-radarr  { background: rgba(106,183,89,0.2);  color: #6ab759; border: 1px solid #6ab759; }
         .cat-badge.cat-sonarr  { background: rgba(0,204,255,0.15);  color: #00ccff; border: 1px solid #00ccff; }
@@ -39,71 +60,68 @@
         .cat-badge.cat-games   { background: rgba(142,68,173,0.2);  color: #9b59b6; border: 1px solid #8e44ad; }
         .cat-badge.cat-other   { background: rgba(100,100,100,0.2); color: #aaa;    border: 1px solid #555; }
 
-        .state-downloading { color: #5ed640; }
-        .state-seeding     { color: #0d6efd; }
-        .state-paused      { color: #ffc230; }
-        .state-error       { color: #e74c3c; }
-        .state-other       { color: #a0a0a0; }
+        /* ── Action buttons ── */
+        .dl-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .dl-actions .btn { font-size: 0.75rem; padding: 3px 10px; }
 
-        #refreshBtn { transition: transform 0.4s; }
+        /* ── Group headers ── */
+        .group-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 4px; cursor: pointer; user-select: none;
+            border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px;
+        }
+        .group-header:hover { background: rgba(255,255,255,0.03); border-radius: 4px; }
+        .group-title { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #ccc; }
+        .group-count { font-size: 0.7rem; color: #888; }
+        .group-toggle-icon { font-size: 0.7rem; color: #666; margin-left: auto; transition: transform 0.2s; }
+        .group-body.collapsed { display: none; }
+        .group-header.collapsed .group-toggle-icon { transform: rotate(-90deg); }
+
+        /* ── State tag indicators ── */
+        .dl-tag-row { padding-top: 4px; }
+        .tag-badge { display: inline-block; font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; }
+        .tag-stalled    { color: #ffc230; background: rgba(255,194,48,0.1);  border: 1px solid #ffc230; }
+        .tag-forced     { color: #f39c12; background: rgba(243,156,18,0.1);  border: 1px solid #f39c12; }
+        .tag-metadata   { color: #5b9cf6; background: rgba(91,156,246,0.1);  border: 1px solid #5b9cf6; }
+        .tag-checking   { color: #a0a0a0; background: rgba(160,160,160,0.1); border: 1px solid #555; }
+        .tag-allocating { color: #a0a0a0; background: rgba(160,160,160,0.1); border: 1px solid #555; }
+        .tag-queued     { color: #ffc230; background: rgba(255,194,48,0.1);  border: 1px solid #ffc230; }
+
+        /* ── Toolbar ── */
         #refreshBtn.spinning { animation: spin 0.8s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .progress-full { height: 6px; border-radius: 3px; }
     </style>
 </head>
+{% set current_page = 'downloads' %}
 <body>
-    <!-- Navbar -->
-    <div class="container-fluid bg-dark py-2">
-        <div class="container d-flex align-items-center">
-            <a href="/" class="d-flex align-items-center text-decoration-none me-auto">
-                <img src="/static/images/logo.png" alt="Addarr Logo" height="40" class="me-2">
-            </a>
-            <div class="dropdown">
-                <button class="btn btn-outline-radarr" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Menu">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
-                    <li><a class="dropdown-item" href="/"><i class="fas fa-home me-2"></i>Home</a></li>
-                    <li><a class="dropdown-item" href="/manage"><i class="fas fa-film me-2"></i>Manage Library</a></li>
-                    <li><a class="dropdown-item" href="/links"><i class="fas fa-link me-2"></i>Service Links</a></li>
-                    {% if config.prowlarr.enabled %}<li><a class="dropdown-item" href="/prowlarr"><i class="fas fa-search me-2"></i>Prowlarr Search</a></li>{% endif %}
-                    {% if config.auth.enabled %}
-                    <li><hr class="dropdown-divider"></li>
-                    {% if session.get('authenticated') %}
-                    <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
-                    {% else %}
-                    <li><a class="dropdown-item" href="/login"><i class="fas fa-sign-in-alt me-2"></i>Sign In</a></li>
-                    {% endif %}
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </div>
+    {% include 'partials/navbar.html' %}
 
     <div class="container mt-4">
-        <!-- Header -->
+        <!-- Toolbar -->
         <div class="d-flex align-items-center justify-content-between mb-3">
             <div class="d-flex align-items-center gap-2">
                 <i class="fas fa-download fa-lg text-primary me-1"></i>
                 <h4 class="mb-0">Downloads</h4>
                 <span id="torrentCount" class="badge bg-secondary ms-1"></span>
             </div>
-            <button class="btn btn-sm btn-outline-secondary" id="refreshBtn" title="Refresh">
-                <i class="fas fa-sync-alt"></i>
-            </button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" id="collapseAllBtn" title="Collapse all groups">
+                    <i class="fas fa-compress-alt me-1"></i><span class="d-none d-sm-inline">Collapse All</span>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="expandAllBtn" title="Expand all groups">
+                    <i class="fas fa-expand-alt me-1"></i><span class="d-none d-sm-inline">Expand All</span>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="refreshBtn" title="Refresh">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
         </div>
 
-        <!-- Filter tabs -->
-        <div class="d-flex gap-2 mb-3 flex-wrap" id="filterTabs">
-            <button class="btn btn-sm btn-outline-secondary active" data-filter="all">All</button>
-            <button class="btn btn-sm btn-outline-secondary" data-filter="downloading">Downloading</button>
-            <button class="btn btn-sm btn-outline-secondary" data-filter="seeding">Seeding</button>
-            <button class="btn btn-sm btn-outline-secondary" data-filter="paused">Paused</button>
-        </div>
+        <!-- Torrent groups -->
+        <div id="torrentGroups"></div>
 
-        <!-- Torrent list -->
-        <div id="torrentList"></div>
-
-        <!-- Empty / loading states -->
+        <!-- States -->
         <div id="loadingState" class="text-center text-muted py-5">
             <div class="spinner-border text-secondary mb-2" role="status"></div>
             <p>Loading downloads…</p>
@@ -115,42 +133,43 @@
         <div id="errorState" class="alert alert-danger" style="display:none;"></div>
     </div>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
     let allTorrents = [];
-    let activeFilter = 'all';
 
-    // ---- Helpers ----
-    function formatBytes(bytes) {
-        if (!bytes || bytes === 0) return '—';
-        const gb = bytes / (1024 ** 3);
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function esc(str) {
+        return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatBytes(b) {
+        if (!b || b === 0) return '—';
+        const gb = b / 1073741824;
         if (gb >= 1) return gb.toFixed(2) + ' GB';
-        const mb = bytes / (1024 ** 2);
+        const mb = b / 1048576;
         if (mb >= 1) return mb.toFixed(1) + ' MB';
-        return Math.round(bytes / 1024) + ' KB';
+        return Math.round(b / 1024) + ' KB';
     }
 
     function formatSpeed(bps) {
         if (!bps || bps === 0) return '0 KB/s';
-        const mbs = bps / (1024 ** 2);
+        const mbs = bps / 1048576;
         if (mbs >= 1) return mbs.toFixed(1) + ' MB/s';
         return Math.round(bps / 1024) + ' KB/s';
     }
 
     function formatEta(secs) {
-        if (!secs || secs < 0 || secs === 8640000) return '∞';
+        if (!secs || secs < 0 || secs >= 8640000) return '∞';
         if (secs < 60) return `${secs}s`;
         if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
-        const h = Math.floor(secs / 3600);
-        const m = Math.floor((secs % 3600) / 60);
+        const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
         return `${h}h ${m}m`;
     }
 
-    function catClass(category) {
-        if (!category) return 'cat-other';
-        const c = category.toLowerCase();
+    function catClass(cat) {
+        if (!cat) return 'cat-other';
+        const c = cat.toLowerCase();
         if (c === 'radarr') return 'cat-radarr';
         if (c === 'tv-sonarr' || c === 'sonarr') return 'cat-sonarr';
         if (c === 'readarr') return 'cat-readarr';
@@ -158,113 +177,311 @@
         return 'cat-other';
     }
 
+    // Full qBittorrent state lookup — maps every API state to a display group + tag
+    const STATE_MAP = {
+        // ── Downloading ──────────────────────────────────────────────────────
+        'downloading':        { label: 'Downloading', cls: 'state-downloading', fillCls: 'fill-downloading', group: 'downloading', tag: null },
+        'stalleddl':          { label: 'Downloading', cls: 'state-downloading', fillCls: 'fill-downloading', group: 'downloading', tag: 'stalled' },
+        'metadl':             { label: 'Downloading', cls: 'state-downloading', fillCls: 'fill-downloading', group: 'downloading', tag: 'metadata' },
+        'forceddl':           { label: 'Downloading', cls: 'state-downloading', fillCls: 'fill-downloading', group: 'downloading', tag: 'forced' },
+        'checkingdl':         { label: 'Downloading', cls: 'state-downloading', fillCls: 'fill-downloading', group: 'downloading', tag: 'checking' },
+        'allocating':         { label: 'Downloading', cls: 'state-downloading', fillCls: 'fill-downloading', group: 'downloading', tag: 'allocating' },
+        // ── Seeding ──────────────────────────────────────────────────────────
+        'uploading':          { label: 'Seeding',     cls: 'state-seeding',    fillCls: 'fill-seeding',    group: 'seeding', tag: null },
+        'seeding':            { label: 'Seeding',     cls: 'state-seeding',    fillCls: 'fill-seeding',    group: 'seeding', tag: null },
+        'stalledup':          { label: 'Seeding',     cls: 'state-seeding',    fillCls: 'fill-seeding',    group: 'seeding', tag: 'stalled' },
+        'forcedup':           { label: 'Seeding',     cls: 'state-seeding',    fillCls: 'fill-seeding',    group: 'seeding', tag: 'forced' },
+        'checkingup':         { label: 'Seeding',     cls: 'state-seeding',    fillCls: 'fill-seeding',    group: 'seeding', tag: 'checking' },
+        // ── Paused ───────────────────────────────────────────────────────────
+        'pauseddl':           { label: 'Paused',      cls: 'state-paused',     fillCls: 'fill-paused',     group: 'paused', tag: null },
+        'pausedup':           { label: 'Paused',      cls: 'state-paused',     fillCls: 'fill-paused',     group: 'paused', tag: null },
+        'queueddl':           { label: 'Queued',      cls: 'state-paused',     fillCls: 'fill-paused',     group: 'paused', tag: 'queued' },
+        'queuedup':           { label: 'Queued',      cls: 'state-paused',     fillCls: 'fill-paused',     group: 'paused', tag: 'queued' },
+        'checkingresumedata': { label: 'Checking',    cls: 'state-paused',     fillCls: 'fill-paused',     group: 'paused', tag: 'checking' },
+        // ── Other ────────────────────────────────────────────────────────────
+        'moving':             { label: 'Moving',      cls: 'state-other',      fillCls: 'fill-other',      group: 'other', tag: null },
+        'error':              { label: 'Error',       cls: 'state-error',      fillCls: 'fill-other',      group: 'other', tag: null },
+        'missingfiles':       { label: 'Missing Files', cls: 'state-error',    fillCls: 'fill-other',      group: 'other', tag: null },
+        'unknown':            { label: 'Unknown',     cls: 'state-error',      fillCls: 'fill-other',      group: 'other', tag: null },
+    };
+    const TAG_LABELS = {
+        stalled:    'Stalled — no peers available',
+        forced:     'Forced — bypassing queue limits',
+        metadata:   'Retrieving metadata\u2026',
+        checking:   'Verifying data\u2026',
+        allocating: 'Allocating disk space\u2026',
+        queued:     'Queued',
+    };
+
     function stateInfo(state) {
         const s = (state || '').toLowerCase();
-        if (s.includes('download') && !s.includes('meta') && !s.includes('check')) {
-            return { label: 'Downloading', cls: 'state-downloading', filterKey: 'downloading' };
-        }
-        if (s.includes('seed') || s.includes('upload')) {
-            return { label: 'Seeding', cls: 'state-seeding', filterKey: 'seeding' };
-        }
-        if (s.includes('paus') || s.includes('stop')) {
-            return { label: 'Paused', cls: 'state-paused', filterKey: 'paused' };
-        }
-        if (s.includes('error') || s.includes('miss') || s.includes('unknown')) {
-            return { label: state, cls: 'state-error', filterKey: 'other' };
-        }
-        return { label: state, cls: 'state-other', filterKey: 'other' };
+        return STATE_MAP[s] || { label: state || 'Unknown', cls: 'state-other', fillCls: 'fill-other', group: 'other', tag: null };
     }
 
-    function progressColor(state) {
-        const s = stateInfo(state);
-        if (s.filterKey === 'downloading') return 'bg-success';
-        if (s.filterKey === 'seeding') return 'bg-primary';
-        if (s.filterKey === 'paused') return 'bg-warning';
-        return 'bg-secondary';
+    function buildTagBadge(tag) {
+        if (!tag || !TAG_LABELS[tag]) return '';
+        return `<span class="tag-badge tag-${tag}">${TAG_LABELS[tag]}</span>`;
     }
 
+    // ── Action buttons helpers ────────────────────────────────────────────────
+    function actionBtn(hash, action, icon, label, cls) {
+        return `<button class="btn btn-sm ${cls}" onclick="torrentAction('${esc(hash)}','${action}',this)">
+            <i class="${icon} me-1"></i>${label}
+        </button>`;
+    }
+
+    function buildActions(t) {
+        const s = stateInfo(t.state);
+        const hash = esc(t.hash);
+        const btns = [];
+
+        if (s.group === 'paused' || s.group === 'other') {
+            btns.push(actionBtn(hash, 'resume',        'fas fa-play',       'Start',       'btn-outline-success'));
+            btns.push(actionBtn(hash, 'setForceStart', 'fas fa-forward',    'Force Start', 'btn-outline-warning'));
+        } else {
+            btns.push(actionBtn(hash, 'pause',         'fas fa-pause',      'Pause',       'btn-outline-secondary'));
+        }
+        btns.push(actionBtn(hash, 'delete', 'fas fa-trash', 'Remove', 'btn-outline-danger'));
+        return btns.join('');
+    }
+
+    // ── Build a single torrent card ───────────────────────────────────────────
     function buildCard(t) {
-        const cat = catClass(t.category);
-        const state = stateInfo(t.state);
-        const progress = Math.min(100, Math.round((t.progress || 0) * 100));
-        const ratio = t.ratio !== undefined ? t.ratio.toFixed(2) : '—';
-        const numSeeds = t.num_seeds !== undefined ? t.num_seeds : '—';
-        const numLeech = t.num_leechs !== undefined ? t.num_leechs : '—';
+        const cat     = catClass(t.category);
+        const si      = stateInfo(t.state);
+        const pct     = Math.min(100, Math.round((t.progress || 0) * 100));
+        const ratio   = t.ratio != null ? t.ratio.toFixed(2) : '—';
         const catLabel = t.category || 'uncategorised';
 
         return `
-        <div class="dl-card p-3 ${cat}" data-state="${state.filterKey}">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-                <div class="dl-name flex-grow-1 me-2">${escHtml(t.name || '—')}</div>
-                <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                    <span class="cat-badge ${cat}">${escHtml(catLabel)}</span>
-                    <span class="dl-state ${state.cls}">${escHtml(state.label)}</span>
+        <div class="dl-card ${cat}" data-hash="${esc(t.hash)}" data-group="${si.group}">
+            <div class="dl-header" onclick="toggleCard(this.closest('.dl-card'))">
+                <div class="dl-progress-mini">
+                    <div class="dl-progress-fill ${si.fillCls}" style="width:${pct}%"></div>
                 </div>
+                <span class="dl-pct">${pct}%</span>
+                <span class="dl-name" title="${esc(t.name)}">${esc(t.name || '—')}</span>
+                <span class="dl-state-badge ${si.cls}">${esc(si.label)}</span>
+                <i class="fas fa-chevron-right dl-expand-icon"></i>
             </div>
-
-            <!-- Progress bar -->
-            <div class="progress mb-2">
-                <div class="progress-bar ${progressColor(t.state)}" style="width:${progress}%"></div>
-            </div>
-
-            <!-- Stats row -->
-            <div class="d-flex flex-wrap gap-3 dl-meta">
-                <span title="Downloaded / Total size">
-                    <i class="fas fa-hdd me-1"></i>${formatBytes(t.downloaded)} / ${formatBytes(t.size)}
-                    <span class="ms-1 text-light">(${progress}%)</span>
-                </span>
-                <span title="Download speed" class="dl-speed">
-                    <i class="fas fa-arrow-down dl-arrow me-1"></i>${formatSpeed(t.dlspeed)}
-                </span>
-                <span title="Upload speed" class="dl-speed">
-                    <i class="fas fa-arrow-up ul-arrow me-1"></i>${formatSpeed(t.upspeed)}
-                </span>
-                <span title="Seeds / Peers">
-                    <i class="fas fa-users me-1"></i>${numSeeds}S / ${numLeech}P
-                </span>
-                <span title="Ratio">
-                    <i class="fas fa-exchange-alt me-1"></i>Ratio: ${ratio}
-                </span>
-                ${t.eta !== undefined ? `<span class="eta-text" title="ETA"><i class="fas fa-clock me-1"></i>ETA: ${formatEta(t.eta)}</span>` : ''}
+            <div class="dl-details">
+                <!-- Full progress bar -->
+                <div class="progress progress-full mb-2 mt-1">
+                    <div class="progress-bar ${si.group === 'downloading' ? 'bg-success' : si.group === 'seeding' ? 'bg-primary' : si.group === 'paused' ? 'bg-warning' : 'bg-secondary'}"
+                         style="width:${pct}%"></div>
+                </div>
+                ${si.tag ? `<div class="dl-tag-row mb-1">${buildTagBadge(si.tag)}</div>` : ''}
+                <!-- Stats -->
+                <div class="d-flex flex-wrap gap-3 dl-meta mb-2">
+                    <span title="Category"><span class="cat-badge ${cat}">${esc(catLabel)}</span></span>
+                    <span title="Downloaded / Total"><i class="fas fa-hdd me-1"></i>${formatBytes(t.downloaded)} / ${formatBytes(t.size)}</span>
+                    <span class="dl-speed" title="Down"><i class="fas fa-arrow-down dl-arrow me-1"></i>${formatSpeed(t.dlspeed)}</span>
+                    <span class="dl-speed" title="Up"><i class="fas fa-arrow-up ul-arrow me-1"></i>${formatSpeed(t.upspeed)}</span>
+                    <span title="Seeds/Peers"><i class="fas fa-users me-1"></i>${t.num_seeds ?? '—'}S / ${t.num_leechs ?? '—'}P</span>
+                    <span title="Ratio"><i class="fas fa-exchange-alt me-1"></i>${ratio}</span>
+                    ${t.eta != null ? `<span title="ETA"><i class="fas fa-clock me-1"></i>${formatEta(t.eta)}</span>` : ''}
+                </div>
+                <!-- Actions -->
+                <div class="dl-actions">${buildActions(t)}</div>
             </div>
         </div>`;
     }
 
-    function renderTorrents(filter) {
-        const list = document.getElementById('torrentList');
-        const empty = document.getElementById('emptyState');
-        const filtered = filter === 'all' ? allTorrents : allTorrents.filter(t => stateInfo(t.state).filterKey === filter);
-        document.getElementById('torrentCount').textContent = filtered.length;
+    // ── Group header ─────────────────────────────────────────────────────────
+    const GROUP_ORDER  = ['downloading', 'seeding', 'paused', 'other'];
+    const GROUP_LABELS = { downloading: 'Downloading', seeding: 'Seeding', paused: 'Paused', other: 'Other' };
+    const GROUP_ICONS  = {
+        downloading: 'fas fa-arrow-down text-success',
+        seeding:     'fas fa-arrow-up text-primary',
+        paused:      'fas fa-pause text-warning',
+        other:       'fas fa-question-circle text-secondary'
+    };
 
-        if (filtered.length === 0) {
-            list.innerHTML = '';
+    function buildGroup(group, torrents) {
+        if (!torrents.length) return '';
+        const cards = torrents.map(buildCard).join('');
+        return `
+        <div class="mb-3 dl-group" data-group="${group}">
+            <div class="group-header" onclick="toggleGroup(this)">
+                <i class="${GROUP_ICONS[group]}"></i>
+                <span class="group-title">${GROUP_LABELS[group]}</span>
+                <span class="group-count">${torrents.length}</span>
+                <i class="fas fa-chevron-down group-toggle-icon"></i>
+            </div>
+            <div class="group-body">${cards}</div>
+        </div>`;
+    }
+
+    // ── In-place card update (preserves expanded state) ──────────────────────
+    function updateCard(card, t) {
+        const si  = stateInfo(t.state);
+        const pct = Math.min(100, Math.round((t.progress || 0) * 100));
+        const cat = catClass(t.category);
+        const wasExpanded = card.classList.contains('expanded');
+
+        // Card-level classes
+        card.className = `dl-card ${cat}${wasExpanded ? ' expanded' : ''}`;
+        card.dataset.group = si.group;
+
+        // Mini progress bar
+        const miniFill = card.querySelector('.dl-progress-fill');
+        if (miniFill) { miniFill.className = `dl-progress-fill ${si.fillCls}`; miniFill.style.width = `${pct}%`; }
+
+        // Percentage
+        const pctEl = card.querySelector('.dl-pct');
+        if (pctEl) pctEl.textContent = `${pct}%`;
+
+        // State badge
+        const badge = card.querySelector('.dl-state-badge');
+        if (badge) { badge.className = `dl-state-badge ${si.cls}`; badge.textContent = si.label; }
+
+        // Details panel (always update so values are correct when user expands)
+        const details = card.querySelector('.dl-details');
+        if (!details) return;
+
+        const fullBar = details.querySelector('.progress-bar');
+        if (fullBar) {
+            const barCls = si.group === 'downloading' ? 'bg-success' : si.group === 'seeding' ? 'bg-primary' : si.group === 'paused' ? 'bg-warning' : 'bg-secondary';
+            fullBar.className = `progress-bar ${barCls}`;
+            fullBar.style.width = `${pct}%`;
+        }
+
+        // Tag row (stalled / forced / metadata etc.)
+        const existingTag = details.querySelector('.dl-tag-row');
+        if (si.tag) {
+            const badgeHtml = `<div class="dl-tag-row mb-1">${buildTagBadge(si.tag)}</div>`;
+            if (existingTag) existingTag.outerHTML = badgeHtml;
+            else {
+                const progEl = details.querySelector('.progress');
+                if (progEl) progEl.insertAdjacentHTML('afterend', badgeHtml);
+            }
+        } else if (existingTag) {
+            existingTag.remove();
+        }
+
+        const meta = details.querySelector('.dl-meta');
+        if (meta) {
+            const ratio    = t.ratio != null ? t.ratio.toFixed(2) : '—';
+            const catLabel = t.category || 'uncategorised';
+            meta.innerHTML = `
+                <span title="Category"><span class="cat-badge ${cat}">${esc(catLabel)}</span></span>
+                <span title="Downloaded / Total"><i class="fas fa-hdd me-1"></i>${formatBytes(t.downloaded)} / ${formatBytes(t.size)}</span>
+                <span class="dl-speed" title="Down"><i class="fas fa-arrow-down dl-arrow me-1"></i>${formatSpeed(t.dlspeed)}</span>
+                <span class="dl-speed" title="Up"><i class="fas fa-arrow-up ul-arrow me-1"></i>${formatSpeed(t.upspeed)}</span>
+                <span title="Seeds/Peers"><i class="fas fa-users me-1"></i>${t.num_seeds ?? '—'}S / ${t.num_leechs ?? '—'}P</span>
+                <span title="Ratio"><i class="fas fa-exchange-alt me-1"></i>${ratio}</span>
+                ${t.eta != null ? `<span title="ETA"><i class="fas fa-clock me-1"></i>${formatEta(t.eta)}</span>` : ''}`;
+        }
+
+        const actionsEl = details.querySelector('.dl-actions');
+        if (actionsEl) actionsEl.innerHTML = buildActions(t);
+    }
+
+    // ── Incremental render (preserves group collapsed state + card expanded state)
+    function renderAll() {
+        const container = document.getElementById('torrentGroups');
+        const empty     = document.getElementById('emptyState');
+
+        if (!allTorrents.length) {
+            container.innerHTML = '';
             empty.style.display = 'block';
+            document.getElementById('torrentCount').textContent = '0';
             return;
         }
         empty.style.display = 'none';
-        list.innerHTML = filtered.map(buildCard).join('');
+        document.getElementById('torrentCount').textContent = allTorrents.length;
+
+        // Bucket incoming torrents by group
+        const buckets = { downloading: [], seeding: [], paused: [], other: [] };
+        allTorrents.forEach(t => { (buckets[stateInfo(t.state).group] || buckets.other).push(t); });
+
+        GROUP_ORDER.forEach(group => {
+            const torrentsInGroup = buckets[group];
+            let groupEl = container.querySelector(`.dl-group[data-group="${group}"]`);
+
+            if (!torrentsInGroup.length) {
+                if (groupEl) groupEl.remove();
+                return;
+            }
+
+            if (!groupEl) {
+                // New group — insert in correct ORDER position
+                container.insertAdjacentHTML('beforeend', buildGroup(group, torrentsInGroup));
+                return;
+            }
+
+            // Update group count badge
+            const countEl = groupEl.querySelector('.group-count');
+            if (countEl) countEl.textContent = torrentsInGroup.length;
+
+            const body = groupEl.querySelector('.group-body');
+            if (!body) return;
+
+            // Index existing cards by hash
+            const existingCards = {};
+            body.querySelectorAll('.dl-card[data-hash]').forEach(c => { existingCards[c.dataset.hash] = c; });
+
+            const newHashSet = new Set(torrentsInGroup.map(t => t.hash));
+
+            // Update or insert cards
+            torrentsInGroup.forEach(t => {
+                if (existingCards[t.hash]) {
+                    updateCard(existingCards[t.hash], t);
+                } else {
+                    body.insertAdjacentHTML('beforeend', buildCard(t));
+                }
+            });
+
+            // Remove cards that left this group (moved state or deleted)
+            Object.entries(existingCards).forEach(([hash, card]) => {
+                if (!newHashSet.has(hash)) card.remove();
+            });
+        });
     }
 
-    function loadTorrents() {
-        const loading = document.getElementById('loadingState');
+    // ── Toggle helpers ────────────────────────────────────────────────────────
+    function toggleCard(card) {
+        card.classList.toggle('expanded');
+    }
+
+    function toggleGroup(header) {
+        const body = header.nextElementSibling;
+        body.classList.toggle('collapsed');
+        header.classList.toggle('collapsed');
+    }
+
+    document.getElementById('collapseAllBtn').addEventListener('click', () => {
+        document.querySelectorAll('.group-body').forEach(b => b.classList.add('collapsed'));
+        document.querySelectorAll('.group-header').forEach(h => h.classList.add('collapsed'));
+    });
+
+    document.getElementById('expandAllBtn').addEventListener('click', () => {
+        document.querySelectorAll('.group-body').forEach(b => b.classList.remove('collapsed'));
+        document.querySelectorAll('.group-header').forEach(h => h.classList.remove('collapsed'));
+        document.querySelectorAll('.dl-card').forEach(c => c.classList.add('expanded'));
+    });
+
+    // ── Load torrents ─────────────────────────────────────────────────────────
+    let firstLoad = true;
+
+    function loadTorrents(showSpinner = false) {
+        const loading  = document.getElementById('loadingState');
         const errState = document.getElementById('errorState');
-        const icon = document.querySelector('#refreshBtn i');
+        const icon     = document.querySelector('#refreshBtn i');
         icon.classList.add('spinning');
-        loading.style.display = 'block';
+        if (showSpinner || firstLoad) loading.style.display = 'block';
         errState.style.display = 'none';
 
         fetch('/api/downloads')
             .then(r => r.json())
             .then(data => {
                 allTorrents = data.torrents || [];
-                // Sort: downloading first, then seeding, then paused, then others
-                const order = { downloading: 0, seeding: 1, paused: 2, other: 3 };
-                allTorrents.sort((a, b) => (order[stateInfo(a.state).filterKey] || 3) - (order[stateInfo(b.state).filterKey] || 3));
-                renderTorrents(activeFilter);
+                renderAll();
+                firstLoad = false;
             })
             .catch(err => {
                 errState.style.display = 'block';
-                errState.textContent = `Failed to load downloads: ${err.message}`;
+                errState.textContent   = `Failed to load downloads: ${err.message}`;
             })
             .finally(() => {
                 loading.style.display = 'none';
@@ -272,24 +489,45 @@
             });
     }
 
-    // Filter tabs
-    document.getElementById('filterTabs').addEventListener('click', function(e) {
-        const btn = e.target.closest('button[data-filter]');
-        if (!btn) return;
-        activeFilter = btn.dataset.filter;
-        document.querySelectorAll('#filterTabs button').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderTorrents(activeFilter);
-    });
+    // ── Torrent actions ───────────────────────────────────────────────────────
+    function torrentAction(hash, action, btn) {
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-    document.getElementById('refreshBtn').addEventListener('click', loadTorrents);
+        if (action === 'delete') {
+            if (!confirm('Remove this torrent? (files will be kept)')) {
+                btn.disabled = false;
+                btn.innerHTML = orig;
+                return;
+            }
+        }
 
-    function escHtml(str) {
-        if (!str) return '';
-        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        fetch('/api/torrents/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, hashes: hash })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                setTimeout(loadTorrents, 800); // brief delay for qBit to process
+            } else {
+                alert(`Action failed: ${data.message || 'unknown error'}`);
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            }
+        })
+        .catch(err => {
+            alert(`Request failed: ${err.message}`);
+            btn.disabled = false;
+            btn.innerHTML = orig;
+        });
     }
 
-    // Auto-refresh every 10s
+    document.getElementById('refreshBtn').addEventListener('click', () => loadTorrents(true));
+
+    // Auto-refresh every 10s (no spinner — updates in-place)
     loadTorrents();
     setInterval(loadTorrents, 10000);
     </script>

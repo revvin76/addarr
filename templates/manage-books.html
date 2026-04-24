@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Books - Addarr</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/styles.css" rel="stylesheet">
+    <link href="/static/css/manage-page.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a1a" />
+    <style>
+        .book-card {
+            background: #2a2a2a;
+            border-radius: 10px;
+            border-left: 4px solid #c0392b;
+            transition: box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .book-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+        .book-thumb { width: 70px; height: 100px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+        .book-thumb-placeholder { width: 70px; height: 100px; background: #333; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .book-title { font-size: 0.95rem; font-weight: 600; color: #fff; }
+        .book-author { font-size: 0.78rem; color: #c0392b; }
+        .book-meta  { font-size: 0.72rem; color: #aaa; }
+        .book-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    </style>
+</head>
+{% set current_page = 'manage-books' %}
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fas fa-book fa-lg" style="color:#c0392b;"></i>
+                <h4 class="mb-0" style="color:#c0392b;">Manage Books</h4>
+                <span class="badge bg-secondary ms-1" title="Downloaded books">{{ total_downloaded }}</span>
+            </div>
+            <span class="text-muted small">{{ total_downloaded }} of {{ total_in_library }} in library downloaded</span>
+        </div>
+
+        <!-- Search -->
+        <div class="input-group mb-3">
+            <input type="text" id="bookSearch" class="form-control bg-dark text-light border-secondary"
+                   placeholder="Search books..." autocomplete="off">
+            <button class="btn btn-outline-secondary" id="clearBookSearch" disabled>
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Book grid -->
+        {% if books %}
+        <div id="booksGrid">
+            {% for book in books %}
+            {% set poster_url = '' %}
+            {% for img in book.images %}
+                {% if img.coverType in ['poster', 'cover'] and poster_url == '' %}
+                    {% set poster_url = img.remoteUrl or img.url %}
+                {% endif %}
+            {% endfor %}
+            {% set author_name = book.author.authorName if book.author else 'Unknown Author' %}
+            {% set file_count = book.statistics.bookFileCount if book.statistics else 0 %}
+            {% set size_mb = (book.statistics.sizeOnDisk / 1048576) | round(1) if book.statistics and book.statistics.sizeOnDisk else 0 %}
+
+            <div class="book-card p-3 mb-2 d-flex gap-3 book-item"
+                 data-title="{{ book.title|lower }}"
+                 data-foreign-id="{{ book.foreignBookId }}"
+                 onclick="openBookDetails('{{ book.foreignBookId }}', {{ book.id }}, this)">
+
+                {% if poster_url %}
+                <img src="{{ poster_url }}" class="book-thumb" alt="{{ book.title }}"
+                     onerror="this.onerror=null;this.src='/static/images/apple-touch-icon.png'">
+                {% else %}
+                <div class="book-thumb-placeholder"><i class="fas fa-book text-muted fa-2x"></i></div>
+                {% endif %}
+
+                <div class="flex-grow-1" style="min-width:0;">
+                    <div class="book-title text-truncate">{{ book.title }}</div>
+                    <div class="book-author">{{ author_name }}</div>
+                    <div class="book-meta mt-1">
+                        {{ book.releaseDate[:4] if book.releaseDate else 'N/A' }}
+                        {% if book.pageCount %} · {{ book.pageCount }} pages{% endif %}
+                        {% if size_mb %} · {{ size_mb }} MB{% endif %}
+                        {% if file_count %} · {{ file_count }} file{{ 's' if file_count != 1 else '' }}{% endif %}
+                    </div>
+                    <div class="book-actions" onclick="event.stopPropagation()">
+                        {% if file_count %}
+                        <a href="/read/{{ book.id }}" target="_blank" class="btn btn-sm btn-outline-success">
+                            <i class="fas fa-book-open me-1"></i>Read
+                        </a>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline-danger"
+                                onclick="deleteBook('{{ book.foreignBookId }}', {{ book.id }}, this)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-secondary text-center">
+            <i class="fas fa-book-open fa-2x mb-2 d-block"></i>
+            No downloaded books found. Books appear here once they have been downloaded.
+        </div>
+        {% endif %}
+
+        <div id="emptySearch" class="alert alert-secondary text-center" style="display:none;">
+            No books match your search.
+        </div>
+    </div>
+
+    <!-- Details Modal (reuses shared renderBookDetails from main.js) -->
+    <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-modal="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="detailsModalLabel">Book Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="detailsContent">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="overlay-backdrop" class="overlay-backdrop"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    <script>
+    // ── Search / filter ──────────────────────────────────────────────────────
+    const searchInput = document.getElementById('bookSearch');
+    const clearBtn    = document.getElementById('clearBookSearch');
+    const emptyMsg    = document.getElementById('emptySearch');
+
+    searchInput.addEventListener('input', function() {
+        const term = this.value.trim().toLowerCase();
+        clearBtn.disabled = !term;
+        let anyVisible = false;
+        document.querySelectorAll('.book-item').forEach(item => {
+            const match = !term || item.dataset.title.includes(term);
+            item.style.display = match ? '' : 'none';
+            if (match) anyVisible = true;
+        });
+        emptyMsg.style.display = anyVisible ? 'none' : 'block';
+    });
+
+    clearBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        this.disabled = true;
+        document.querySelectorAll('.book-item').forEach(i => i.style.display = '');
+        emptyMsg.style.display = 'none';
+    });
+
+    // ── Client-side book data cache ──────────────────────────────────────────
+    // Map<foreignBookId, bookData> — populated on first load and after each
+    // detail fetch so repeat clicks never hit the server again.
+    const bookDataCache = new Map();
+
+    // ── Card patch helper ────────────────────────────────────────────────────
+    // Handles two response shapes:
+    //   • Batch cache endpoint: { authorName, posterUrl, title, overview }
+    //   • Details endpoint data object: { author: { authorName }, images: [...], remotePoster }
+    function patchBookCard(foreignBookId, bookData) {
+        const card = document.querySelector(`.book-item[data-foreign-id="${foreignBookId}"]`);
+        if (!card || !bookData) return;
+
+        // Author — flat shape first, then nested
+        const authorName = bookData.authorName || bookData.author?.authorName;
+        if (authorName) {
+            const authorEl = card.querySelector('.book-author');
+            if (authorEl && (!authorEl.textContent.trim() || authorEl.textContent.trim() === 'Unknown Author')) {
+                authorEl.textContent = authorName;
+            }
+        }
+
+        // Poster — flat shape first, then images array, then remotePoster
+        const posterUrl = bookData.posterUrl
+            || (bookData.images || []).find(i => i.coverType === 'poster' || i.coverType === 'cover')?.remoteUrl
+            || bookData.remotePoster;
+        if (posterUrl) {
+            const placeholder = card.querySelector('.book-thumb-placeholder');
+            if (placeholder) {
+                const img = document.createElement('img');
+                img.src = posterUrl;
+                img.className = 'book-thumb';
+                img.alt = bookData.title || '';
+                img.onerror = function() { this.onerror = null; this.src = '/static/images/apple-touch-icon.png'; };
+                placeholder.replaceWith(img);
+            } else {
+                const existingImg = card.querySelector('.book-thumb');
+                if (existingImg && (!existingImg.complete || existingImg.naturalHeight === 0)) {
+                    existingImg.src = posterUrl;
+                }
+            }
+        }
+    }
+
+    // ── First-load cache population ──────────────────────────────────────────
+    // Collect all foreignBookIds, ask the server for whatever it has in the
+    // local metadata cache (fast disk reads — no Readarr/Apify HTTP calls),
+    // then patch every card that was missing author or thumbnail.
+    document.addEventListener('DOMContentLoaded', function() {
+        const ids = [...document.querySelectorAll('.book-item[data-foreign-id]')]
+            .map(el => el.dataset.foreignId).filter(Boolean);
+        if (!ids.length) return;
+
+        fetch('/api/book/metadata-cache?ids=' + ids.join(','))
+            .then(r => r.json())
+            .then(data => {
+                Object.entries(data).forEach(([fid, bookData]) => {
+                    bookDataCache.set(fid, bookData);
+                    patchBookCard(fid, bookData);
+                });
+            })
+            .catch(() => {});
+    });
+
+    // ── Click handler ────────────────────────────────────────────────────────
+    function openBookDetails(foreignBookId, internalId) {
+        // Always open the modal (main.js fetches + renders detail view)
+        showManageDetails('book', foreignBookId, internalId);
+
+        // If we already have this book's data, patch the card immediately
+        const cached = bookDataCache.get(foreignBookId);
+        if (cached) {
+            patchBookCard(foreignBookId, cached);
+            return;
+        }
+
+        // Not in cache — fetch enriched data, store in cache, then patch
+        fetch(`/get_media_details?type=book&id=${foreignBookId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.data) {
+                    bookDataCache.set(foreignBookId, data.data);
+                    patchBookCard(foreignBookId, data.data);
+                }
+            })
+            .catch(() => {});
+    }
+
+    function deleteBook(foreignBookId, internalId, btn) {
+        if (!confirm('Remove this book from your library? (files will NOT be deleted)')) return;
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        fetch(`/api/book/${internalId}`, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    bookDataCache.delete(foreignBookId);
+                    btn.closest('.book-item').remove();
+                } else {
+                    alert('Failed: ' + (data.message || 'unknown error'));
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }
+            })
+            .catch(err => {
+                alert('Error: ' + err.message);
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            });
+    }
+    </script>
+</body>
+</html>

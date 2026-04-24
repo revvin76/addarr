@@ -1,10 +1,48 @@
 # utils.py
 import requests
 import os
+import json
 import logging
 from datetime import datetime
 import time
 from packaging import version
+
+# ── Metadata cache ────────────────────────────────────────────────────────────
+_APP_DIR      = os.path.dirname(os.path.abspath(__file__))
+METADATA_DIR  = os.path.join(_APP_DIR, 'metadata')
+
+def _ensure_metadata_dir():
+    os.makedirs(METADATA_DIR, exist_ok=True)
+
+def save_book_metadata(book_data):
+    """Persist a normalised book dict to the local metadata cache.
+    Key is foreignBookId (string). Silently ignores errors.
+    """
+    try:
+        fid = str(book_data.get('foreignBookId', '')).strip()
+        if not fid:
+            return
+        _ensure_metadata_dir()
+        path = os.path.join(METADATA_DIR, f'book_{fid}.json')
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(book_data, f, ensure_ascii=False, indent=2)
+        logging.debug(f"[cache] saved metadata for book {fid}")
+    except Exception as e:
+        logging.warning(f"[cache] save_book_metadata error: {e}")
+
+def load_book_metadata(foreign_book_id):
+    """Load a cached book dict for foreign_book_id, or return None."""
+    try:
+        path = os.path.join(METADATA_DIR, f'book_{foreign_book_id}.json')
+        if not os.path.isfile(path):
+            return None
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        logging.debug(f"[cache] loaded metadata for book {foreign_book_id}")
+        return data
+    except Exception as e:
+        logging.warning(f"[cache] load_book_metadata error: {e}")
+        return None
 
 class SharedUtils:
     def __init__(self, config_manager):
@@ -256,6 +294,116 @@ class SharedUtils:
         
         return result
 
+    # ============ APIFY / GOODREADS METHODS ============
+
+    def search_goodreads_apify(self, query, max_items=12):
+        """Search Goodreads via Apify actor and normalise results to Addarr book format.
+
+        Uses the run-sync-get-dataset-items endpoint so the call blocks until
+        the actor run completes and returns all scraped items in one response.
+
+        Actor default: petr_cermak~goodreads-books
+        Override via APIFY_ACTOR env var if you prefer a different actor.
+        """
+        import re
+        token = self.config.apify.token
+        if not token:
+            logging.warning("[Apify] APIFY_TOKEN not configured — skipping Goodreads search")
+            return []
+        try:
+            actor_id = self.config.apify.actor or 'petr_cermak~goodreads-books'
+            url = f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
+            payload = {
+                'search': query,
+                'maxItems': max_items,
+                'maxResults': max_items,   # some actors use this name
+            }
+            logging.info(f"[Apify] Goodreads search actor={actor_id!r} q={query!r}")
+            response = requests.post(
+                url,
+                params={'token': token},
+                json=payload,
+                timeout=90,   # actor runs can take a while
+            )
+            if response.status_code not in (200, 201):
+                logging.error(f"[Apify] HTTP {response.status_code}: {response.text[:400]}")
+                return []
+            items = response.json()
+            if not isinstance(items, list):
+                logging.error(f"[Apify] unexpected response type: {type(items).__name__} — {str(items)[:300]}")
+                return []
+            logging.info(f"[Apify] {len(items)} raw results for q={query!r}")
+
+            results = []
+            for item in items:
+                # ── Goodreads book ID ──────────────────────────────────────────
+                book_url = item.get('url') or item.get('bookUrl') or ''
+                gid_match = re.search(r'/show/(\d+)', book_url)
+                foreign_id = (
+                    gid_match.group(1) if gid_match
+                    else str(item.get('goodreadsId') or item.get('bookId') or item.get('id') or '')
+                )
+
+                # ── Author ─────────────────────────────────────────────────────
+                author_raw = item.get('author') or item.get('authorName') or ''
+                if isinstance(author_raw, list):
+                    author_raw = ', '.join(str(a) for a in author_raw)
+
+                # ── Cover image ────────────────────────────────────────────────
+                cover_url = (
+                    item.get('coverUrl') or item.get('imageUrl') or
+                    item.get('thumbnailUrl') or item.get('image') or ''
+                )
+                images = (
+                    [{'coverType': 'poster', 'remoteUrl': cover_url, 'url': cover_url}]
+                    if cover_url else []
+                )
+
+                # ── Publication year ───────────────────────────────────────────
+                pub_date = (
+                    item.get('publishDate') or item.get('publicationDate') or
+                    item.get('firstPublishDate') or item.get('published') or ''
+                )
+                year = ''
+                if pub_date:
+                    yr_match = re.search(r'(\d{4})', str(pub_date))
+                    year = yr_match.group(1) if yr_match else ''
+
+                # ── Page count ─────────────────────────────────────────────────
+                pages = item.get('numberOfPages') or item.get('pageCount') or item.get('pages') or 0
+                try:
+                    pages = int(pages)
+                except (ValueError, TypeError):
+                    pages = 0
+
+                book_entry = {
+                    'title': item.get('title', ''),
+                    'overview': item.get('description') or item.get('overview') or '',
+                    'foreignBookId': foreign_id,
+                    'author': {
+                        'authorName': author_raw,
+                        'foreignAuthorId': None,
+                        'overview': '',
+                        'images': [],
+                    },
+                    'releaseDate': str(pub_date) if pub_date else '',
+                    'pageCount': pages,
+                    'images': images,
+                    'remotePoster': cover_url,
+                    'year': year,
+                    'ratings': {'value': item.get('rating') or item.get('ratingScore') or 0},
+                    'media_type': 'book',
+                    '_source': 'apify',
+                }
+                results.append(book_entry)
+                # Persist to local cache so details lookups are free
+                save_book_metadata(book_entry)
+            return results
+
+        except Exception as e:
+            logging.error(f"[Apify] Goodreads search error: {e}", exc_info=True)
+            return []
+
     # ============ READARR METHODS ============
 
     def search_readarr(self, query):
@@ -282,28 +430,41 @@ class SharedUtils:
             return []
 
     def add_to_readarr(self, foreign_book_id):
-        """Add a book to Readarr by looking up the author then adding via author endpoint"""
+        """Add a book to Readarr by looking up the author then adding via author endpoint.
+        Returns (success: bool, message: str).
+        """
         logging.info(f"[Readarr] adding book foreignBookId={foreign_book_id}")
         try:
-            # Look up the book to get author data
+            # Step 1: look up book by Goodreads ID
             lookup_url = f"{self.config.readarr.url}/api/v1/book/lookup"
             params = {'term': f'goodreads:{foreign_book_id}', 'apikey': self.config.readarr.api_key}
-            lookup_res = requests.get(lookup_url, params=params, timeout=10)
+            lookup_res = requests.get(lookup_url, params=params, timeout=15)
 
             if lookup_res.status_code != 200:
-                return False
+                msg = f"Readarr lookup HTTP {lookup_res.status_code}: {lookup_res.text[:200]}"
+                logging.error(f"[Readarr] {msg}")
+                return False, msg
 
             results = lookup_res.json()
-            if not results:
-                return False
+            if not isinstance(results, list) or not results:
+                msg = "Readarr lookup returned no results for this book ID"
+                logging.error(f"[Readarr] {msg}")
+                return False, msg
 
             book_data = results[0]
-            author_data = book_data.get('author', {})
+            author_data = book_data.get('author') or {}
 
             if not author_data:
-                return False
+                msg = f"Book found but author data is missing (foreignBookId={foreign_book_id})"
+                logging.error(f"[Readarr] {msg}")
+                return False, msg
 
-            # Add author with specific book monitored
+            if not author_data.get('foreignAuthorId'):
+                msg = f"Author object missing foreignAuthorId — Readarr metadata may be incomplete"
+                logging.warning(f"[Readarr] {msg}")
+                # Still try — Readarr may accept it
+
+            # Step 2: post author with the specific book monitored
             author_data.update({
                 'monitored': True,
                 'rootFolderPath': self.config.readarr.root_folder,
@@ -322,11 +483,53 @@ class SharedUtils:
                 params={'apikey': self.config.readarr.api_key},
                 timeout=15
             )
-            return response.status_code in [200, 201]
+
+            if response.status_code in (200, 201):
+                logging.info(f"[Readarr] successfully added book {foreign_book_id}")
+                return True, 'Added successfully'
+
+            # 400 often means "author already exists" — try adding the book directly
+            if response.status_code == 400:
+                logging.info(f"[Readarr] author exists (400), attempting to add book directly")
+                # Find the existing author
+                authors_res = requests.get(
+                    f"{self.config.readarr.url}/api/v1/author",
+                    params={'apikey': self.config.readarr.api_key},
+                    timeout=10
+                )
+                if authors_res.status_code == 200:
+                    foreign_author_id = author_data.get('foreignAuthorId')
+                    existing_author = next(
+                        (a for a in authors_res.json()
+                         if str(a.get('foreignAuthorId')) == str(foreign_author_id)),
+                        None
+                    )
+                    if existing_author:
+                        # Patch the book to be monitored
+                        book_post = {
+                            **book_data,
+                            'monitored': True,
+                            'author': existing_author,
+                            'addOptions': {'searchForMissingBooks': True}
+                        }
+                        book_res = requests.post(
+                            f"{self.config.readarr.url}/api/v1/book",
+                            json=book_post,
+                            params={'apikey': self.config.readarr.api_key},
+                            timeout=15
+                        )
+                        if book_res.status_code in (200, 201):
+                            return True, 'Book added to existing author'
+                        logging.error(f"[Readarr] book POST HTTP {book_res.status_code}: {book_res.text[:300]}")
+
+            msg = f"Readarr returned HTTP {response.status_code}: {response.text[:300]}"
+            logging.error(f"[Readarr] {msg}")
+            return False, msg
 
         except Exception as e:
-            logging.error(f"Error adding to Readarr: {str(e)}")
-            return False
+            msg = str(e)
+            logging.error(f"[Readarr] add error: {msg}", exc_info=True)
+            return False, msg
 
     def get_readarr_books(self):
         """Get all books from Readarr library"""
@@ -338,34 +541,199 @@ class SharedUtils:
             logging.info(f"[Readarr] fetching library from {url!r}")
             response = requests.get(url, params={'apikey': self.config.readarr.api_key}, timeout=10)
             books = response.json()
-            # Normalise image field: Readarr uses 'url' not 'remoteUrl'
             for book in books:
-                for img in book.get('images', []):
-                    if 'url' in img and 'remoteUrl' not in img:
-                        img['remoteUrl'] = img['url']
-                    # Normalise coverType: Readarr uses 'cover' instead of 'poster'
-                    if img.get('coverType') == 'cover':
-                        img['coverType'] = 'poster'
+                self._normalise_book_images(book)
+                # Cache-only enrichment (no HTTP calls) — fills author/poster from
+                # any previously cached Apify search results. api_fallback=False
+                # prevents making one Readarr author API call per book in the list.
+                self._enrich_book_from_cache(book, book.get('foreignBookId', ''), api_fallback=False)
             return books
         except Exception as e:
             logging.error(f"Error fetching Readarr books: {str(e)}")
             return []
 
+    def _normalise_book_images(self, book):
+        """Fix up Readarr image fields in-place.
+        - coverType 'cover' → 'poster' (Addarr convention)
+        - remoteUrl missing and url is a relative Readarr path →
+          route through Addarr's /api/readarr/cover proxy so the
+          browser doesn't need direct access to the Readarr host.
+        """
+        for img in book.get('images', []):
+            local = img.get('url', '')
+            if not img.get('remoteUrl') and local:
+                if local.startswith('/'):
+                    img['remoteUrl'] = f"/api/readarr/cover?path={requests.utils.quote(local, safe='/?=&')}"
+                else:
+                    img['remoteUrl'] = local
+            if img.get('coverType') == 'cover':
+                img['coverType'] = 'poster'
+
+    def _fetch_readarr_author(self, author_id):
+        """Fetch full author object from Readarr by internal author ID (integer).
+        Returns the JSON dict on success, None on failure.
+        """
+        try:
+            url = f"{self.config.readarr.url}/api/v1/author/{author_id}"
+            r = requests.get(url, params={'apikey': self.config.readarr.api_key}, timeout=5)
+            if r.status_code == 200:
+                return r.json()
+        except Exception as e:
+            logging.debug(f"[Readarr] author lookup error: {e}")
+        return None
+
+    def _enrich_book_from_cache(self, book, foreign_book_id, api_fallback=True):
+        """Fill in missing author/overview/poster fields on a Readarr book dict.
+
+        Priority:
+          1) already present in the Readarr object
+          2) local Apify metadata cache  (always checked — fast disk read)
+          3) Readarr /api/v1/author/{id} API call  (only when api_fallback=True)
+
+        Pass api_fallback=False when enriching many books in bulk (e.g. the
+        manage-books list) to avoid one HTTP request per book.
+        """
+        author_obj  = book.get('author') or {}
+        if isinstance(author_obj, str):
+            author_obj = {'authorName': author_obj}
+            book['author'] = author_obj
+        author_name = author_obj.get('authorName', '')
+        overview    = book.get('overview', '')
+        poster_ok   = any(
+            img.get('remoteUrl') or img.get('url')
+            for img in book.get('images', [])
+            if img.get('coverType') in ('poster', 'cover')
+        )
+
+        if author_name and overview and poster_ok:
+            return book   # nothing to enrich
+
+        # 1. Local disk cache (fast — no HTTP)
+        cached = load_book_metadata(str(foreign_book_id))
+        if cached:
+            if not author_name:
+                cached_author = cached.get('author') or {}
+                cached_name   = cached_author.get('authorName', '') if isinstance(cached_author, dict) else str(cached_author)
+                if cached_name:
+                    book.setdefault('author', {})['authorName'] = cached_name
+                    author_name = cached_name
+                    logging.debug(f"[cache] enriched authorName for {foreign_book_id} from disk cache")
+            if not overview and cached.get('overview'):
+                book['overview'] = cached['overview']
+                overview = book['overview']
+            if not poster_ok and cached.get('remotePoster'):
+                book.setdefault('images', []).append({
+                    'coverType': 'poster',
+                    'remoteUrl': cached['remotePoster'],
+                    'url': cached['remotePoster'],
+                })
+                book['remotePoster'] = cached['remotePoster']
+                poster_ok = True
+
+        if author_name and overview and poster_ok:
+            return book   # fully enriched from cache — done
+
+        if not api_fallback:
+            return book   # bulk load mode — no HTTP calls allowed
+
+        # 2. Goodreads / Apify fallback (when apify is enabled)
+        apify_on = False
+        try:
+            apify_on = bool(self.config.apify.enabled)
+        except Exception:
+            pass
+
+        if apify_on and (not author_name or not poster_ok):
+            title = book.get('title', '')
+            if title:
+                auth_hint = ''
+                try:
+                    ao = book.get('author') or {}
+                    auth_hint = ao.get('authorName', '') if isinstance(ao, dict) else str(ao)
+                except Exception:
+                    pass
+                query = f"{title} {auth_hint}".strip() if auth_hint else title
+                try:
+                    logging.info(f"[enrich] Apify fallback for book {foreign_book_id}: {query!r}")
+                    results = self.search_goodreads_apify(query, max_items=5)
+                    # Best match: foreignBookId > exact title > first result
+                    matched = None
+                    for r in results:
+                        if str(r.get('foreignBookId')) == str(foreign_book_id):
+                            matched = r; break
+                    if not matched:
+                        tl = title.lower()
+                        matched = next((r for r in results if r.get('title', '').lower() == tl), None)
+                    if not matched and results:
+                        matched = results[0]
+
+                    if matched:
+                        if not author_name:
+                            ma = matched.get('author') or {}
+                            mn = ma.get('authorName', '') if isinstance(ma, dict) else str(ma)
+                            if mn:
+                                book.setdefault('author', {})['authorName'] = mn
+                                author_name = mn
+                        if not poster_ok:
+                            mp = matched.get('remotePoster', '')
+                            if not mp:
+                                for img in matched.get('images', []):
+                                    if img.get('coverType') in ('poster', 'cover'):
+                                        mp = img.get('remoteUrl') or img.get('url', '')
+                                        if mp: break
+                            if mp:
+                                book.setdefault('images', []).append({
+                                    'coverType': 'poster', 'remoteUrl': mp, 'url': mp,
+                                })
+                                book['remotePoster'] = mp
+                                poster_ok = True
+                        # Save under this book's foreignBookId if Apify returned a different one
+                        if str(matched.get('foreignBookId')) != str(foreign_book_id):
+                            patched = dict(matched)
+                            patched['foreignBookId'] = str(foreign_book_id)
+                            save_book_metadata(patched)
+                            logging.debug(f"[cache] saved Apify data for book {foreign_book_id} (title match)")
+                        # (if IDs matched, search_goodreads_apify already saved it)
+                except Exception as e:
+                    logging.warning(f"[enrich] Apify fallback error: {e}")
+
+        # 3. Readarr author API — last resort for missing authorName
+        if not author_name and self.config.readarr.url:
+            author_id = book.get('authorId') or (book.get('author') or {}).get('id')
+            if author_id:
+                author_data = self._fetch_readarr_author(author_id)
+                if author_data and author_data.get('authorName'):
+                    book.setdefault('author', {})['authorName'] = author_data['authorName']
+                    logging.debug(f"[Readarr] enriched authorName for book {foreign_book_id} from author API")
+                    # Persist so the next load finds it in cache
+                    if not cached:
+                        save_book_metadata({
+                            'foreignBookId': str(foreign_book_id),
+                            'title': book.get('title', ''),
+                            'author': {'authorName': author_data['authorName']},
+                            'images': book.get('images', []),
+                            'remotePoster': book.get('remotePoster', ''),
+                            'overview': book.get('overview', ''),
+                        })
+                        logging.debug(f"[cache] auto-saved Readarr author entry for book {foreign_book_id}")
+
+        return book
+
     def get_readarr_details(self, foreign_book_id):
-        """Get details for a specific book from Readarr"""
+        """Get details for a specific book from Readarr, enriched from local cache."""
         try:
             # Check if it's in the library first
             library_url = f"{self.config.readarr.url}/api/v1/book"
-            existing = requests.get(library_url, params={'apikey': self.config.readarr.api_key}, timeout=10).json()
+            lib_response = requests.get(library_url, params={'apikey': self.config.readarr.api_key}, timeout=10)
+            existing = lib_response.json() if lib_response.status_code == 200 else []
+            if not isinstance(existing, list):
+                logging.warning(f"[Readarr] /api/v1/book returned non-list ({type(existing).__name__}): {str(existing)[:200]}")
+                existing = []
 
             for book in existing:
                 if str(book.get('foreignBookId')) == str(foreign_book_id):
-                    # Normalise images
-                    for img in book.get('images', []):
-                        if 'url' in img and 'remoteUrl' not in img:
-                            img['remoteUrl'] = img['url']
-                        if img.get('coverType') == 'cover':
-                            img['coverType'] = 'poster'
+                    self._normalise_book_images(book)
+                    self._enrich_book_from_cache(book, foreign_book_id)
                     return {
                         'status': 'existing',
                         'data': book,
@@ -373,23 +741,35 @@ class SharedUtils:
                         'monitored': book.get('monitored', False)
                     }
 
-            # Not in library — look it up
+            # Not in library — look it up in Readarr
             lookup_url = f"{self.config.readarr.url}/api/v1/book/lookup"
-            lookup = requests.get(lookup_url, params={
+            lookup_resp = requests.get(lookup_url, params={
                 'term': f'goodreads:{foreign_book_id}',
                 'apikey': self.config.readarr.api_key
-            }, timeout=10).json()
+            }, timeout=10)
+            lookup = lookup_resp.json() if lookup_resp.status_code == 200 else []
+            if not isinstance(lookup, list):
+                logging.warning(f"[Readarr] book/lookup returned non-list: {str(lookup)[:200]}")
+                lookup = []
 
             if lookup:
                 book = lookup[0]
-                for img in book.get('images', []):
-                    if 'url' in img and 'remoteUrl' not in img:
-                        img['remoteUrl'] = img['url']
-                    if img.get('coverType') == 'cover':
-                        img['coverType'] = 'poster'
+                self._normalise_book_images(book)
+                self._enrich_book_from_cache(book, foreign_book_id)
                 return {
                     'status': 'not_added',
                     'data': book,
+                    'on_disk': False,
+                    'monitored': False
+                }
+
+            # Readarr has nothing — try the local Apify metadata cache directly
+            cached = load_book_metadata(str(foreign_book_id))
+            if cached:
+                logging.info(f"[cache] using cached metadata for book {foreign_book_id} (not in Readarr)")
+                return {
+                    'status': 'not_added',
+                    'data': cached,
                     'on_disk': False,
                     'monitored': False
                 }
@@ -398,22 +778,61 @@ class SharedUtils:
 
         except Exception as e:
             logging.error(f"Error fetching Readarr details: {str(e)}")
+            # Last-resort fallback: serve from local cache if available
+            cached = load_book_metadata(str(foreign_book_id))
+            if cached:
+                return {'status': 'not_added', 'data': cached, 'on_disk': False, 'monitored': False}
             return {'error': str(e)}
+
+    def get_readarr_book_file_path(self, book_id):
+        """Return the on-disk path for the first EPUB or PDF file for a book.
+        book_id is the Readarr internal integer book ID (not foreignBookId).
+        Returns the path string or None.
+        """
+        try:
+            url = f"{self.config.readarr.url}/api/v1/bookFile"
+            params = {'bookId': book_id, 'apikey': self.config.readarr.api_key}
+            r = requests.get(url, params=params, timeout=10)
+            if r.status_code != 200:
+                logging.error(f"[Readarr] bookFile HTTP {r.status_code}")
+                return None
+            files = r.json()
+            if not isinstance(files, list) or not files:
+                return None
+            # Prefer EPUB, then fall back to first file
+            for book_file in files:
+                path = book_file.get('path', '')
+                if path.lower().endswith('.epub'):
+                    return path
+            for book_file in files:
+                path = book_file.get('path', '')
+                if path.lower().endswith('.pdf'):
+                    return path
+            # Any file
+            return files[0].get('path')
+        except Exception as e:
+            logging.error(f"[Readarr] get_book_file_path error: {str(e)}", exc_info=True)
+            return None
 
     # ============ PROWLARR METHODS ============
 
-    def search_prowlarr(self, query):
-        """Search Prowlarr across all indexers"""
+    def search_prowlarr(self, query, categories=None):
+        """Search Prowlarr across all indexers.
+        categories: optional list of Newznab category IDs, e.g. [2000] for movies.
+        """
         try:
             url = f"{self.config.prowlarr.url}/api/v1/search"
-            params = {
-                'query': query,
-                'type': 'search',
-                'limit': 100,
-                'offset': 0,
-                'apikey': self.config.prowlarr.api_key
-            }
-            logging.info(f"[Prowlarr] searching: term={query!r}")
+            params = [
+                ('query', query),
+                ('type', 'search'),
+                ('limit', 100),
+                ('offset', 0),
+                ('apikey', self.config.prowlarr.api_key),
+            ]
+            if categories:
+                for cat in categories:
+                    params.append(('categories', cat))
+            logging.info(f"[Prowlarr] searching: term={query!r} categories={categories}")
             response = requests.get(url, params=params, timeout=20)
             if response.status_code != 200:
                 logging.error(f"[Prowlarr] search HTTP {response.status_code}: {response.text[:200]}")
@@ -481,6 +900,41 @@ class SharedUtils:
         except Exception as e:
             logging.error(f"[qBit] get torrents error: {str(e)}", exc_info=True)
             return []
+
+    def qbit_action(self, action, hashes):
+        """Perform an action on one or more torrents.
+        action: 'resume' | 'pause' | 'delete' | 'setForceStart'
+        hashes: str or list of torrent hashes
+        """
+        try:
+            sid = self._qbit_login()
+            if isinstance(hashes, list):
+                hash_str = '|'.join(hashes)
+            else:
+                hash_str = hashes
+
+            if action == 'setForceStart':
+                url = f"{self.config.qbit.url}/api/v2/torrents/setForceStart"
+                r = requests.post(url, data={'hashes': hash_str, 'value': 'true'},
+                                  cookies={'SID': sid}, timeout=10)
+            elif action == 'delete':
+                url = f"{self.config.qbit.url}/api/v2/torrents/delete"
+                r = requests.post(url, data={'hashes': hash_str, 'deleteFiles': 'false'},
+                                  cookies={'SID': sid}, timeout=10)
+            else:
+                # 'resume' or 'pause'
+                url = f"{self.config.qbit.url}/api/v2/torrents/{action}"
+                r = requests.post(url, data={'hashes': hash_str},
+                                  cookies={'SID': sid}, timeout=10)
+
+            if r.status_code == 200:
+                return {'success': True}
+            msg = f"qBittorrent returned HTTP {r.status_code}: {r.text[:200]}"
+            logging.error(f"[qBit] action={action} {msg}")
+            return {'success': False, 'message': msg}
+        except Exception as e:
+            logging.error(f"[qBit] action={action} error: {str(e)}", exc_info=True)
+            return {'success': False, 'message': str(e)}
 
     def check_auth(self, username, password):
         """Check authentication"""

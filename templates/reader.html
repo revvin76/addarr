@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>addarr: Reader</title>
+    <link rel="shortcut icon" href="/static/images/favicon.ico">
+    <meta name="theme-color" content="#111">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; width: 100%; background: #111; color: #f0f0f0;
+                     font-family: sans-serif; overflow: hidden; }
+
+        /* ── Toolbar (top) ── */
+        #toolbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 110;
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(17,17,17,0.96); border-bottom: 1px solid #2a2a2a;
+            padding: 8px 12px; height: 44px;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        #toolbar.ui-hidden { opacity: 0; pointer-events: none; transform: translateY(-100%); }
+
+        /* ── Footer (bottom) ── */
+        #footer {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 110;
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            background: rgba(17,17,17,0.96); border-top: 1px solid #2a2a2a;
+            padding: 6px 12px; height: 44px;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        #footer.ui-hidden { opacity: 0; pointer-events: none; transform: translateY(100%); }
+
+        /* ── Shared button style ── */
+        .tb-btn {
+            background: none; border: 1px solid #3a3a3a; color: #ccc; border-radius: 5px;
+            padding: 4px 10px; font-size: 0.78rem; cursor: pointer; white-space: nowrap;
+            flex-shrink: 0; line-height: 1.4;
+        }
+        .tb-btn:hover { background: #2a2a2a; color: #fff; border-color: #555; }
+        .tb-btn.bookmarked { color: #f39c12; border-color: #f39c12; }
+
+        #bookTitle {
+            flex: 1; font-size: 0.82rem; color: #999;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+        }
+        #footerPageInfo { font-size: 0.82rem; color: #bbb; min-width: 100px; text-align: center; }
+
+        /* ── Reader area fills entire viewport ── */
+        #reader { position: fixed; inset: 0; }
+
+        /* ── EPUB tap zones (over the iframe) ── */
+        #prevZone, #centerZone, #nextZone {
+            position: absolute; top: 0; bottom: 0; z-index: 10;
+        }
+        #prevZone   { left: 0;   width: 18%; cursor: pointer;
+                      display: flex; align-items: center; justify-content: flex-start; padding-left: 6px; }
+        #centerZone { left: 18%; width: 64%; cursor: default; }
+        #nextZone   { right: 0;  width: 18%; cursor: pointer;
+                      display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; }
+
+        .nav-arrow {
+            background: rgba(0,0,0,0.4); border-radius: 50%;
+            width: 34px; height: 34px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 1rem;
+            opacity: 0; transition: opacity 0.15s;
+        }
+        #prevZone:hover .nav-arrow, #nextZone:hover .nav-arrow { opacity: 1; }
+
+        /* ── EPUB viewer ── */
+        #epubViewer { width: 100%; height: 100%; background: #fff; display: none; }
+
+        /* ── PDF viewer ── */
+        #pdfViewer {
+            width: 100%; height: 100%; overflow-y: auto; display: none;
+            flex-direction: column; align-items: center;
+            padding: 52px 0; background: #444;
+        }
+        #pdfCanvas { box-shadow: 0 2px 14px rgba(0,0,0,0.6); background: #fff; display: block; }
+        #pdfFooterNav { display: flex; align-items: center; gap: 8px; }
+        #pdfPageInput {
+            width: 44px; text-align: center; background: #222; color: #fff;
+            border: 1px solid #555; border-radius: 4px; font-size: 0.8rem; padding: 2px 4px;
+        }
+
+        /* ── TOC panel ── */
+        #tocOverlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+            z-index: 200; display: none;
+        }
+        #tocOverlay.open { display: block; }
+        #tocPanel {
+            position: fixed; top: 0; left: 0; bottom: 0;
+            width: min(300px, 82vw);
+            background: #181818; border-right: 1px solid #2e2e2e;
+            z-index: 201; display: flex; flex-direction: column; overflow: hidden;
+            transform: translateX(-105%); transition: transform 0.22s ease;
+        }
+        #tocPanel.open { transform: translateX(0); }
+        #tocHeader {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; border-bottom: 1px solid #2e2e2e;
+            font-size: 0.8rem; color: #888; flex-shrink: 0;
+        }
+        #tocClose {
+            background: none; border: none; color: #666; font-size: 1rem;
+            cursor: pointer; padding: 2px 6px; border-radius: 3px;
+        }
+        #tocClose:hover { color: #fff; background: #2a2a2a; }
+        #tocList { overflow-y: auto; flex: 1; }
+        .toc-entry {
+            display: block; padding: 10px 16px; color: #bbb; font-size: 0.8rem;
+            border-bottom: 1px solid #1e1e1e; cursor: pointer;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            transition: background 0.1s;
+        }
+        .toc-entry:hover { background: #242424; color: #fff; }
+        .toc-entry.depth-1 { padding-left: 28px; font-size: 0.76rem; color: #888; }
+        .toc-entry.depth-2 { padding-left: 40px; font-size: 0.73rem; color: #666; }
+
+        /* ── Loading / error ── */
+        #statusMsg {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: #999; z-index: 50;
+        }
+        .spinner {
+            width: 38px; height: 38px; border: 3px solid #333; border-top-color: #6ab759;
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Toast notification ── */
+        #toast {
+            position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%);
+            background: rgba(30,30,30,0.95); color: #ccc; padding: 7px 20px;
+            border-radius: 20px; font-size: 0.78rem; border: 1px solid #444;
+            opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 300;
+            white-space: nowrap;
+        }
+        #toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+<!-- ── Toolbar ── -->
+<div id="toolbar">
+    <button class="tb-btn" onclick="closeReader()">← Back</button>
+    <span id="bookTitle">Loading…</span>
+    {% if file_type == 'epub' %}
+    <button class="tb-btn" id="bookmarkBtn" onclick="toggleBookmark()" title="Bookmark this page">🔖</button>
+    <button class="tb-btn" id="tocBtn"      onclick="toggleToc()"    title="Table of contents">☰ Contents</button>
+    {% endif %}
+</div>
+
+<!-- ── Footer ── -->
+<div id="footer">
+    {% if file_type == 'epub' %}
+    <button class="tb-btn" style="border:none; font-size:1.1rem; padding:2px 8px;" onclick="epubPrev()">‹</button>
+    <span id="footerPageInfo">—</span>
+    <button class="tb-btn" style="border:none; font-size:1.1rem; padding:2px 8px;" onclick="epubNext()">›</button>
+    {% else %}
+    <div id="pdfFooterNav">
+        <button class="tb-btn" style="border:none; font-size:1.1rem; padding:2px 8px;" onclick="pdfGo(-1)">‹</button>
+        <input id="pdfPageInput" type="number" min="1" value="1" onchange="pdfGoTo(this.value)">
+        <span id="footerPageInfo" style="font-size:0.8rem; color:#888;">/ —</span>
+        <button class="tb-btn" style="border:none; font-size:1.1rem; padding:2px 8px;" onclick="pdfGo(1)">›</button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── TOC (epub only) ── -->
+{% if file_type == 'epub' %}
+<div id="tocOverlay" onclick="closeToc()"></div>
+<div id="tocPanel">
+    <div id="tocHeader">
+        <span>Contents</span>
+        <button id="tocClose" onclick="closeToc()">✕</button>
+    </div>
+    <div id="tocList"></div>
+</div>
+{% endif %}
+
+<!-- ── Reader area ── -->
+<div id="reader">
+    <div id="statusMsg">
+        <div class="spinner"></div>
+        <p>Loading book…</p>
+    </div>
+
+    {% if file_type == 'epub' %}
+    <div id="prevZone"   onclick="epubPrev()"><div class="nav-arrow">‹</div></div>
+    <div id="centerZone" onclick="toggleUI()"></div>
+    <div id="nextZone"   onclick="epubNext()"><div class="nav-arrow">›</div></div>
+    <div id="epubViewer"></div>
+    {% else %}
+    <div id="pdfViewer">
+        <canvas id="pdfCanvas"></canvas>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"></div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     EPUB
+════════════════════════════════════════════════════════════ -->
+{% if file_type == 'epub' %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+<script>
+const bookId  = {{ book_id }};
+const fileUrl = `/api/book/file/${bookId}`;
+const BM_KEY  = `epub_bm_${bookId}`;   // bookmark CFI in localStorage
+const LOC_KEY = `epub_loc_${bookId}`;  // generated locations in sessionStorage
+
+let book, rendition;
+let uiVisible      = true;
+let locationsReady = false;
+let totalLocs      = 0;
+let bookmarkCfi    = localStorage.getItem(BM_KEY) || null;
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg, ms = 1800) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// ── UI toggle (centre tap) ────────────────────────────────────────────────
+function toggleUI() {
+    uiVisible = !uiVisible;
+    document.getElementById('toolbar').classList.toggle('ui-hidden', !uiVisible);
+    document.getElementById('footer').classList.toggle('ui-hidden',  !uiVisible);
+}
+function closeReader() { window.close(); }
+
+// ── TOC ───────────────────────────────────────────────────────────────────
+function toggleToc() {
+    document.getElementById('tocPanel').classList.toggle('open');
+    document.getElementById('tocOverlay').classList.toggle('open');
+}
+function closeToc() {
+    document.getElementById('tocPanel').classList.remove('open');
+    document.getElementById('tocOverlay').classList.remove('open');
+}
+function buildToc(items, depth = 0) {
+    const list = document.getElementById('tocList');
+    for (const item of items) {
+        const el = document.createElement('div');
+        el.className = 'toc-entry' + (depth ? ` depth-${Math.min(depth, 2)}` : '');
+        el.textContent = item.label;
+        el.onclick = () => { rendition.display(item.href); closeToc(); };
+        list.appendChild(el);
+        if (item.subitems?.length) buildToc(item.subitems, depth + 1);
+    }
+}
+
+// ── Bookmark helpers ──────────────────────────────────────────────────────
+
+// Apply an amber highlight annotation at the given CFI.
+// epub.js keeps annotations per-spine-item; it will automatically show
+// the highlight whenever that page is rendered, and hide it on other pages.
+function applyHighlight(cfi) {
+    if (!cfi || !rendition) return;
+    try {
+        rendition.annotations.highlight(
+            cfi, {}, null, 'bm-hl',
+            { 'fill': '#f39c12', 'fill-opacity': '0.28' }
+        );
+    } catch(e) {}
+}
+
+function removeHighlight(cfi) {
+    if (!cfi || !rendition) return;
+    try { rendition.annotations.remove(cfi, 'highlight'); } catch(e) {}
+}
+
+// Returns true if bookmarkCfi falls within the current page's CFI range.
+// Uses the spine-item prefix (before '!') for a quick equality check, then
+// a simple lexicographic range check within the same spine item — accurate
+// enough for the overwhelming majority of epubs.
+function isBookmarkOnPage(loc) {
+    if (!bookmarkCfi || !loc) return false;
+    const start = loc.start?.cfi;
+    const end   = loc.end?.cfi || start;
+    if (!start) return false;
+    const spineOf = c => { const m = c.match(/epubcfi\(([^!]+)!/); return m ? m[1] : ''; };
+    if (spineOf(bookmarkCfi) !== spineOf(start)) return false;
+    return bookmarkCfi >= start && bookmarkCfi <= end;
+}
+
+// Update button appearance: gold when on the bookmarked page, grey otherwise.
+function updateBookmarkBtn(loc) {
+    const btn = document.getElementById('bookmarkBtn');
+    if (!btn) return;
+    if (bookmarkCfi && isBookmarkOnPage(loc)) {
+        btn.classList.add('bookmarked');
+        btn.title = 'Remove bookmark';
+    } else {
+        btn.classList.remove('bookmarked');
+        btn.title = bookmarkCfi ? 'Move bookmark here' : 'Bookmark this page';
+    }
+}
+
+// Toggle: if currently on the bookmarked page → remove it.
+//         otherwise → remove old highlight and set bookmark at current position.
+function toggleBookmark() {
+    const loc = rendition?.currentLocation?.();
+    const cfi = loc?.start?.cfi;
+    if (!cfi) return;
+
+    if (bookmarkCfi && isBookmarkOnPage(loc)) {
+        // ── Remove ──
+        removeHighlight(bookmarkCfi);
+        localStorage.removeItem(BM_KEY);
+        bookmarkCfi = null;
+        updateBookmarkBtn(loc);
+        showToast('Bookmark removed');
+    } else {
+        // ── Set / move ──
+        if (bookmarkCfi) removeHighlight(bookmarkCfi);
+        bookmarkCfi = cfi;
+        localStorage.setItem(BM_KEY, cfi);
+        applyHighlight(cfi);
+        updateBookmarkBtn(loc);
+        showToast('📖 Bookmark saved — opens here next time');
+    }
+}
+
+// ── Page info footer ──────────────────────────────────────────────────────
+function updateFooter(cfi) {
+    const el = document.getElementById('footerPageInfo');
+    if (locationsReady && totalLocs) {
+        const n = book.locations.locationFromCfi(cfi);
+        el.textContent = `Page ${n} of ${totalLocs}`;
+    } else {
+        const pct = book.locations.percentageFromCfi(cfi);
+        el.textContent = pct ? `${Math.round(pct * 100)}%` : '—';
+    }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+async function initEpub() {
+    try {
+        const resp = await fetch(fileUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status} fetching epub`);
+        const buffer = await resp.arrayBuffer();
+        book = ePub(buffer);
+
+        rendition = book.renderTo('epubViewer', {
+            width: '100%', height: '100%', spread: 'none'
+        });
+
+        // Open at bookmark position (if saved), otherwise start of book
+        await rendition.display(bookmarkCfi || undefined);
+
+        // Title
+        const meta = await book.loaded.metadata;
+        document.getElementById('bookTitle').textContent = meta.title || 'Book';
+        document.title = meta.title || 'Reader';
+
+        // Show viewer
+        document.getElementById('statusMsg').style.display  = 'none';
+        document.getElementById('epubViewer').style.display = 'block';
+
+        // Apply saved bookmark highlight (shows on the bookmarked page automatically)
+        if (bookmarkCfi) applyHighlight(bookmarkCfi);
+
+        // TOC
+        book.loaded.navigation.then(nav => {
+            if (nav?.toc?.length) buildToc(nav.toc);
+            else document.getElementById('tocBtn').style.display = 'none';
+        });
+
+        // Track location changes: update footer + bookmark button state
+        rendition.on('relocated', location => {
+            updateFooter(location.start.cfi);
+            updateBookmarkBtn(location);   // highlight appears/disappears automatically;
+                                            // button turns gold only on the bookmarked page
+        });
+
+        // Initial button state
+        updateBookmarkBtn(rendition.currentLocation());
+
+        // Generate / restore locations for "Page N of N"
+        book.ready.then(async () => {
+            const locCached = sessionStorage.getItem(LOC_KEY);
+            if (locCached) {
+                try {
+                    book.locations.load(locCached);
+                    totalLocs = book.locations.total;
+                    locationsReady = true;
+                    const l = rendition.currentLocation();
+                    if (l) updateFooter(l.start.cfi);
+                    return;
+                } catch(e) { /* stale cache — regenerate */ }
+            }
+            await book.locations.generate(1600);
+            totalLocs = book.locations.total;
+            locationsReady = true;
+            try { sessionStorage.setItem(LOC_KEY, book.locations.save()); } catch(e) {}
+            const l = rendition.currentLocation();
+            if (l) updateFooter(l.start.cfi);
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') epubNext();
+            if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   epubPrev();
+        });
+
+        // Swipe
+        let tx = 0;
+        document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+        document.addEventListener('touchend',   e => {
+            const dx = e.changedTouches[0].clientX - tx;
+            if (Math.abs(dx) > 50) { dx < 0 ? epubNext() : epubPrev(); }
+        });
+
+    } catch (err) {
+        document.getElementById('statusMsg').innerHTML =
+            `<p style="color:#e74c3c;padding:0 20px">Failed to load book:<br><small>${err.message}</small></p>`;
+        console.error(err);
+    }
+}
+
+function epubNext() { if (rendition) rendition.next(); }
+function epubPrev() { if (rendition) rendition.prev(); }
+
+initEpub();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     PDF
+════════════════════════════════════════════════════════════ -->
+{% else %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+const bookId  = {{ book_id }};
+const fileUrl = `/api/book/file/${bookId}`;
+const BM_KEY  = `pdf_bm_${bookId}`;
+
+let pdfDoc = null, currentPage = 1, rendering = false, pendingPage = null;
+let uiVisible = true;
+const canvas = document.getElementById('pdfCanvas');
+const ctx    = canvas.getContext('2d');
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+function toggleUI() {
+    uiVisible = !uiVisible;
+    document.getElementById('toolbar').classList.toggle('ui-hidden', !uiVisible);
+    document.getElementById('footer').classList.toggle('ui-hidden',  !uiVisible);
+}
+function closeReader() { window.close(); }
+
+async function initPdf() {
+    try {
+        pdfDoc = await pdfjsLib.getDocument(fileUrl).promise;
+        document.getElementById('bookTitle').textContent = 'PDF Book';
+        document.title = 'PDF Reader';
+        document.getElementById('footerPageInfo').textContent = `/ ${pdfDoc.numPages}`;
+        document.getElementById('statusMsg').style.display = 'none';
+        document.getElementById('pdfViewer').style.display = 'flex';
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') pdfGo(1);
+            if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   pdfGo(-1);
+        });
+
+        // Tap centre of screen to toggle UI
+        canvas.addEventListener('click', e => {
+            const cx = e.clientX / window.innerWidth;
+            if (cx > 0.18 && cx < 0.82) toggleUI();
+        });
+
+        let tx = 0;
+        document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+        document.addEventListener('touchend',   e => {
+            const dx = e.changedTouches[0].clientX - tx;
+            if (Math.abs(dx) > 50) pdfGo(dx < 0 ? 1 : -1);
+        });
+
+        // Restore bookmark
+        const saved = parseInt(localStorage.getItem(BM_KEY) || '1', 10);
+        renderPage(Math.min(Math.max(1, saved), pdfDoc.numPages));
+
+    } catch(err) {
+        document.getElementById('statusMsg').innerHTML =
+            `<p style="color:#e74c3c;padding:0 20px">Failed to load PDF:<br><small>${err.message}</small></p>`;
+        console.error(err);
+    }
+}
+
+async function renderPage(num) {
+    if (rendering) { pendingPage = num; return; }
+    rendering = true;
+    const page = await pdfDoc.getPage(num);
+    const scale = Math.min(window.innerWidth - 24, 900) / page.getViewport({ scale: 1 }).width;
+    const vp    = page.getViewport({ scale });
+    canvas.width = vp.width; canvas.height = vp.height;
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    currentPage = num;
+    document.getElementById('pdfPageInput').value = num;
+    document.getElementById('footerPageInfo').textContent = `/ ${pdfDoc.numPages}`;
+    // Auto-bookmark every page turn
+    localStorage.setItem(BM_KEY, String(num));
+    rendering = false;
+    if (pendingPage && pendingPage !== num) { const n = pendingPage; pendingPage = null; renderPage(n); }
+}
+
+function pdfGo(d) {
+    const n = Math.min(Math.max(1, currentPage + d), pdfDoc?.numPages || 1);
+    if (n !== currentPage) renderPage(n);
+}
+function pdfGoTo(v) {
+    const n = parseInt(v, 10);
+    if (n >= 1 && n <= (pdfDoc?.numPages || 1)) renderPage(n);
+}
+
+initPdf();
+</script>
+{% endif %}
+
+</body>
+</html>
