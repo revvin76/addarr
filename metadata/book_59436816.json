@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "59436816",
+  "title": "TW",
+  "author": {
+    "authorName": "K. Kingsman"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/433/cover.jpg?lastWrite=636507882990000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1514759497i/37784548.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "59408047",
+  "title": "The End Zone",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/105/cover.jpg?lastWrite=636572347680000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1521205957i/37770280.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

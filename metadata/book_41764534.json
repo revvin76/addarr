@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41764534",
+  "title": "The Queen",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/853/cover.jpg?lastWrite=636436673500000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1443436134i/22357746.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

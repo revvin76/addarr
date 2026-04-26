@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "60401737",
+  "title": "The Rose",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/890/cover.jpg?lastWrite=636622541770000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1526657279i/38827724.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

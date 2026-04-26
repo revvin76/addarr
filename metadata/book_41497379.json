@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41497379",
+  "title": "Dark Ghost",
+  "author": {
+    "authorName": "Christine Feehan"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/414/cover.jpg?lastWrite=636435022130000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1425924817i/22152434.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

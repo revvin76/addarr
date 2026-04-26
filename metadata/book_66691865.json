@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "66691865",
+  "title": "A Midwinter Night's Dream",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/892/cover.jpg?lastWrite=636806396310000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1545042803i/42903623.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41798522",
+  "title": "Quod Me Nutrit Me Destruit",
+  "author": {
+    "authorName": "Kimber S. Dawn"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/918/cover.jpg?lastWrite=636437017810000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1438113358i/22382811.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

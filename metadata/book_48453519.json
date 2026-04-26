@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "48453519",
+  "title": "The Forever Broken",
+  "author": {
+    "authorName": "Ker Dukey"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/678/cover.jpg?lastWrite=636437051060000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1454049117i/28797736.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

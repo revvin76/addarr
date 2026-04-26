@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "84940664",
+  "title": "Heresy",
+  "author": {
+    "authorName": "Lily White"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/671/cover.jpg?lastWrite=637340808300000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1598484025i/54431377.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

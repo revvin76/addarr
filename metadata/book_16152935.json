@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "16152935",
+  "title": "Sweet Dreams",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/951/cover.jpg?lastWrite=636040591080000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1327912890i/11227040.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

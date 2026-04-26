@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "65120637",
+  "title": "Heated Rivalry",
+  "author": {
+    "authorName": "Rachel Reid"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4877/cover.jpg?lastWrite=636753351570000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1539738291i/41735449.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

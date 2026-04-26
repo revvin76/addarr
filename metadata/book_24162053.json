@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "24162053",
+  "title": "The Edge of Always",
+  "author": {
+    "authorName": "J.A. Redmerski"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/786/cover.jpg?lastWrite=636040855900000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1386922856i/17899696.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

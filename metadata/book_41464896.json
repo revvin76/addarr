@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41464896",
+  "title": "The Degas Girl",
+  "author": {
+    "authorName": "A.J. Adams"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/413/cover.jpg?lastWrite=636434701850000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1400290877i/22119669.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

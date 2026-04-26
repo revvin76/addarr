@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "95751764",
+  "title": "Beautiful Graves",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/126/cover.jpg?lastWrite=637904685940000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1654871790i/60831811.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

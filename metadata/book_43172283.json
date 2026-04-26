@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43172283",
+  "title": "Thicker Than Blood",
+  "author": {
+    "authorName": "Madeline Sheehan"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/656/cover.jpg?lastWrite=636434689180000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1416244740i/23573808.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "57048974",
+  "title": "One Night",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/536/cover.jpg?lastWrite=636508417620000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1514812960i/35609385.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

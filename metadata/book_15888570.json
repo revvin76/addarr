@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "15888570",
+  "title": "The Siren",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/826/cover.jpg?lastWrite=636040881040000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1335832751i/10970532.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

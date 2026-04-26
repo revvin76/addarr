@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "69187251",
+  "title": "The Forgotten",
+  "author": {
+    "authorName": "K.A. Knight"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/228/cover.jpg?lastWrite=636889562440000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1553359324i/44576595.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

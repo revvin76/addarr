@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41253772",
+  "title": "Mr. X",
+  "author": {
+    "authorName": "Clarissa Wild"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/326/cover.jpg?lastWrite=637020176330000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1566420790i/22757860.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

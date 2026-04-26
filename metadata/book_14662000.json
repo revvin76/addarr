@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "14662000",
+  "title": "Seven Day Loan",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/825/cover.jpg?lastWrite=638636851210000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1328364378i/9772406.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

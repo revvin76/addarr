@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "98882360",
+  "title": "Fire and Ash",
+  "author": {
+    "authorName": "Sara Cate"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/256/cover.jpg?lastWrite=638020833840000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1666054634i/63028631.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

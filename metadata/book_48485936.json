@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "48485936",
+  "title": "The Other Einstein",
+  "author": {
+    "authorName": "Marie Benedict"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4871/cover.jpg?lastWrite=636699599280000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1534338102i/41149395.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

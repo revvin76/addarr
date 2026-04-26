@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "201494716",
+  "title": "The Maid's Secret",
+  "author": {
+    "authorName": "Anita Zara"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/449/cover.jpg?lastWrite=638300624910000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1694049949i/198498043.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

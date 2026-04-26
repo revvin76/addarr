@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "76671255",
+  "title": "Beautiful Monster",
+  "author": {
+    "authorName": "Sara Cate"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/240/cover.jpg?lastWrite=637266142120000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1591016865i/51993754.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

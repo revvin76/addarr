@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42992097",
+  "title": "Determined to Obey",
+  "author": {
+    "authorName": "C.J. Roberts"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/517/cover.jpg?lastWrite=636433809580000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1413927780i/23431912.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

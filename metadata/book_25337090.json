@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25337090",
+  "title": "Killing Sarai",
+  "author": {
+    "authorName": "J.A. Redmerski"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/787/cover.jpg?lastWrite=636440469870000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1389883928i/20559676.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25431098",
+  "title": "Nearly Mended",
+  "author": {
+    "authorName": "Devon Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/337/cover.jpg?lastWrite=636041106690000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1396716526i/18108637.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

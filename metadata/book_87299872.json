@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "87299872",
+  "title": "Want to Know a Secret?",
+  "author": {
+    "authorName": "Freida McFadden"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4891/cover.jpg?lastWrite=637456978930000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1609705729i/56047352.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

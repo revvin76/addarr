@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "86254925",
+  "title": "Dream Spinner",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1030/cover.jpg?lastWrite=637504452140000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1614808489i/55310696.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

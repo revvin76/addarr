@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25748840",
+  "title": "The Dark Light of Day",
+  "author": {
+    "authorName": "T.M. Frazier"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/286/cover.jpg?lastWrite=636432646240000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1434693216i/18278129.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

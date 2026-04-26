@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "89875145",
+  "title": "Satan's Affair",
+  "author": {
+    "authorName": "H.D. Carlton"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/38/cover.jpg?lastWrite=637541056880000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1618508877i/57748116.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

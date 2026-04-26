@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "51185966",
+  "title": "Papa's Little Pain Princess",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/697/cover.jpg?lastWrite=638636724160000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1466280893i/30645411.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "53401627",
+  "title": "Sin With Me",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/198/cover.jpg?lastWrite=636433235950000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1489959314i/32960545.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

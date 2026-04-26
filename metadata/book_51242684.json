@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "51242684",
+  "title": "The Night Mark",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/882/cover.jpg?lastWrite=636433863320000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1475584741i/30698729.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

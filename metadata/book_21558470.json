@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21558470",
+  "title": "When We Collide",
+  "author": {
+    "authorName": "A.L. Jackson"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/347/cover.jpg?lastWrite=636041908230000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1354020152i/15826457.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

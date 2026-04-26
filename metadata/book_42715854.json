@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42715854",
+  "title": "Sociopath",
+  "author": {
+    "authorName": "Lime Craven"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/360/cover.jpg?lastWrite=636433865360000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1421455134i/23437776.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

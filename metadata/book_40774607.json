@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "40774607",
+  "title": "Bang",
+  "author": {
+    "authorName": "E.K. Blair"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/297/cover.jpg?lastWrite=636442180570000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1397646990i/21459365.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

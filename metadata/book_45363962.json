@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "45363962",
+  "title": "Tyrant",
+  "author": {
+    "authorName": "T.M. Frazier"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/926/cover.jpg?lastWrite=636434117600000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1435501516i/25711641.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

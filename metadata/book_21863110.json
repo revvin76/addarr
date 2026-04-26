@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21863110",
+  "title": "Truth",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/519/cover.jpg?lastWrite=636084461500000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1398768721i/16070018.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "94620823",
+  "title": "Gold Lust",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/568/cover.jpg?lastWrite=637789025700000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1642873766i/60183263.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

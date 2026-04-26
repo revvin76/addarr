@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21844443",
+  "title": "Enslaved",
+  "author": {
+    "authorName": "Shoshanna Evers"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/369/cover.jpg?lastWrite=636040878260000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1375650732i/16058187.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

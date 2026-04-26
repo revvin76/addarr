@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "68963280",
+  "title": "Cross",
+  "author": {
+    "authorName": "Shantel Tessier"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/24/cover.jpg?lastWrite=637643347640000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1628737943i/44415680.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

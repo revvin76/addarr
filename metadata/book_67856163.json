@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "67856163",
+  "title": "Lust",
+  "author": {
+    "authorName": "Ker Dukey"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/686/cover.jpg?lastWrite=636844926860000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1548611686i/43720553.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

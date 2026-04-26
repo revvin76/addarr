@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "61363503",
+  "title": "Pretty Reckless",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/107/cover.jpg?lastWrite=636904929570000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1554895598i/39709060.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

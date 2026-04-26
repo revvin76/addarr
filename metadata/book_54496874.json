@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "54496874",
+  "title": "Ruckus",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/101/cover.jpg?lastWrite=636437242690000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1494562657i/33643772.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

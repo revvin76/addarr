@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "85902872",
+  "title": "Beautiful Sinner",
+  "author": {
+    "authorName": "Sara Cate"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/242/cover.jpg?lastWrite=637368549850000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1601258159i/55102888.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

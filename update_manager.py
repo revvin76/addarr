@@ -111,27 +111,33 @@ class UpdateManager:
     
     def _update_checker(self):
         """Memory-optimized background update checker"""
+        # Run an immediate check on startup without waiting the full interval
+        try:
+            if self.config.app.debug:
+                logging.info("Automated update check running (startup)...")
+            update_info = self._check_github_for_updates()
+            if update_info.get('update_available'):
+                self._handle_available_update(update_info)
+            self.set_env('LAST_CHECKED', str(time.time()))
+        except Exception as e:
+            logging.error(f"Update checker startup error: {str(e)}")
+
         while self.running and not self._stop_event.is_set():
             try:
-                current_time = time.time()
-                last_checked = self.config.update.last_checked
-                check_interval = self.config.update.check_interval
-                
-                if current_time - last_checked >= check_interval:
-                    if self.config.app.debug:
-                        logging.info("Automated update check running...")
-                    
-                    update_info = self._check_github_for_updates()
-                    if update_info.get('update_available'):
-                        self._handle_available_update(update_info)
-                    
-                    # Update last_checked - you'll need to implement this
-                    # self.set_env('LAST_CHECKED', str(current_time))
-                
-                # Use wait with timeout for quicker shutdown
-                if self._stop_event.wait(timeout=check_interval):
+                # Wait for the configured interval (or until stop is signalled)
+                if self._stop_event.wait(timeout=self.config.update.check_interval):
                     break
-                
+
+                current_time = time.time()
+                if self.config.app.debug:
+                    logging.info("Automated update check running...")
+
+                update_info = self._check_github_for_updates()
+                if update_info.get('update_available'):
+                    self._handle_available_update(update_info)
+
+                self.set_env('LAST_CHECKED', str(current_time))
+
             except Exception as e:
                 logging.error(f"Update checker error: {str(e)}")
                 # Shorter sleep on error, but check stop event
@@ -293,6 +299,21 @@ class UpdateManager:
             logging.error(f"Error checking DEV updates: {str(e)}")
             return {'update_available': False, 'error': str(e), 'channel': 'dev'}
                
+    def download_update(self):
+        """Public method: check for the latest version then download it.
+        Called by the in-app Download Update button (routes.py /api/update/download)."""
+        try:
+            update_info = self._check_github_for_updates()
+            if not update_info.get('update_available'):
+                return {'success': False, 'error': 'No update available', 'update_info': update_info}
+            latest_version = update_info.get('latest_version')
+            if not latest_version:
+                return {'success': False, 'error': 'Could not determine latest version'}
+            return self._download_update(latest_version)
+        except Exception as e:
+            logging.error(f"download_update error: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
     def _download_update(self, version):
         """Download update with improved DEV branch support"""
         try:

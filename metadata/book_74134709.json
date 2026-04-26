@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "74134709",
+  "title": "Cruel King",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/157/cover.jpg?lastWrite=638960551920000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1760458354i/124928062.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

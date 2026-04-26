@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42476841",
+  "title": "A Peek Beyond the Consequences",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/524/cover.jpg?lastWrite=636440964630000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1407942717i/22911953.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

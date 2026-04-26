@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "16441531",
+  "title": "Beautiful Disaster",
+  "author": {
+    "authorName": "Jamie McGuire"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/301/cover.jpg?lastWrite=636084522850000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1358259032i/11505797.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

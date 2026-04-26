@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "54472026",
+  "title": "Menace",
+  "author": {
+    "authorName": "J.M. Darhower"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/779/cover.jpg?lastWrite=636437106920000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484515782i/33629847.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

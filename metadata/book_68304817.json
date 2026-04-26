@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "68304817",
+  "title": "Be Mine",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1015/cover.jpg?lastWrite=636853391940000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1549709588i/43898169.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

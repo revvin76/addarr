@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "40786222",
+  "title": "Sore Spots",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/851/cover.jpg?lastWrite=636442274540000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1395075943i/21468417.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

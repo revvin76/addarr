@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25098810",
+  "title": "Control",
+  "author": {
+    "authorName": "M.S. Willis"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/821/cover.jpg?lastWrite=636040999110000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1369664073i/17912005.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "59612282",
+  "title": "Falls Boys",
+  "author": {
+    "authorName": "Penelope Douglas"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/223/cover.jpg?lastWrite=637711982640000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1635601458i/37906154.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

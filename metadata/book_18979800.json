@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "18979800",
+  "title": "Until the Sun Falls from the Sky",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/972/cover.jpg?lastWrite=636172368070000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1329757719i/13453301.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

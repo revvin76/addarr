@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42859234",
+  "title": "Prisoner",
+  "author": {
+    "authorName": "Annika Martin"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/324/cover.jpg?lastWrite=636433078550000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1413251660i/23303963.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

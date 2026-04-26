@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42862263",
+  "title": "Freakshow",
+  "author": {
+    "authorName": "Jaden Wilkes"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1078/cover.jpg?lastWrite=636433105980000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1414510276i/23307464.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

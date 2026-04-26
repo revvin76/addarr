@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "75950639",
+  "title": "The Danger You Know",
+  "author": {
+    "authorName": "Lily White"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/668/cover.jpg?lastWrite=637211873890000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1585590307i/51180445.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "59813832",
+  "title": "Permission",
+  "author": {
+    "authorName": "T.M. Frazier"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/939/cover.jpg?lastWrite=636733446140000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1537747792i/38125011.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

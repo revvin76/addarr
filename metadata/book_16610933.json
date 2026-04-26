@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "16610933",
+  "title": "At Peace",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/954/cover.jpg?lastWrite=636040989890000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1327913073i/11665750.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

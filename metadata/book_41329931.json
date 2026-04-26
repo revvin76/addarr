@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41329931",
+  "title": "Twisted Boss",
+  "author": {
+    "authorName": "Suzanne Steele"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/505/cover.jpg?lastWrite=636432459660000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1410816676i/23214029.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

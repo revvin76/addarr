@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "55382026",
+  "title": "Class A Felony",
+  "author": {
+    "authorName": "Deena Lee Davis"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/436/cover.jpg?lastWrite=636433805060000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1487680478i/34321096.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "86997337",
+  "title": "Savage Vow",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/722/cover.jpg?lastWrite=637392353960000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1603638592i/55781322.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

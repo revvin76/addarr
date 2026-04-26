@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "91894185",
+  "title": "Kingdom Come",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/565/cover.jpg?lastWrite=637639370090000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1628340191i/58507512.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

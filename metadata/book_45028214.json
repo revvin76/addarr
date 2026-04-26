@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "45028214",
+  "title": "Forbidden Pleasures",
+  "author": {
+    "authorName": "D.H. Sidebottom"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/910/cover.jpg?lastWrite=636438803240000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1430903703i/25300408.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

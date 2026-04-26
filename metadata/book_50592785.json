@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "50592785",
+  "title": "Lily On The Edge",
+  "author": {
+    "authorName": "J.A. Redmerski"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/797/cover.jpg?lastWrite=638072874020000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1671260862i/30154760.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

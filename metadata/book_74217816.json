@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "74217816",
+  "title": "Dangerous",
+  "author": {
+    "authorName": "Sara Cate"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/239/cover.jpg?lastWrite=637095125630000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1573915743i/48837879.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

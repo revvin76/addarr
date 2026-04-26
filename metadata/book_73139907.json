@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "73139907",
+  "title": "Wall Street Titan",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/630/cover.jpg?lastWrite=637211534450000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1574524510l/52809078.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "56812396",
+  "title": "Pretty New Doll",
+  "author": {
+    "authorName": "Ker Dukey"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/681/cover.jpg?lastWrite=636433835360000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1498643157i/35432292.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

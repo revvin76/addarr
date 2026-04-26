@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "40786220",
+  "title": "The Last Good Night",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/849/cover.jpg?lastWrite=636442274510000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1395076097i/21468415.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

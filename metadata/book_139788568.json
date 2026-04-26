@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "139788568",
+  "title": "Secrets of the Brother",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/735/cover.jpg?lastWrite=638124148250000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1676390644i/117752324.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

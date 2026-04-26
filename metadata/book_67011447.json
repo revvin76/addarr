@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "67011447",
+  "title": "Damned Doll",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/713/cover.jpg?lastWrite=636800479080000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1544447289i/43188845.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

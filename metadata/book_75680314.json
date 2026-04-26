@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "75680314",
+  "title": "Mathilda, SuperWitch: The Rise of the Dark Lord",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1024/cover.jpg?lastWrite=637195384790000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1583941676i/52293099.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

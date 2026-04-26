@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "60668629",
+  "title": "Picture Perfect Cowboy: A Western Romance",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/891/cover.jpg?lastWrite=636697021900000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1534099845i/41129203.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

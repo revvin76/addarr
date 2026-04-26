@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "238520604",
+  "title": "To Have and To Hold",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/593/cover.jpg?lastWrite=638753823800000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1739480148i/223285718.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

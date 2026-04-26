@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "82545051",
+  "title": "Rise of a Queen",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/162/cover.jpg?lastWrite=639074650020000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1771868165i/53401047.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

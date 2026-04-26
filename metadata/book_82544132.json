@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "82544132",
+  "title": "Royal Elite Epilogue",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/160/cover.jpg?lastWrite=638959699130000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1760373105i/53400995.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

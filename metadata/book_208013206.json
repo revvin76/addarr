@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "208013206",
+  "title": "Embracing the Change",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1046/cover.jpg?lastWrite=638456172010000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1709680447i/202548465.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "85523048",
+  "title": "Pretty Hot",
+  "author": {
+    "authorName": "K.A. Knight"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/232/cover.jpg?lastWrite=637321782360000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1596581422i/54819515.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

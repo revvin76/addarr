@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "81319852",
+  "title": "Undeniable",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/554/cover.jpg?lastWrite=637286052020000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1593008314i/53296815.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

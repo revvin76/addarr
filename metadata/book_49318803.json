@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "49318803",
+  "title": "Unforeseen",
+  "author": {
+    "authorName": "Shantel Tessier"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/11/cover.jpg?lastWrite=636438257620000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1455372733i/29085730.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

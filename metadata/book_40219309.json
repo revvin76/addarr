@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "40219309",
+  "title": "Number Thirteen",
+  "author": {
+    "authorName": "Bella Jewel"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/333/cover.jpg?lastWrite=636434551290000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1393481293i/20879280.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

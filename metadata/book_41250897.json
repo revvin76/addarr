@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41250897",
+  "title": "Irrevocable",
+  "author": {
+    "authorName": "Skye Callahan"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/358/cover.jpg?lastWrite=637321836800000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1596586844i/54820003.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

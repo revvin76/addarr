@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "58170001",
+  "title": "The Three Series Box Set",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1007/cover.jpg?lastWrite=636444033920000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1508806452i/36463164.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

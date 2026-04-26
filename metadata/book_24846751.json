@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "24846751",
+  "title": "Resolution",
+  "author": {
+    "authorName": "D.H. Sidebottom"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/901/cover.jpg?lastWrite=636040822790000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1365908317i/17761524.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

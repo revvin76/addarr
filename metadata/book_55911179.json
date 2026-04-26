@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "55911179",
+  "title": "Obsession Mine",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/627/cover.jpg?lastWrite=636466172830000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1511020407i/36055526.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

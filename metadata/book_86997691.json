@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "86997691",
+  "title": "Torment: Part One",
+  "author": {
+    "authorName": "Dylan Page"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/376/cover.jpg?lastWrite=637420601150000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1606463301i/55781834.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

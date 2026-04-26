@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "11221308",
+  "title": "Comfort Food",
+  "author": {
+    "authorName": "Kitty Thomas"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/271/cover.jpg?lastWrite=638764270840000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1740711307i/211699859.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

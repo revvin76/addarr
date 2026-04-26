@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "45796016",
+  "title": "Dark Night of the Soul",
+  "author": {
+    "authorName": "Kitty Thomas"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/606/cover.jpg?lastWrite=637716709970000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1636074101i/25909713.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

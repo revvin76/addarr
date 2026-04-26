@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "19057463",
+  "title": "Immersed in Pleasure",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/827/cover.jpg?lastWrite=636041571690000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1330615056i/13506541.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

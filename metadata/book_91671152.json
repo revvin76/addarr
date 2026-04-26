@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "91671152",
+  "title": "Blood Lust",
+  "author": {
+    "authorName": "Kitty Thomas"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/612/cover.jpg?lastWrite=637602375360000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1624640602i/58423742.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "195414510",
+  "title": "Five Brothers",
+  "author": {
+    "authorName": "Penelope Douglas"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/225/cover.jpg?lastWrite=638345188710000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1698922067i/201102380.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

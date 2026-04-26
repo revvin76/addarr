@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41370680",
+  "title": "Drops of Rain",
+  "author": {
+    "authorName": "Kathryn Andrews"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/396/cover.jpg?lastWrite=636433792010000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1405272322i/22046210.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25120064",
+  "title": "The Darker Side of Trey Grey",
+  "author": {
+    "authorName": "Tara Spears"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/323/cover.jpg?lastWrite=636041086470000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1371065781i/17924251.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "74304171",
+  "title": "The Rising",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1022/cover.jpg?lastWrite=637220021770000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1586405341i/53069818.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

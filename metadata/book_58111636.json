@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "58111636",
+  "title": "Ripples",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/538/cover.jpg?lastWrite=636436419470000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1508045033i/36415105.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "7397279",
+  "title": "Sunset Embrace",
+  "author": {
+    "authorName": "Sandra Brown"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/382/cover.jpg?lastWrite=636042059330000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1287693143i/759916.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

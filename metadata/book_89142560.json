@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "89142560",
+  "title": "Lords of Pain",
+  "author": {
+    "authorName": "Angel Lawson"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/402/cover.jpg?lastWrite=637486577630000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1612752520i/56986379.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

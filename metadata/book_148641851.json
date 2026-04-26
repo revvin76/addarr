@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "148641851",
+  "title": "Butcher & Blackbird",
+  "author": {
+    "authorName": "Brynne Weaver"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/451/cover.jpg?lastWrite=638330764940000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1697047810i/199405466.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

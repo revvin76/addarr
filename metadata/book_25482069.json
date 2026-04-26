@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25482069",
+  "title": "The Case of the Acting Actress",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/837/cover.jpg?lastWrite=636041435210000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1372534291i/18138732.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

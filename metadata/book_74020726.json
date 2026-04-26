@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "74020726",
+  "title": "Ruthless Empire",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/156/cover.jpg?lastWrite=638960133470000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1760416542i/48675643.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

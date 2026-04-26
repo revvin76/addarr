@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "75756211",
+  "title": "Bad Cruz",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/119/cover.jpg?lastWrite=637692941820000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1633697267i/50724063.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

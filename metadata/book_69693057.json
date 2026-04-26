@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "69693057",
+  "title": "The Hero Complex",
+  "author": {
+    "authorName": "K.A. Knight"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/229/cover.jpg?lastWrite=636905763060000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1554977062i/45020292.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

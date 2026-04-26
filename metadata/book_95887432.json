@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "95887432",
+  "title": "Cold Hearted Casanova",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/128/cover.jpg?lastWrite=638156348660000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1680038063i/86505855.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

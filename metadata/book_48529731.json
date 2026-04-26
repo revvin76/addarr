@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "48529731",
+  "title": "Away from the Dark",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/533/cover.jpg?lastWrite=636433300340000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1470316886i/29439804.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

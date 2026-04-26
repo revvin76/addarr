@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43087862",
+  "title": "The Sect",
+  "author": {
+    "authorName": "Courtney Lane"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/351/cover.jpg?lastWrite=636435428120000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1423879710i/23791347.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

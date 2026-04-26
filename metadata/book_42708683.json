@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42708683",
+  "title": "Finally Heaven",
+  "author": {
+    "authorName": "D.H. Sidebottom"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/906/cover.jpg?lastWrite=636432184910000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1410007209i/23162405.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

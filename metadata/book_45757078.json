@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "45757078",
+  "title": "Sebring",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/996/cover.jpg?lastWrite=636435880660000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1447696416i/25879951.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

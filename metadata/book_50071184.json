@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "50071184",
+  "title": "The Deep End",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/998/cover.jpg?lastWrite=636438976680000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1468259545i/30259004.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "65770130",
+  "title": "Broken Doll",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/711/cover.jpg?lastWrite=636753903830000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1539791081i/42378493.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

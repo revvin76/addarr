@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "92661092",
+  "title": "MR. BENNETT",
+  "author": {
+    "authorName": "Nancy Brown"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/466/cover.jpg?lastWrite=638361556040000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1700175599i/202291431.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

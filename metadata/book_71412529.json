@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "71412529",
+  "title": "The Thief",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/717/cover.jpg?lastWrite=637123046280000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1562866020l/49444606.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

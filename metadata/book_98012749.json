@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "98012749",
+  "title": "Highest Bidder",
+  "author": {
+    "authorName": "Sara Cate"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/254/cover.jpg?lastWrite=639052504700000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1769289737i/62322599.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

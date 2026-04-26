@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "26542165",
+  "title": "Devil's Game",
+  "author": {
+    "authorName": "Joanna Wylde"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/815/cover.jpg?lastWrite=636437381200000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1433115819i/18693621.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

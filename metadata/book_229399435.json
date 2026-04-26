@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "229399435",
+  "title": "Queens and Monsters",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/592/cover.jpg?lastWrite=638693989970000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1733796615i/222409840.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

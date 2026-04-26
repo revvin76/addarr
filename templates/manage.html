@@ -39,7 +39,7 @@
             batchStart += BATCH;
 
             const promises = slice.map(item => {
-                const img = item.querySelector('.manage-result-thumbnail');
+                const img = item.querySelector('.search-result-thumbnail');
                 if (!img) return Promise.resolve();
                 const src = img.getAttribute('data-src');
                 if (!src) return Promise.resolve();
@@ -154,73 +154,50 @@
                 {% else %}
                     {% set item_id = item.tvdbId %}
                 {% endif %}
-                <div class="col-12 mb-3 media-item {{ item.media_type }}-item"
+                <div class="col-6 col-md-4 col-lg-12 mb-3 media-item {{ item.media_type }}-item"
                     data-title="{{ item.title|lower }}"
                     data-id="{{ item_id }}"
                     data-media-type="{{ item.media_type }}"
                     onclick="showManageDetails('{{ item.media_type }}', '{{ item_id }}', {{ item.id }})">
 
-                    <div class="manage-result-card h-100 d-flex flex-column {{ item.media_type }}-card">
-                        <!-- Watermark Icon -->
-                        <div class="watermark-icon position-absolute">
-                            {% if item.media_type == 'movie' %}
-                                <i class="fas fa-film"></i>
-                            {% elif item.media_type == 'book' %}
-                                <i class="fas fa-book"></i>
-                            {% else %}
-                                <i class="fas fa-tv"></i>
-                            {% endif %}
-                        </div>
-
-                        <!-- Card Header Section - Thumbnail + Title + Info -->
-                        <div class="d-flex" style="min-height: 120px;">
-                            <!-- Thumbnail container - smaller on left -->
-                            <div class="manage-result-thumbnail-container me-3" style="width: 80px; flex-shrink: 0;">
-                                <img data-src="{% if item.images %}{% for image in item.images %}{% if image.coverType == 'poster' %}{{ image.remoteUrl }}{% endif %}{% endfor %}{% endif %}{% if not item.images or not item.images|selectattr('coverType', 'equalto', 'poster')|list %}/static/images/apple-touch-icon.png{% endif %}"
-                                    src="/static/images/placeholder.png"
-                                    class="manage-result-thumbnail h-100 w-100 object-fit-cover"
-                                    alt="{{ item.title }}"
-                                    onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                            </div>
-
-                            <!-- Card content - on right of thumbnail -->
-                            <div class="manage-result-content flex-grow-1 d-flex flex-column justify-content-between" style="min-width: 0;">
-                                <div>
-                                    <h5 class="text-white mb-1 text-truncate" style="font-size: 0.95rem;">
-                                        {{ item.title }}
-                                    </h5>
-                                    <div class="d-flex align-items-center mb-1 flex-wrap" style="gap: 0.25rem;">
-                                        <span class="text-xs me-1">{{ item.year }}</span>
-                                        {% if item.certification %}
-                                        <span class="badge bg-dark text-white" style="font-size: 0.7rem;">{{ item.certification }}</span>
-                                        {% endif %}
-                                        <span class="text-xs">
-                                            {% if item.media_type == 'movie' %}
-                                                {{ item.runtime }} min
-                                            {% elif item.media_type == 'book' %}
-                                                {% if item.author %}{{ item.author.authorName }}{% endif %}
-                                            {% else %}
-                                                {{ item.statistics.seasonCount }} seasons
-                                            {% endif %}
-                                        </span>
-                                    </div>
-                                </div>
+                    <div class="search-result-card manage-result-card h-100 {{ item.media_type }}-card">
+                        <!-- Poster -->
+                        <div class="search-result-thumbnail-container">
+                            <img data-src="{% if item.images and item.images[0].remoteUrl %}{{ item.images[0].remoteUrl }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
+                                 src="/static/images/placeholder.png"
+                                 class="search-result-thumbnail"
+                                 alt="{{ item.title }}"
+                                 onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
+                            <div class="fade-overlay"></div>
+                            <div class="watermark-icon position-absolute">
+                                {% if item.media_type == 'movie' %}
+                                    <i class="fas fa-film"></i>
+                                {% else %}
+                                    <i class="fas fa-tv"></i>
+                                {% endif %}
                             </div>
                         </div>
 
-                        <!-- Status and Controls Section -->
-                        <div class="media-status-section mt-2 pt-2 border-top" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                            <!-- Status Badges Row -->
-                            <div class="d-flex align-items-center gap-1 mb-2 flex-wrap">
-                                <span class="status-badge text-xs badge bg-secondary">Not Added</span>
-                                <div class="media-extra-badges" style="display: none;">
-                                    <!-- "On disk"/"Missing" badge will be inserted here -->
-                                </div>
+                        <!-- Card content -->
+                        <div class="search-result-content">
+                            <h6 class="text-white truncate">{{ item.title }}</h6>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-xs text-muted">{{ item.year }}</span>
+                                <span class="text-xs text-muted">
+                                    {% if item.media_type == 'movie' %}
+                                        {% if item.runtime %}{{ item.runtime }} min{% endif %}
+                                    {% else %}
+                                        {{ item.statistics.seasonCount }} seasons
+                                    {% endif %}
+                                </span>
                             </div>
-
-                            <!-- Manage Controls Row -->
-                            <div class="manage-controls" style="display: none;">
-                                <!-- Manage info and buttons will be inserted here -->
+                            <!-- Status section — queried by initializeManageGrid() -->
+                            <div class="media-status-section mt-2">
+                                <div class="d-flex align-items-center gap-1 flex-wrap">
+                                    <span class="status-badge text-xs badge bg-secondary">In Library</span>
+                                    <div class="media-extra-badges" style="display: none;"></div>
+                                </div>
+                                <div class="manage-controls mt-1" style="display: none;"></div>
                             </div>
                         </div>
                     </div>

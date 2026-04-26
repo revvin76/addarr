@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "49152682",
+  "title": "Mindfu*k",
+  "author": {
+    "authorName": "Kimber S. Dawn"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/922/cover.jpg?lastWrite=636432586970000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1456602925i/29353344.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "16024485",
+  "title": "Three Wishes",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/950/cover.jpg?lastWrite=636040790560000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1327913254i/11102353.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

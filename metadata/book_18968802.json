@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "18968802",
+  "title": "Motorcycle Man",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/971/cover.jpg?lastWrite=636830908040000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1547157943i/13448656.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

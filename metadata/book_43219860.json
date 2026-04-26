@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43219860",
+  "title": "All I Want",
+  "author": {
+    "authorName": "J.M. Darhower"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/776/cover.jpg?lastWrite=636435413050000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1420897160i/23789769.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

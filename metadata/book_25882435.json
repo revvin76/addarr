@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25882435",
+  "title": "Satanarium",
+  "author": {
+    "authorName": "Troy Lambert"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/395/cover.jpg?lastWrite=636433887480000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1378684035i/18389060.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

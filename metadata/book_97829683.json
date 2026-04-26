@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "97829683",
+  "title": "Dangerous Web",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/576/cover.jpg?lastWrite=637968350890000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1661238286i/62059817.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

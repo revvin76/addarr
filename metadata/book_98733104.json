@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "98733104",
+  "title": "Killer Love",
+  "author": {
+    "authorName": "Ryder O. Cox"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/447/cover.jpg?lastWrite=638013261030000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1665305158i/62915478.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

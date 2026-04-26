@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "47260519",
+  "title": "Entrapment",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/530/cover.jpg?lastWrite=636435328310000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1469736158i/27217725.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

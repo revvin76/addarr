@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "68455849",
+  "title": "The Five",
+  "author": {
+    "authorName": "Lily White"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/663/cover.jpg?lastWrite=636874843860000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1551887542i/44026483.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

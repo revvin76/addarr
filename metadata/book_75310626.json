@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "75310626",
+  "title": "They Won't Believe You",
+  "author": {
+    "authorName": "Paisley Alice Quinn"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/440/cover.jpg?lastWrite=637142216930000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1578500532i/50361943.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

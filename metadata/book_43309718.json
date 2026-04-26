@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43309718",
+  "title": "That Summer",
+  "author": {
+    "authorName": "Lauren Crossley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/380/cover.jpg?lastWrite=636435203080000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1427474637i/23700351.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

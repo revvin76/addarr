@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "94932951",
+  "title": "Pen Pal",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/66/cover.jpg?lastWrite=637793306160000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1643301835i/60192737.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

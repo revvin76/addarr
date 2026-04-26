@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "27164164",
+  "title": "The Last Vampire",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/192/cover.jpg?lastWrite=636442274590000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1386049793i/19129935.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

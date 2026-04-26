@@ -2882,7 +2882,7 @@ function initializeManageGrid() {
     mediaItems.forEach(item => {
         const mediaType = item.dataset.mediaType;
         const mediaId   = item.dataset.id;
-        const card      = item.querySelector('.manage-result-card');
+        const card      = item.querySelector('.manage-result-card, .search-result-card');
         if (!card || !mediaType || !mediaId) return;
 
         const statusBadge   = card.querySelector('.status-badge');

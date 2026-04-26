@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "199463937",
+  "title": "Little Stranger",
+  "author": {
+    "authorName": "Leigh Rivers"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/58/cover.jpg?lastWrite=638520700260000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1716473106i/213798776.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

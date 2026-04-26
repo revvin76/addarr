@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "22003374",
+  "title": "Fearscape",
+  "author": {
+    "authorName": "Nenia Campbell"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/371/cover.jpg?lastWrite=636042136150000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1353434876i/16161543.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

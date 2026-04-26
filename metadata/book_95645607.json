@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "95645607",
+  "title": "The Pirate",
+  "author": {
+    "authorName": "Amelia Wilde"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/492/cover.jpg?lastWrite=637862302400000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1650633437i/60686840.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

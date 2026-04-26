@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "275518581",
+  "title": "Intercepted",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/599/cover.jpg?lastWrite=639029500140000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1767353212i/246031319.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

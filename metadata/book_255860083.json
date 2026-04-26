@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "255860083",
+  "title": "Dear Debbie",
+  "author": {
+    "authorName": "Freida McFadden"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4872/cover.jpg?lastWrite=638890679650000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1753470988i/239264351.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

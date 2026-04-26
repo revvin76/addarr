@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "234799300",
+  "title": "Dark Prince's Mate",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/644/cover.jpg?lastWrite=638747945540000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1738810191i/227205031.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

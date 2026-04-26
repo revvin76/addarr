@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "94649335",
+  "title": "Punk Love",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/125/cover.jpg?lastWrite=637769506590000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1641353855i/60034747.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

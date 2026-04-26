@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "51871992",
+  "title": "Pretty Stolen Dolls",
+  "author": {
+    "authorName": "Ker Dukey"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/679/cover.jpg?lastWrite=636436323840000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1473070211i/31216812.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

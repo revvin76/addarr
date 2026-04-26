@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "228061451",
+  "title": "Fit for Love",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/643/cover.jpg?lastWrite=638773213570000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1741724430i/221108787.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

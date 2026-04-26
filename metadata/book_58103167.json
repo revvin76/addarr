@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "58103167",
+  "title": "The Hookup",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1006/cover.jpg?lastWrite=636466577210000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1511060888i/36408499.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

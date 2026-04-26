@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "67452804",
+  "title": "Her Master's Reckoning",
+  "author": {
+    "authorName": "Lily White"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/662/cover.jpg?lastWrite=636851529010000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1549465874i/43411985.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

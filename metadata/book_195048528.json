@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "195048528",
+  "title": "Rock Chick Rematch",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1043/cover.jpg?lastWrite=638260022130000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1689973432i/193330791.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

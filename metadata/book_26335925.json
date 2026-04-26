@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "26335925",
+  "title": "Surrender To Me",
+  "author": {
+    "authorName": "Laura Bailey"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/345/cover.jpg?lastWrite=636436105500000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1380373469i/18591715.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

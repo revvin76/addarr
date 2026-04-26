@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "220060952",
+  "title": "Chokehold",
+  "author": {
+    "authorName": "Leigh Rivers"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/140/cover.jpg?lastWrite=638546557310000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1719014200i/213806323.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

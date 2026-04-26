@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "99204065",
+  "title": "Lies of My Monster",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/178/cover.jpg?lastWrite=638960127170000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1760415895i/63287431.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

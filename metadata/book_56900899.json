@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "56900899",
+  "title": "The Chateau",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/887/cover.jpg?lastWrite=636627088880000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1515171541i/35497678.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

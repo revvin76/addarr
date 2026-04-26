@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25482101",
+  "title": "The Case of the Brokenhearted Bartender",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/841/cover.jpg?lastWrite=636041435550000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1372534870i/18138757.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

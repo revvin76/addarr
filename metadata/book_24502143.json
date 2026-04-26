@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "24502143",
+  "title": "Friend-Zoned",
+  "author": {
+    "authorName": "Belle Aurora"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/799/cover.jpg?lastWrite=636041336930000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1369113567i/17948485.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "64100908",
+  "title": "Lies",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/544/cover.jpg?lastWrite=636754998170000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1539902951i/41051922.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

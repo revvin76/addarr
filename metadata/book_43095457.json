@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43095457",
+  "title": "Tight",
+  "author": {
+    "authorName": "Alessandra Torre"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/336/cover.jpg?lastWrite=636434281200000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1418226421i/23496782.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

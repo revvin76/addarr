@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "79174855",
+  "title": "Quarantined",
+  "author": {
+    "authorName": "Drethi Anis"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/353/cover.jpg?lastWrite=637215399020000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1585943073i/52894269.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

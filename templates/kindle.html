@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Books - Addarr</title>
+    <!--
+        kindle.html — Kindle/Silk browser optimised book library view.
+        Redirected to from /kindle when a Kindle User-Agent is detected.
+        Designed for:
+          - Kindle Silk browser (Fire tablets)
+          - Kindle e-ink browsers (basic Kindle devices)
+          - Low-bandwidth connections
+          - Large tap targets (finger navigation, no hover)
+          - High contrast, no animations, no shadows
+    -->
+    <style>
+        /* ── Reset & base ─────────────────────────────────────────────────── */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0; padding: 0;
+            /* Kill all animations/transitions — they stutter on Silk */
+            animation: none !important;
+            transition: none !important;
+        }
+
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 17px;
+            line-height: 1.6;
+            background: #f5f0e8;   /* warm off-white, easier on e-ink */
+            color: #111;
+            padding: 0;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        /* ── Header ───────────────────────────────────────────────────────── */
+        header {
+            background: #1a1a1a;
+            color: #fff;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 3px solid #c0392b;
+        }
+        header h1 {
+            font-size: 1.1rem;
+            font-weight: bold;
+            letter-spacing: 0.02em;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        .header-count {
+            font-size: 0.8rem;
+            background: #c0392b;
+            color: #fff;
+            padding: 2px 9px;
+            border-radius: 12px;
+            font-family: Arial, sans-serif;
+            white-space: nowrap;
+        }
+
+        /* ── Search bar ───────────────────────────────────────────────────── */
+        .search-bar {
+            padding: 10px 12px;
+            background: #e8e0d0;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .search-bar input {
+            flex: 1;
+            font-size: 16px;
+            padding: 10px 12px;
+            border: 2px solid #888;
+            border-radius: 6px;
+            background: #fff;
+            color: #111;
+            /* Silk-safe: avoid outline flicker */
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .search-bar input:focus { border-color: #c0392b; }
+        .search-bar button {
+            font-size: 15px;
+            padding: 10px 16px;
+            border: 2px solid #888;
+            border-radius: 6px;
+            background: #fff;
+            color: #555;
+            cursor: pointer;
+            min-height: 44px;
+            min-width: 44px;   /* minimum tap target */
+        }
+        .search-bar button:active { background: #e0e0e0; }
+
+        /* ── A-Z navigation ───────────────────────────────────────────────── */
+        .az-bar {
+            padding: 8px 12px;
+            background: #e8e0d0;
+            border-bottom: 1px solid #ccc;
+            display: none;   /* shown via JS */
+        }
+        .az-bar.open { display: block; }
+        .az-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .az-btn {
+            padding: 7px 10px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            background: #fff;
+            color: #333;
+            font-size: 0.8rem;
+            font-family: Arial, sans-serif;
+            cursor: pointer;
+            min-height: 36px;
+            min-width: 36px;
+            text-align: center;
+        }
+        .az-btn:active { background: #ddd; }
+        .az-btn[disabled] { opacity: 0.3; cursor: default; }
+        .az-toggle {
+            font-size: 14px;
+            padding: 8px 14px;
+            border: 2px solid #888;
+            border-radius: 6px;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+            margin: 8px 12px 0;
+            display: inline-block;
+            font-family: Arial, sans-serif;
+            min-height: 44px;
+        }
+        .az-toggle.az-active { border-color: #c0392b; color: #c0392b; }
+
+        /* ── Book list ────────────────────────────────────────────────────── */
+        #booksGrid {
+            padding: 0;
+        }
+
+        .book-item {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 14px 14px;
+            border-bottom: 1px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+            /* No box-shadow — renders poorly on e-ink */
+        }
+        .book-item:nth-child(even) { background: #f9f5ee; }
+        .book-item:active { background: #e8e0d0; }
+
+        /* Cover image: small, left-aligned */
+        .book-thumb {
+            width: 56px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 3px;
+            flex-shrink: 0;
+            border: 1px solid #ccc;
+            /* Degrade gracefully if image fails */
+            background: #ddd;
+        }
+        .book-thumb-placeholder {
+            width: 56px;
+            height: 80px;
+            background: #ddd;
+            border-radius: 3px;
+            flex-shrink: 0;
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: #999;
+        }
+
+        .book-info { flex: 1; min-width: 0; }
+        .book-title {
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #111;
+            font-family: Arial, sans-serif;
+            /* Wrap on Kindle — no truncation */
+            white-space: normal;
+            word-break: break-word;
+        }
+        .book-author {
+            font-size: 0.82rem;
+            color: #c0392b;
+            font-family: Arial, sans-serif;
+            margin-top: 2px;
+        }
+        .book-meta {
+            font-size: 0.75rem;
+            color: #666;
+            font-family: Arial, sans-serif;
+            margin-top: 4px;
+        }
+
+        /* ── Action buttons ───────────────────────────────────────────────── */
+        .book-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            align-items: center;
+        }
+        .btn-read {
+            font-size: 14px;
+            padding: 9px 16px;
+            border: 2px solid #2a7a2a;
+            border-radius: 6px;
+            background: #fff;
+            color: #2a7a2a;
+            text-decoration: none;
+            font-family: Arial, sans-serif;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-read:active { background: #e8f5e8; }
+
+        .bm-badge {
+            font-size: 0.72rem;
+            background: #f39c12;
+            color: #000;
+            padding: 3px 7px;
+            border-radius: 4px;
+            font-family: Arial, sans-serif;
+        }
+
+        /* ── Empty / no-results states ────────────────────────────────────── */
+        .empty-msg {
+            padding: 40px 20px;
+            text-align: center;
+            color: #666;
+            font-family: Arial, sans-serif;
+            font-size: 0.9rem;
+        }
+        #emptySearch {
+            display: none;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-family: Arial, sans-serif;
+            border-top: 1px solid #ccc;
+        }
+
+        /* ── Back to top ──────────────────────────────────────────────────── */
+        #backToTop {
+            display: none;   /* hidden until JS shows it */
+            position: fixed;
+            bottom: 20px;
+            right: 16px;
+            background: #1a1a1a;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            font-size: 20px;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            font-family: Arial, sans-serif;
+        }
+        #backToTop.visible { display: flex; }
+
+        /* ── Details panel (inline, no modal — modals are unreliable on Silk) */
+        #bookDetails {
+            display: none;
+            background: #fff;
+            border-top: 3px solid #c0392b;
+            border-bottom: 3px solid #c0392b;
+            padding: 16px 14px;
+        }
+        #bookDetails.open { display: block; }
+        #bookDetails h2 {
+            font-size: 1rem;
+            font-family: Arial, sans-serif;
+            margin-bottom: 6px;
+        }
+        #bookDetails p {
+            font-size: 0.85rem;
+            color: #444;
+            margin-bottom: 8px;
+        }
+        .details-close {
+            font-size: 14px;
+            padding: 9px 16px;
+            border: 2px solid #888;
+            border-radius: 6px;
+            background: #f5f0e8;
+            color: #333;
+            cursor: pointer;
+            font-family: Arial, sans-serif;
+            min-height: 44px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <h1>&#128218; My Books</h1>
+        <span class="header-count">{{ total_downloaded }} downloaded</span>
+    </header>
+
+    <!-- Search -->
+    <div class="search-bar">
+        <input type="text" id="bookSearch" placeholder="Search books or authors..."
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button id="clearBookSearch" disabled aria-label="Clear search">&#10005;</button>
+    </div>
+
+    <!-- A-Z toggle + panel -->
+    <button class="az-toggle" id="azToggle" onclick="toggleAzNav()">A&#8211;Z</button>
+    <div class="az-bar" id="azLetters">
+        <div class="az-grid" id="azGrid"></div>
+    </div>
+
+    <!-- Inline detail panel (replaces modal — Silk modal support is unreliable) -->
+    <div id="bookDetails">
+        <div id="bookDetailsBody"></div>
+        <button class="details-close" onclick="closeDetails()">&#8592; Back to list</button>
+    </div>
+
+    <!-- Book list -->
+    {% if books %}
+    <div id="booksGrid">
+        {% for book in books %}
+        {% set poster_url = '' %}
+        {% for img in book.images %}
+            {% if img.coverType in ['poster', 'cover'] and poster_url == '' %}
+                {% set poster_url = img.remoteUrl or img.url %}
+            {% endif %}
+        {% endfor %}
+        {% set author_name = book.author.authorName if book.author else 'Unknown Author' %}
+        {% set size_mb = (book.statistics.sizeOnDisk / 1048576) | round(1) if book.statistics and book.statistics.sizeOnDisk else 0 %}
+
+        <div class="book-item"
+             data-title="{{ book.title|lower }}"
+             data-foreign-id="{{ book.foreignBookId }}"
+             data-internal-id="{{ book.id }}"
+             onclick="window.location.href='/read/{{ book.id }}'">
+
+
+            <!-- Cover -->
+            {% if poster_url %}
+            <img src="{{ poster_url }}" class="book-thumb" alt="{{ book.title }}"
+                 onerror="this.onerror=null;this.src='/static/images/apple-touch-icon.png'">
+            {% else %}
+            <div class="book-thumb-placeholder">&#128218;</div>
+            {% endif %}
+
+            <!-- Info -->
+            <div class="book-info">
+                <div class="book-title">{{ book.title }}</div>
+                <div class="book-author">{{ author_name }}</div>
+                <div class="book-meta">
+                    {{ book.releaseDate[:4] if book.releaseDate else '' }}
+                    {% if book.pageCount %} &middot; {{ book.pageCount }}pp{% endif %}
+                    {% if size_mb %} &middot; {{ size_mb }}MB{% endif %}
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-msg">
+        <p>&#128218;</p>
+        <p>No downloaded books found.<br>Books appear here once they have been downloaded.</p>
+    </div>
+    {% endif %}
+
+    <div id="emptySearch">No books match your search.</div>
+
+    <!-- Back to top -->
+    <button id="backToTop" onclick="window.scrollTo(0,0)" aria-label="Back to top">&#8679;</button>
+
+    <script>
+    // ── Search ───────────────────────────────────────────────────────────────
+    const searchInput = document.getElementById('bookSearch');
+    const clearBtn    = document.getElementById('clearBookSearch');
+    const emptyMsg    = document.getElementById('emptySearch');
+
+    searchInput.addEventListener('input', function() {
+        const term = this.value.trim().toLowerCase();
+        clearBtn.disabled = !term;
+        let anyVisible = false;
+        document.querySelectorAll('.book-item').forEach(item => {
+            const titleMatch  = item.dataset.title.includes(term);
+            const authorEl    = item.querySelector('.book-author');
+            const authorMatch = authorEl ? authorEl.textContent.toLowerCase().includes(term) : false;
+            const match = !term || titleMatch || authorMatch;
+            item.style.display = match ? '' : 'none';
+            if (match) anyVisible = true;
+        });
+        emptyMsg.style.display = anyVisible || !term ? 'none' : 'block';
+    });
+
+    clearBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        this.disabled = true;
+        document.querySelectorAll('.book-item').forEach(i => i.style.display = '');
+        emptyMsg.style.display = 'none';
+    });
+
+    // ── Back to top ──────────────────────────────────────────────────────────
+    const backToTop = document.getElementById('backToTop');
+    window.addEventListener('scroll', function() {
+        backToTop.classList.toggle('visible', window.scrollY > 300);
+    });
+
+    // ── A-Z navigation ───────────────────────────────────────────────────────
+    function buildAzNav() {
+        const grid = document.getElementById('azGrid');
+        if (!grid) return;
+        const used = new Set();
+        document.querySelectorAll('.book-item[data-title]').forEach(item => {
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
+            const c = t.charAt(0);
+            if (/[0-9]/.test(c)) used.add('0');
+            else if (/[a-z]/i.test(c)) used.add(c.toLowerCase());
+        });
+        const chars = ['0', ...'abcdefghijklmnopqrstuvwxyz'];
+        grid.innerHTML = chars.map(c => {
+            const label  = c === '0' ? '0-9' : c.toUpperCase();
+            const active = used.has(c);
+            return `<button class="az-btn" ${active ? `onclick="scrollToLetter('${c}')"` : 'disabled'}>${label}</button>`;
+        }).join('');
+    }
+
+    function toggleAzNav() {
+        const bar = document.getElementById('azLetters');
+        const tog = document.getElementById('azToggle');
+        const isOpen = bar.classList.toggle('open');
+        tog.classList.toggle('az-active', isOpen);
+    }
+
+    function scrollToLetter(letter) {
+        document.getElementById('azLetters').classList.remove('open');
+        document.getElementById('azToggle').classList.remove('az-active');
+        for (const item of document.querySelectorAll('.book-item[data-title]')) {
+            if (item.style.display === 'none') continue;
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
+            const c = t.charAt(0).toLowerCase();
+            const match = letter === '0' ? /[0-9]/.test(c) : c === letter;
+            if (match) {
+                item.scrollIntoView({ behavior: 'auto', block: 'start' }); // 'auto' not 'smooth' — Silk scrolls jank
+                return;
+            }
+        }
+    }
+
+    // ── Client-side cache ────────────────────────────────────────────────────
+    const bookDataCache = new Map();
+
+    // ── Inline details panel (no modal — Silk Bootstrap modal is unreliable) ─
+    let currentOpenItem = null;
+
+    function openBookDetails(foreignBookId, internalId, itemEl) {
+        const panel = document.getElementById('bookDetails');
+        const body  = document.getElementById('bookDetailsBody');
+
+        // Close if tapping same item again
+        if (currentOpenItem === itemEl && panel.classList.contains('open')) {
+            closeDetails();
+            return;
+        }
+        currentOpenItem = itemEl;
+
+        // Insert panel after the tapped item
+        itemEl.parentNode.insertBefore(panel, itemEl.nextSibling);
+        body.innerHTML = '<p>Loading...</p>';
+        panel.classList.add('open');
+
+        // Scroll panel into view (Silk-safe: behavior: auto)
+        panel.scrollIntoView({ behavior: 'auto', block: 'start' });
+
+        // Use cache if available
+        const cached = bookDataCache.get(foreignBookId);
+        if (cached) {
+            renderDetails(body, cached, internalId);
+            return;
+        }
+
+        fetch('/get_media_details?type=book&id=' + foreignBookId)
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.data) {
+                    bookDataCache.set(foreignBookId, data.data);
+                    renderDetails(body, data.data, internalId);
+                } else {
+                    body.innerHTML = '<p>Details not available.</p>';
+                }
+            })
+            .catch(() => { body.innerHTML = '<p>Could not load details.</p>'; });
+    }
+
+    function renderDetails(container, book, internalId) {
+        const title    = book.title || 'Unknown Title';
+        const author   = book.authorName || book.author?.authorName || '';
+        const overview = book.overview || book.synopsis || '';
+        const year     = (book.releaseDate || '').slice(0, 4);
+        const pages    = book.pageCount ? book.pageCount + ' pages' : '';
+        const rating   = book.ratings?.value ? '&#9733; ' + book.ratings.value.toFixed(1) : '';
+        const fileCount = book.statistics?.bookFileCount || 0;
+
+        container.innerHTML = `
+            <h2>${title}</h2>
+            ${author ? `<p style="color:#c0392b;font-family:Arial,sans-serif;margin-bottom:6px;">${author}</p>` : ''}
+            ${[year, pages, rating].filter(Boolean).join(' &middot; ')
+                ? `<p style="font-size:0.8rem;color:#666;font-family:Arial,sans-serif;margin-bottom:10px;">${[year, pages, rating].filter(Boolean).join(' &middot; ')}</p>`
+                : ''}
+            ${overview ? `<p style="font-size:0.85rem;color:#333;font-family:Arial,sans-serif;">${overview}</p>` : ''}
+            ${fileCount ? `<a href="/read/${internalId}" class="btn-read" style="margin-top:12px;display:inline-flex;">&#128214; Open in reader</a>` : ''}
+        `;
+    }
+
+    function closeDetails() {
+        const panel = document.getElementById('bookDetails');
+        panel.classList.remove('open');
+        currentOpenItem = null;
+        // Move panel back to end of grid so it doesn't affect layout
+        const grid = document.getElementById('booksGrid');
+        if (grid) grid.appendChild(panel);
+    }
+
+    // ── Bookmark badges ──────────────────────────────────────────────────────
+    function applyBookmarkBadges() {
+        document.querySelectorAll('.book-item[data-internal-id]').forEach(card => {
+            const internalId    = card.dataset.internalId;
+            const bmKey         = 'epub_bm_' + internalId;
+            const actionsDiv    = card.querySelector('.book-actions');
+            const existingBadge = actionsDiv ? actionsDiv.querySelector('.bm-badge') : null;
+            if (!localStorage.getItem(bmKey)) {
+                if (existingBadge) existingBadge.remove();
+                return;
+            }
+            if (!actionsDiv) return;
+            const pageInfo = localStorage.getItem(bmKey + '_page') || '';
+            const badge = existingBadge || document.createElement('span');
+            badge.className = 'bm-badge';
+            if (pageInfo) {
+                const parts = pageInfo.split('/');
+                badge.textContent = '\uD83D\uDD16 p.' + parts[0];
+                badge.title = 'Bookmarked at page ' + parts[0] + ' of ' + (parts[1] || '?');
+            } else {
+                badge.textContent = '\uD83D\uDD16';
+                badge.title = 'Bookmarked';
+            }
+            if (!existingBadge) actionsDiv.prepend(badge);
+        });
+    }
+
+    // ── Card cover enrichment ────────────────────────────────────────────────
+    // Kindle connections can be slow — we load the disk cache first (fast),
+    // then only fire enrichment for books still missing a cover image.
+    function patchBookCard(foreignBookId, bookData) {
+        const card = document.querySelector('.book-item[data-foreign-id="' + foreignBookId + '"]');
+        if (!card || !bookData) return;
+
+        const authorName = bookData.authorName || bookData.author?.authorName;
+        if (authorName) {
+            const authorEl = card.querySelector('.book-author');
+            if (authorEl && (!authorEl.textContent.trim() || authorEl.textContent.trim() === 'Unknown Author')) {
+                authorEl.textContent = authorName;
+            }
+        }
+
+        const posterUrl = bookData.posterUrl
+            || (bookData.images || []).find(i => i.coverType === 'poster' || i.coverType === 'cover')?.remoteUrl
+            || bookData.remotePoster;
+        if (posterUrl) {
+            const placeholder = card.querySelector('.book-thumb-placeholder');
+            if (placeholder) {
+                const img = document.createElement('img');
+                img.src = posterUrl;
+                img.className = 'book-thumb';
+                img.alt = bookData.title || '';
+                img.onerror = function() { this.onerror = null; this.src = '/static/images/apple-touch-icon.png'; };
+                placeholder.replaceWith(img);
+            }
+        }
+    }
+
+    function enrichMissingBooks() {
+        const missing = [...document.querySelectorAll('.book-item[data-foreign-id]')]
+            .filter(card => !bookDataCache.has(card.dataset.foreignId) && card.querySelector('.book-thumb-placeholder'));
+        if (!missing.length) return;
+
+        // Smaller batches than desktop — Kindle connections are slower
+        const BATCH = 5;
+        let start = 0;
+
+        function nextBatch() {
+            const slice = missing.slice(start, start + BATCH);
+            if (!slice.length) return;
+            start += BATCH;
+            Promise.all(slice.map(card => {
+                const fid = card.dataset.foreignId;
+                return fetch('/get_media_details?type=book&id=' + fid)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.data) {
+                            bookDataCache.set(fid, data.data);
+                            patchBookCard(fid, data.data);
+                        }
+                    })
+                    .catch(() => {});
+            })).then(() => {
+                // Small delay between batches — be polite on slow connections
+                setTimeout(nextBatch, 500);
+            });
+        }
+        nextBatch();
+    }
+
+    // ── Delete ───────────────────────────────────────────────────────────────
+    function deleteBook(foreignBookId, internalId, btn) {
+        if (!confirm('Remove this book from your library?\n(Files will NOT be deleted)')) return;
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '...';
+        fetch('/api/book/' + internalId, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    bookDataCache.delete(foreignBookId);
+                    closeDetails();
+                    btn.closest('.book-item').remove();
+                } else {
+                    alert('Failed: ' + (data.message || 'unknown error'));
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }
+            })
+            .catch(err => {
+                alert('Error: ' + err.message);
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            });
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+        applyBookmarkBadges();
+        buildAzNav();
+
+        const ids = [...document.querySelectorAll('.book-item[data-foreign-id]')]
+            .map(el => el.dataset.foreignId).filter(Boolean);
+        if (!ids.length) return;
+
+        // Pass 1: fast disk cache (no HTTP calls)
+        fetch('/api/book/metadata-cache?ids=' + ids.join(','))
+            .then(r => r.json())
+            .then(data => {
+                Object.entries(data).forEach(([fid, bookData]) => {
+                    bookDataCache.set(fid, bookData);
+                    patchBookCard(fid, bookData);
+                });
+                enrichMissingBooks();
+            })
+            .catch(() => enrichMissingBooks());
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) applyBookmarkBadges();
+    });
+    window.addEventListener('pageshow', applyBookmarkBadges);
+    </script>
+
+</body>
+</html>

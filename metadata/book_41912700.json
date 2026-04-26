@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41912700",
+  "title": "Enslaved",
+  "author": {
+    "authorName": "Marissa Honeycutt"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/273/cover.jpg?lastWrite=636437320220000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1426269058i/25135715.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

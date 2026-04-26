@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "19113247",
+  "title": "The Angel",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/829/cover.jpg?lastWrite=636040630530000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1337044736i/13548075.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

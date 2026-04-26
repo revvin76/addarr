@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "204119879",
+  "title": "Beautiful Chains",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/640/cover.jpg?lastWrite=638463453980000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1710479327i/199626264.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

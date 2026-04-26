@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "66529145",
+  "title": "In the Unlikely Event",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/111/cover.jpg?lastWrite=637098049110000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1574208004i/48847096.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

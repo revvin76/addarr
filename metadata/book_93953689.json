@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "93953689",
+  "title": "Gossamer in the Darkness",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1034/cover.jpg?lastWrite=637730503180000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1637453431i/59662359.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

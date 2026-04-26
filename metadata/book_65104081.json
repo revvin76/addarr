@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "65104081",
+  "title": "Dangerous Beauty",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/203/cover.jpg?lastWrite=636813507780000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1544489973i/41729309.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "51923396",
+  "title": "Retribution",
+  "author": {
+    "authorName": "Julia Ban"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/415/cover.jpg?lastWrite=636436528220000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1469616080i/31267451.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

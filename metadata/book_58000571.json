@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "58000571",
+  "title": "Rough Ride",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1004/cover.jpg?lastWrite=636440820990000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1506700386i/36324717.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

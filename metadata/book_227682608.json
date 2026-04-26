@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "227682608",
+  "title": "Tempting Venom",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/182/cover.jpg?lastWrite=639025697380000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1766927219i/220735489.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "88045143",
+  "title": "Stolen",
+  "author": {
+    "authorName": "Darcy Rose"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/512/cover.jpg?lastWrite=637447433610000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1609138808i/56443214.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

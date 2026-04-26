@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "85658479",
+  "title": "The Nations",
+  "author": {
+    "authorName": "K.A. Knight"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/233/cover.jpg?lastWrite=637328055940000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1597208791i/54894821.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "99048694",
+  "title": "Resilient Reign",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/578/cover.jpg?lastWrite=638080616230000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1672464821i/75437495.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

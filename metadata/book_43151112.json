@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43151112",
+  "title": "The Black Wolf",
+  "author": {
+    "authorName": "J.A. Redmerski"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/793/cover.jpg?lastWrite=636434580960000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1431990626i/23551387.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

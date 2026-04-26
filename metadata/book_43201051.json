@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43201051",
+  "title": "The Mitzvah",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/859/cover.jpg?lastWrite=636434818570000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1495471024i/23598915.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

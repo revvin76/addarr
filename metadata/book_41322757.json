@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41322757",
+  "title": "Resist Me",
+  "author": {
+    "authorName": "A.O. Peart"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/487/cover.jpg?lastWrite=636432066040000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1421746437i/23148351.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

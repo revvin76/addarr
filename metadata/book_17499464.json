@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "17499464",
+  "title": "Captive in the Dark",
+  "author": {
+    "authorName": "C.J. Roberts"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/268/cover.jpg?lastWrite=636040811020000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1315343569i/12513614.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

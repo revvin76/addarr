@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21466174",
+  "title": "Edge of Oblivion",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/188/cover.jpg?lastWrite=636041046370000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1359923417i/17317625.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

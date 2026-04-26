@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21932121",
+  "title": "Unattainable",
+  "author": {
+    "authorName": "Madeline Sheehan"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/652/cover.jpg?lastWrite=638420139920000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1705985236i/16114862.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

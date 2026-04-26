@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42917460",
+  "title": "Cadence",
+  "author": {
+    "authorName": "D.H. Sidebottom"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/907/cover.jpg?lastWrite=636434925070000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1416963648i/23616946.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

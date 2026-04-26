@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "73747499",
+  "title": "Rules of Engagement",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/210/cover.jpg?lastWrite=637212157840000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1578035979l/52838537.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

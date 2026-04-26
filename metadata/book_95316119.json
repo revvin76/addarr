@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "95316119",
+  "title": "Vows",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/570/cover.jpg?lastWrite=637816579110000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1645629106i/60481565.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

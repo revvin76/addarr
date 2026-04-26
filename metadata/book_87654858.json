@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "87654858",
+  "title": "Betrayed Honor",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/724/cover.jpg?lastWrite=637567043480000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1621107517i/58052326.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

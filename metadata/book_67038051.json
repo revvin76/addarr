@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "67038051",
+  "title": "Rock Hard",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/112/cover.jpg?lastWrite=637560853450000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1620488469i/57980891.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

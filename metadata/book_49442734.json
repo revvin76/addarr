@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "49442734",
+  "title": "The Confessions",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/877/cover.jpg?lastWrite=636431843490000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1455734202i/29208586.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

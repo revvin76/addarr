@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "89511969",
+  "title": "Toxic Creek",
+  "author": {
+    "authorName": "K.C. Kean"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/514/cover.jpg?lastWrite=637533938880000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1617797077i/57193221.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

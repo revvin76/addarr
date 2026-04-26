@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41060333",
+  "title": "Scandal",
+  "author": {
+    "authorName": "Navessa Allen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/72/cover.jpg?lastWrite=637101349100000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1574538105i/48921270.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

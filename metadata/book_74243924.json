@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "74243924",
+  "title": "Playing with Fire",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/115/cover.jpg?lastWrite=637351718270000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1598618622i/48854978.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "98153134",
+  "title": "Jekyll",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/732/cover.jpg?lastWrite=638011097700000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1665081196i/62896317.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

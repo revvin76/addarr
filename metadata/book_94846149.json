@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "94846149",
+  "title": "Quintessentially",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/569/cover.jpg?lastWrite=638985237190000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1762926897i/61256126.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

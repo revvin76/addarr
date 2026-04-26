@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "57859381",
+  "title": "The Fantasyland Series Box Set",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1003/cover.jpg?lastWrite=636440098230000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1505160119i/36221844.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

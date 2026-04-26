@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "50733954",
+  "title": "The Farthest Edge",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/999/cover.jpg?lastWrite=636438988370000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1474586854i/30261519.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

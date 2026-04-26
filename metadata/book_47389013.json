@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "47389013",
+  "title": "Bounty",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/997/cover.jpg?lastWrite=636436203410000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1453936227i/27335087.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

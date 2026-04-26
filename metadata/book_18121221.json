@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "18121221",
+  "title": "The Devil's Eyes",
+  "author": {
+    "authorName": "Jennifer Loren"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/330/cover.jpg?lastWrite=636433215520000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1376574718i/18333441.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

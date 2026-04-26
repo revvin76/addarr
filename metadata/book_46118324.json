@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "46118324",
+  "title": "Behind the Hands That Kill",
+  "author": {
+    "authorName": "J.A. Redmerski"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/795/cover.jpg?lastWrite=636438723100000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1459898420i/26160134.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

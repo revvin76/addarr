@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "1049526",
+  "title": "The Claiming of Sleeping Beauty",
+  "author": {
+    "authorName": "A.N. Roquelaure"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/318/cover.jpg?lastWrite=636900472820000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1554450437i/26582.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

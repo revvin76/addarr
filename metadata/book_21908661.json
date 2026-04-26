@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21908661",
+  "title": "My Soul to Take",
+  "author": {
+    "authorName": "Madeline Sheehan"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/650/cover.jpg?lastWrite=636041395230000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1350863094i/16099258.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

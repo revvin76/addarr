@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "73296408",
+  "title": "Unforgettable",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/552/cover.jpg?lastWrite=637163013060000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1568913804l/50929219.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

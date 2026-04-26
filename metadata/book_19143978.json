@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "19143978",
+  "title": "Knight",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/287/cover.jpg?lastWrite=638489505330000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1713353674i/211647010.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

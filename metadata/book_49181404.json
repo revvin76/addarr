@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "49181404",
+  "title": "Lana's Awakening",
+  "author": {
+    "authorName": "Kristin Elyon"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/356/cover.jpg?lastWrite=636439460080000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1403757823i/22589313.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

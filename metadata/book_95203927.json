@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "95203927",
+  "title": "Sweet Ferocity",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/729/cover.jpg?lastWrite=637809312200000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1645020027i/60416115.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

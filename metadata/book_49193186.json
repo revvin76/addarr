@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "49193186",
+  "title": "Behind Her Eyes",
+  "author": {
+    "authorName": "Sarah Pinborough"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/493/cover.jpg?lastWrite=636432794960000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1490199768i/34118869.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

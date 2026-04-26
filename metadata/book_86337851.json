@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "86337851",
+  "title": "Contention",
+  "author": {
+    "authorName": "Asha Everly"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/473/cover.jpg?lastWrite=637359525260000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1600355679i/55361016.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

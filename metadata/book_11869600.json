@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "11869600",
+  "title": "Blue Is the Warmest Color",
+  "author": {
+    "authorName": "Jul Maroh"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/488/cover.jpg?lastWrite=637514146960000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1615817799i/17465574.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

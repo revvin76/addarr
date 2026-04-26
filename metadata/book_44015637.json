@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "44015637",
+  "title": "Penelope's Punishment",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/695/cover.jpg?lastWrite=638636824310000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1435080142i/24427970.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

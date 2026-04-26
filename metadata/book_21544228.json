@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21544228",
+  "title": "With Everything I Am",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/978/cover.jpg?lastWrite=636041801990000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1352928074i/15817326.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

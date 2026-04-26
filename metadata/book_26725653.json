@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "26725653",
+  "title": "All for Maddie",
+  "author": {
+    "authorName": "Jettie Woodruff"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/755/cover.jpg?lastWrite=636438564950000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1385751526i/18799346.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

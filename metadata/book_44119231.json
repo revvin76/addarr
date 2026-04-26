@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "44119231",
+  "title": "Snowflakes & Fire Escapes",
+  "author": {
+    "authorName": "J.M. Darhower"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/777/cover.jpg?lastWrite=636432968290000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1425139504i/24519775.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "71867116",
+  "title": "Watch Me",
+  "author": {
+    "authorName": "Ker Dukey"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/691/cover.jpg?lastWrite=637131284430000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1563841725l/50018100.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

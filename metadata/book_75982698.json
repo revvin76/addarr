@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "75982698",
+  "title": "The Monster",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/120/cover.jpg?lastWrite=637572056190000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1621608806i/57517266.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

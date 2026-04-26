@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "207383833",
+  "title": "His in the Dark",
+  "author": {
+    "authorName": "Willow Winters"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/483/cover.jpg?lastWrite=638359806760000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1699960949i/202116405.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

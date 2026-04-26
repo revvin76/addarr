@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "285135348",
+  "title": "My Darling Reverie",
+  "author": {
+    "authorName": "H.D. Carlton"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/45/cover.jpg?lastWrite=639091416480000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1773544809i/249719463.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

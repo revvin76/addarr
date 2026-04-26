@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "95895258",
+  "title": "Playing the Field",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/129/cover.jpg?lastWrite=637859646170000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1649935809i/60811105.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

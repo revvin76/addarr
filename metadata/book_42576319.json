@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42576319",
+  "title": "The Consequences Beginnings",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/525/cover.jpg?lastWrite=636441278040000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1409088336i/23009547.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

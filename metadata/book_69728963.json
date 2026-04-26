@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "69728963",
+  "title": "Mafia Romance",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/548/cover.jpg?lastWrite=636907960170000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1555199072i/45037891.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "117259085",
+  "title": "Ravishing Reign",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/581/cover.jpg?lastWrite=638107822180000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1675185416i/92978409.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

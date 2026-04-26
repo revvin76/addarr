@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25473966",
+  "title": "For The Sub",
+  "author": {
+    "authorName": "Sierra Cartwright"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/389/cover.jpg?lastWrite=636234858390000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1379812024i/18134480.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

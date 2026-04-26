@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "59205325",
+  "title": "N9ne: The Tale of Kevin Clearwater",
+  "author": {
+    "authorName": "T.M. Frazier"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/937/cover.jpg?lastWrite=636899457920000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1554341552i/44780783.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

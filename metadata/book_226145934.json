@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "226145934",
+  "title": "Ravage",
+  "author": {
+    "authorName": "Steph Macca"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/50/cover.jpg?lastWrite=638749041250000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1738931092i/219221908.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

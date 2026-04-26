@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "90422473",
+  "title": "Yellow Thorns",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/169/cover.jpg?lastWrite=637566040070000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1621007155i/57729643.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

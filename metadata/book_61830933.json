@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "61830933",
+  "title": "A Secret One",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/540/cover.jpg?lastWrite=638637404360000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1524624541i/39937808.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

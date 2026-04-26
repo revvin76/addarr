@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "63225033",
+  "title": "Loose Ends: Volume One",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1011/cover.jpg?lastWrite=636664055870000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1530562646i/40669052.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

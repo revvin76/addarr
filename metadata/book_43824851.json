@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43824851",
+  "title": "The Teacher's Pet",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/863/cover.jpg?lastWrite=636437722600000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1495471091i/24239506.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

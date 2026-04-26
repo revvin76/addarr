@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43211205",
+  "title": "Dash: Volume 2",
+  "author": {
+    "authorName": "Shantel Tessier"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/6/cover.jpg?lastWrite=636434886570000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1419905813i/23609436.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

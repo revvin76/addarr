@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "223249988",
+  "title": "Deadly Deception",
+  "author": {
+    "authorName": "Jasmine Rov"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/452/cover.jpg?lastWrite=638578608070000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1722263813i/216811043.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

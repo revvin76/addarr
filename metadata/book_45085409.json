@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "45085409",
+  "title": "Pure Revenge",
+  "author": {
+    "authorName": "Anya M. Silver"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/496/cover.jpg?lastWrite=638891044840000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1753507500i/25346359.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

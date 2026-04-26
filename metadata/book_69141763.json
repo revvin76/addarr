@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "69141763",
+  "title": "Shadowed",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/148/cover.jpg?lastWrite=636991634080000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1563566505i/45273718.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

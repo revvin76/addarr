@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "78982151",
+  "title": "From Blood and Ash",
+  "author": {
+    "authorName": "Jennifer L. Armentrout"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4875/cover.jpg?lastWrite=638700396210000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1734440654i/52831200.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

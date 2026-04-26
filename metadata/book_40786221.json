@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "40786221",
+  "title": "Fit to Be Tied",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/850/cover.jpg?lastWrite=636442274530000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1395076055i/21468416.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

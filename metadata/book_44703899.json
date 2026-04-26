@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "44703899",
+  "title": "Vacant",
+  "author": {
+    "authorName": "Ker Dukey"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/676/cover.jpg?lastWrite=636436319400000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1426490223i/25028920.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

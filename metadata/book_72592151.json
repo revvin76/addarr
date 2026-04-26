@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "72592151",
+  "title": "Hurt Me",
+  "author": {
+    "authorName": "Ker Dukey"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/692/cover.jpg?lastWrite=637161069150000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1565642288l/50746743.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

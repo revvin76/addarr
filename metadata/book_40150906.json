@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "40150906",
+  "title": "Keep Me",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/618/cover.jpg?lastWrite=636433082200000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1473195498i/31847614.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

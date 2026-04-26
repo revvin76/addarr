@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "74020663",
+  "title": "Vicious Prince",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/155/cover.jpg?lastWrite=638960143780000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1760417571i/48675599.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

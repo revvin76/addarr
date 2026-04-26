@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "222829921",
+  "title": "Rock Chick Bonus Tracks",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1049/cover.jpg?lastWrite=638655344930000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1729937629i/216412344.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

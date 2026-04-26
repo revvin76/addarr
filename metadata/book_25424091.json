@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25424091",
+  "title": "Reviving Izabel",
+  "author": {
+    "authorName": "J.A. Redmerski"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/788/cover.jpg?lastWrite=636440470090000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1389884232i/20559695.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

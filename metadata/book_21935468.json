@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21935468",
+  "title": "The Mistress",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/833/cover.jpg?lastWrite=636041874120000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1358807432i/17251444.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

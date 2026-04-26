@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "98012761",
+  "title": "Madame",
+  "author": {
+    "authorName": "Sara Cate"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/255/cover.jpg?lastWrite=638309275260000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1694898723i/63883436.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

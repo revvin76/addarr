@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "66753830",
+  "title": "Poppy",
+  "author": {
+    "authorName": "Kailee Reese Samuels"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/441/cover.jpg?lastWrite=636789536950000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1543345287i/42967480.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

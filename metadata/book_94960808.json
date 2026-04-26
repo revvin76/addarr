@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "94960808",
+  "title": "Aces and Ashes",
+  "author": {
+    "authorName": "Steph Macca"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/86/cover.jpg?lastWrite=637816441520000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1645615385i/60480440.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

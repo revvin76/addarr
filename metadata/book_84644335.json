@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "84644335",
+  "title": "The Game Maker",
+  "author": {
+    "authorName": "Kitty Thomas"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/610/cover.jpg?lastWrite=638464604000000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1710631011i/210064997.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

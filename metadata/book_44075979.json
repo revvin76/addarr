@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "44075979",
+  "title": "Beyond the Consequences",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/526/cover.jpg?lastWrite=636435589130000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1418493877i/23815291.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

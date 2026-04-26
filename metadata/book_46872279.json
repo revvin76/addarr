@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "46872279",
+  "title": "Counsellor",
+  "author": {
+    "authorName": "Celia Aaron"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/349/cover.jpg?lastWrite=636433031970000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1443585671i/26838277.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

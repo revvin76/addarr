@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "40648107",
+  "title": "Embracing the Darkness",
+  "author": {
+    "authorName": "Laura Morgan"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/372/cover.jpg?lastWrite=636440953810000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1394270928i/21340877.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

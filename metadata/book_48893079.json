@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "48893079",
+  "title": "My Fresh Out Alpha Mate",
+  "author": {
+    "authorName": "A.J. Young"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/387/cover.jpg?lastWrite=636436746950000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1453738815i/28695283.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

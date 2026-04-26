@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42799866",
+  "title": "Silver Bastard",
+  "author": {
+    "authorName": "Joanna Wylde"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/817/cover.jpg?lastWrite=636432715950000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1412174740i/23258847.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

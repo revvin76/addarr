@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "108772100",
+  "title": "One Kiss: Riverbend Lighter One",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/580/cover.jpg?lastWrite=638259399850000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1689911487i/84229894.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

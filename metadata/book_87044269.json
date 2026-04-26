@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "87044269",
+  "title": "Danger's First Kiss",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/559/cover.jpg?lastWrite=637409756900000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1605378768i/55886202.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

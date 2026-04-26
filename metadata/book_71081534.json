@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "71081534",
+  "title": "Rules of Bennett",
+  "author": {
+    "authorName": "Ember Michaels"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/481/cover.jpg?lastWrite=636961630370000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1560552785i/46139622.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

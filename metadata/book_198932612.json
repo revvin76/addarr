@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "198932612",
+  "title": "Theo of Golden",
+  "author": {
+    "authorName": "Allen Levi"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4889/cover.jpg?lastWrite=638973410120000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1761744192i/242376245.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

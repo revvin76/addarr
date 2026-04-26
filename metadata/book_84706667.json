@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "84706667",
+  "title": "Defiant",
+  "author": {
+    "authorName": "Sara Cate"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/241/cover.jpg?lastWrite=637288181180000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1593221278i/54282995.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

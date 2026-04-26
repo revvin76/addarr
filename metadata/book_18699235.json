@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "18699235",
+  "title": "Play It Safe",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/970/cover.jpg?lastWrite=636040680570000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1326638842i/13413762.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

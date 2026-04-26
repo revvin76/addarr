@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "96512012",
+  "title": "A Day of Chaos",
+  "author": {
+    "authorName": "Steph Macca"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/88/cover.jpg?lastWrite=637966652340000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1660636614i/61992236.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

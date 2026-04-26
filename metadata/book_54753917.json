@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "54753917",
+  "title": "The Dark Forest",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/699/cover.jpg?lastWrite=636438032870000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1484015808i/33828450.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43111444",
+  "title": "Broken Dolls",
+  "author": {
+    "authorName": "Kitty Thomas"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/605/cover.jpg?lastWrite=638414500440000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1705421252i/205465459.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42815909",
+  "title": "Hold Me",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/619/cover.jpg?lastWrite=636433082330000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1473195625i/31847626.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

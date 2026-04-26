@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21908648",
+  "title": "The Soul Mate",
+  "author": {
+    "authorName": "Madeline Sheehan"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/649/cover.jpg?lastWrite=636041395140000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1350862860i/16099246.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

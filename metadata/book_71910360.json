@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "71910360",
+  "title": "Perfect Strangers",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/209/cover.jpg?lastWrite=637126603000000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1568641242l/49730872.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

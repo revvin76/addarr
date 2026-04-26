@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "26535802",
+  "title": "Tainted",
+  "author": {
+    "authorName": "Jamie Begley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/416/cover.jpg?lastWrite=636437331010000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1382246996i/18690140.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

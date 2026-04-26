@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "49002428",
+  "title": "Swept Away",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/624/cover.jpg?lastWrite=638636994380000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1461020550i/29952507.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

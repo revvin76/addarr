@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "100455093",
+  "title": "Recklessly Damaged",
+  "author": {
+    "authorName": "Steph Macca"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/90/cover.jpg?lastWrite=638159460990000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1679924903i/123851341.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

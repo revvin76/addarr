@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "181928663",
+  "title": "Relentless Surrender",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/736/cover.jpg?lastWrite=638223119390000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1686284573i/174619948.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

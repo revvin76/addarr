@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42346944",
+  "title": "The Submission of Little Emmie",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/693/cover.jpg?lastWrite=636440434180000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1406930010i/22798404.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

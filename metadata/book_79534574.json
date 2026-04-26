@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "79534574",
+  "title": "Dream Chaser",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1027/cover.jpg?lastWrite=637393422520000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1591465157i/53021566.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

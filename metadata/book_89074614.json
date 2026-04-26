@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "89074614",
+  "title": "The Dark Arts",
+  "author": {
+    "authorName": "Kitty Thomas"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/611/cover.jpg?lastWrite=638196965440000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1683667748i/56951732.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

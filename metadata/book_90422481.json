@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "90422481",
+  "title": "Red Thorns",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/170/cover.jpg?lastWrite=637550382060000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1619441351i/57729648.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

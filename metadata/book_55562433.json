@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "55562433",
+  "title": "Scandalous",
+  "author": {
+    "authorName": "L.J. Shen"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/102/cover.jpg?lastWrite=636434898320000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1505752703i/34450909.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

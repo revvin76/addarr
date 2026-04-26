@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "211943699",
+  "title": "Unwillingly His",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/742/cover.jpg?lastWrite=638634023810000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1727804212i/219834513.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

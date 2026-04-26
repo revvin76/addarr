@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "26129516",
+  "title": "Raw",
+  "author": {
+    "authorName": "Belle Aurora"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/280/cover.jpg?lastWrite=636439188320000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1437456543i/20421367.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

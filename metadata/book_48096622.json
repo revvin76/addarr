@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "48096622",
+  "title": "This is War, Baby",
+  "author": {
+    "authorName": "K. Webster"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/311/cover.jpg?lastWrite=636432460310000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1455166013i/28094098.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

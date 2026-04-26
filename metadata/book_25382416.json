@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25382416",
+  "title": "Reaper's Legacy",
+  "author": {
+    "authorName": "Joanna Wylde"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/814/cover.jpg?lastWrite=636040796110000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1373565326i/18076876.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

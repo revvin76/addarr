@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "47991727",
+  "title": "Uncovering You",
+  "author": {
+    "authorName": "Scarlett Edwards"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/500/cover.jpg?lastWrite=636431862830000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1448563451i/27989635.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

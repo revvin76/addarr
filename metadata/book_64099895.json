@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "64099895",
+  "title": "Secrets",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/542/cover.jpg?lastWrite=636724665760000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1536859367i/41051574.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

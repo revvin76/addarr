@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "58652076",
+  "title": "Debt",
+  "author": {
+    "authorName": "E.L. Beth"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/499/cover.jpg?lastWrite=636480169310000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1512420057i/36891861.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

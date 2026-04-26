@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "39930583",
+  "title": "Lex",
+  "author": {
+    "authorName": "S.K. Logsdon"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/354/cover.jpg?lastWrite=636432029640000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1394427674i/20640026.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

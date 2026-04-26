@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "69144610",
+  "title": "Wicked Games",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/208/cover.jpg?lastWrite=636887521140000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1553115895i/44553144.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "39952874",
+  "title": "By My Choice... A Valentine's Day Story",
+  "author": {
+    "authorName": "Christine Blackthorn"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/363/cover.jpg?lastWrite=636432274950000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1391090386i/20656399.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

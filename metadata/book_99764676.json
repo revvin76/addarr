@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "99764676",
+  "title": "A Wolfe in Winter",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/899/cover.jpg?lastWrite=638053199180000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1669296431i/63833616.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

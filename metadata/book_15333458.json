@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "15333458",
+  "title": "Shatter Me",
+  "author": {
+    "authorName": "Tahereh Mafi"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4882/cover.jpg?lastWrite=638912416890000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1755641100i/37642300.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

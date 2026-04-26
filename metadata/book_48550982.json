@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "48550982",
+  "title": "Dark Notes",
+  "author": {
+    "authorName": "Pam Godwin"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1079/cover.jpg?lastWrite=636434940110000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1456118781i/28435457.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

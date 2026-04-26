@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "56364137",
+  "title": "The Poppy War",
+  "author": {
+    "authorName": "R.F. Kuang"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4887/cover.jpg?lastWrite=637637482630000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1628151442i/58705175.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

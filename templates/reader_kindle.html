@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Reader</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box; margin: 0; padding: 0;
+            /* No transitions — every CSS transition causes an e-ink flash */
+            transition: none !important;
+            animation: none !important;
+        }
+
+        html, body {
+            height: 100%; width: 100%;
+            background: #fff;
+            color: #111;
+            font-family: Georgia, 'Times New Roman', serif;
+            overflow: hidden;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        /* ── Toolbar ──────────────────────────────────────────────────────── */
+        #toolbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 110;
+            display: flex; align-items: center; gap: 6px;
+            background: #fff;
+            border-bottom: 2px solid #222;
+            padding: 6px 10px;
+            height: 50px;
+        }
+
+        /* ── Footer ──────────────────────────────────────────────────────── */
+        #footer {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 110;
+            display: flex; align-items: center; justify-content: center; gap: 0;
+            background: #fff;
+            border-top: 2px solid #222;
+            height: 54px;
+        }
+
+        /* ── Buttons ──────────────────────────────────────────────────────── */
+        .tb-btn {
+            background: #fff;
+            border: 2px solid #555;
+            color: #111;
+            border-radius: 5px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            font-family: Arial, sans-serif;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+            line-height: 1.4;
+            min-height: 38px;
+            min-width: 38px;
+        }
+        /* Active state instead of hover — Paperwhite has no hover */
+        .tb-btn:active { background: #e0e0e0; }
+        .tb-btn.bookmarked { color: #c07000; border-color: #c07000; font-weight: bold; }
+
+        /* Page-turn buttons are wider tap targets */
+        .page-btn {
+            height: 54px;
+            width: 30%;
+            border: none;
+            border-radius: 0;
+            background: #fff;
+            color: #111;
+            font-size: 1.6rem;
+            font-family: Arial, sans-serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        .page-btn:active { background: #e8e8e8; }
+
+        #footerPageInfo {
+            flex: 1;
+            font-size: 0.78rem;
+            color: #555;
+            text-align: center;
+            font-family: Arial, sans-serif;
+            padding: 0 4px;
+        }
+
+        #bookTitle {
+            flex: 1;
+            font-size: 0.75rem;
+            color: #555;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        /* ── Reader area ──────────────────────────────────────────────────── */
+        #reader {
+            position: fixed;
+            top: 50px;    /* below toolbar */
+            bottom: 54px; /* above footer */
+            left: 0; right: 0;
+        }
+
+        /* ── Tap zones (over the epub iframe) ────────────────────────────── */
+        /* Wider left/right zones than desktop — fingers are imprecise */
+        #prevZone, #centerZone, #nextZone {
+            position: absolute; top: 0; bottom: 0; z-index: 10;
+        }
+        #prevZone   { left: 0;   width: 25%; cursor: pointer; }
+        #centerZone { left: 25%; width: 50%; cursor: default; }
+        #nextZone   { right: 0;  width: 25%; cursor: pointer; }
+
+        /* ── EPUB viewer ──────────────────────────────────────────────────── */
+        #epubViewer {
+            width: 100%; height: 100%;
+            background: #fff;
+            display: none;
+        }
+
+        /* ── TOC — inline panel, not a slide-in overlay ───────────────────── */
+        /* Shown/hidden by toggling display. No transforms — they flash on e-ink */
+        #tocPanel {
+            display: none;
+            position: fixed;
+            top: 50px; bottom: 54px; left: 0; right: 0;
+            background: #fff;
+            z-index: 200;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        #tocPanel.open { display: block; }
+        #tocHeader {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 2px solid #222;
+            font-size: 0.85rem;
+            color: #333;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            position: sticky; top: 0;
+        }
+        #tocClose {
+            background: #fff; border: 2px solid #555; color: #111;
+            font-size: 0.85rem; cursor: pointer; padding: 5px 12px;
+            border-radius: 4px; font-family: Arial, sans-serif;
+            min-height: 38px;
+        }
+        #tocClose:active { background: #e0e0e0; }
+        .toc-entry {
+            display: block;
+            padding: 14px 18px;
+            color: #111;
+            font-size: 0.9rem;
+            font-family: Arial, sans-serif;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            /* No text-overflow ellipsis — wrap instead, easier to read on e-ink */
+            white-space: normal;
+            word-break: break-word;
+        }
+        .toc-entry:active { background: #e8e8e8; }
+        .toc-entry.depth-1 { padding-left: 32px; font-size: 0.85rem; color: #444; }
+        .toc-entry.depth-2 { padding-left: 46px; font-size: 0.8rem;  color: #666; }
+
+        /* ── Loading / error ──────────────────────────────────────────────── */
+        #statusMsg {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center; color: #555; z-index: 50;
+            font-family: Arial, sans-serif; font-size: 0.9rem;
+        }
+        /* Simple text spinner — CSS animation would flicker on e-ink */
+        #loadingDots { font-size: 1.4rem; letter-spacing: 4px; color: #999; margin-top: 10px; }
+
+        /* ── Toast — larger, longer-lived on e-ink ────────────────────────── */
+        #toast {
+            display: none;
+            position: fixed; bottom: 64px; left: 50%;
+            transform: translateX(-50%);
+            background: #111; color: #fff;
+            padding: 10px 22px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-family: Arial, sans-serif;
+            z-index: 300;
+            white-space: nowrap;
+            border: 1px solid #444;
+        }
+        #toast.show { display: block; }
+    </style>
+</head>
+<body>
+
+<!-- ── Toolbar ── -->
+<div id="toolbar">
+    <button class="tb-btn" onclick="goBack()">&#8592; Library</button>
+    <span id="bookTitle">Loading&hellip;</span>
+    {% if file_type == 'epub' %}
+    <button class="tb-btn" id="bookmarkBtn" onclick="toggleBookmark()" title="Bookmark">&#128278;</button>
+    <button class="tb-btn" id="tocBtn"      onclick="toggleToc()">Contents</button>
+    {% endif %}
+</div>
+
+<!-- ── Reader area ── -->
+<div id="reader">
+    <div id="statusMsg">
+        <p>Loading book&hellip;</p>
+        <div id="loadingDots">. . .</div>
+    </div>
+
+    {% if file_type == 'epub' %}
+    <div id="prevZone"   onclick="epubPrev()"></div>
+    <div id="centerZone"></div>
+    <div id="nextZone"   onclick="epubNext()"></div>
+    <div id="epubViewer"></div>
+    {% else %}
+    <!-- PDF is not supported on Kindle Paperwhite — browser can't handle pdf.js -->
+    <div style="padding: 40px 24px; font-family: Arial, sans-serif; font-size: 0.95rem; color: #555; text-align: center;">
+        <p style="margin-bottom: 12px; font-size: 1rem; color: #111;">PDF files cannot be displayed on this device.</p>
+        <p>Try accessing this book from a tablet or desktop browser.</p>
+        <button class="tb-btn" style="margin-top: 20px;" onclick="goBack()">&#8592; Back to Library</button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── TOC (epub only — inline panel, no overlay) ── -->
+{% if file_type == 'epub' %}
+<div id="tocPanel">
+    <div id="tocHeader">
+        <span>Contents</span>
+        <button id="tocClose" onclick="closeToc()">&#10005; Close</button>
+    </div>
+    <div id="tocList"></div>
+</div>
+{% endif %}
+
+<!-- ── Footer ── -->
+<div id="footer">
+    {% if file_type == 'epub' %}
+    <button class="page-btn" onclick="epubPrev()">&#8249;</button>
+    <span id="footerPageInfo">&mdash;</span>
+    <button class="page-btn" onclick="epubNext()">&#8250;</button>
+    {% endif %}
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"></div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     EPUB
+     epub.js is the same library as desktop reader.
+     Key Kindle-specific changes:
+       - defaultTheme forces a serif font and larger line-height
+       - locations.generate() uses a larger spread (2400) because
+         Paperwhite renders chapters as single long pages — fewer
+         spine items means fewer location slices needed
+       - Swipe threshold increased to 60px (Paperwhite touch imprecise)
+       - keyboard nav retained for Paperwhite page-turn buttons
+         (they send ArrowRight / ArrowLeft key events via the browser)
+════════════════════════════════════════════════════════════ -->
+{% if file_type == 'epub' %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+<script>
+const bookId     = {{ book_id }};
+const fileUrl    = `/api/book/file/${bookId}`;
+const BM_KEY     = `epub_bm_${bookId}`;
+const LOC_KEY    = `epub_loc_${bookId}`;
+
+let book, rendition;
+let locationsReady = false;
+let totalLocs      = 0;
+let bookmarkCfi    = localStorage.getItem(BM_KEY) || null;
+let tocOpen        = false;
+
+// ── Navigation ────────────────────────────────────────────────────────────
+function goBack() {
+    // Navigate to the Kindle book library — do NOT use window.close()
+    // as the Paperwhite browser may not allow JS-initiated tab closes.
+    window.location.href = '/kindle';
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+// Longer display time than desktop — e-ink refresh means the toast
+// may not render until 200-300ms after it's inserted into the DOM.
+function showToast(msg, ms = 2500) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// ── TOC ───────────────────────────────────────────────────────────────────
+// Use a plain full-screen panel instead of a slide-in overlay.
+// CSS transforms cause a full e-ink refresh on every animation frame.
+function toggleToc() {
+    tocOpen = !tocOpen;
+    document.getElementById('tocPanel').classList.toggle('open', tocOpen);
+}
+function closeToc() {
+    tocOpen = false;
+    document.getElementById('tocPanel').classList.remove('open');
+}
+function buildToc(items, depth = 0) {
+    const list = document.getElementById('tocList');
+    for (const item of items) {
+        const el = document.createElement('div');
+        el.className = 'toc-entry' + (depth ? ` depth-${Math.min(depth, 2)}` : '');
+        el.textContent = item.label;
+        el.onclick = () => {
+            rendition.display(item.href);
+            closeToc();
+        };
+        list.appendChild(el);
+        if (item.subitems?.length) buildToc(item.subitems, depth + 1);
+    }
+}
+
+// ── Bookmark ──────────────────────────────────────────────────────────────
+function applyHighlight(cfi) {
+    if (!cfi || !rendition) return;
+    try {
+        rendition.annotations.highlight(
+            cfi, {}, null, 'bm-hl',
+            { 'fill': '#c07000', 'fill-opacity': '0.22' }  // amber, but less vivid on e-ink
+        );
+    } catch(e) {}
+}
+
+function removeHighlight(cfi) {
+    if (!cfi || !rendition) return;
+    try { rendition.annotations.remove(cfi, 'highlight'); } catch(e) {}
+}
+
+function isBookmarkOnPage(loc) {
+    if (!bookmarkCfi || !loc) return false;
+    const start = loc.start?.cfi;
+    const end   = loc.end?.cfi || start;
+    if (!start) return false;
+    const spineOf = c => { const m = c.match(/epubcfi\(([^!]+)!/); return m ? m[1] : ''; };
+    if (spineOf(bookmarkCfi) !== spineOf(start)) return false;
+    return bookmarkCfi >= start && bookmarkCfi <= end;
+}
+
+function updateBookmarkBtn(loc) {
+    const btn = document.getElementById('bookmarkBtn');
+    if (!btn) return;
+    if (bookmarkCfi && isBookmarkOnPage(loc)) {
+        btn.classList.add('bookmarked');
+        btn.title = 'Remove bookmark';
+    } else {
+        btn.classList.remove('bookmarked');
+        btn.title = bookmarkCfi ? 'Move bookmark here' : 'Bookmark this page';
+    }
+}
+
+function toggleBookmark() {
+    const loc = rendition?.currentLocation?.();
+    const cfi = loc?.start?.cfi;
+    if (!cfi) return;
+
+    if (bookmarkCfi && isBookmarkOnPage(loc)) {
+        removeHighlight(bookmarkCfi);
+        localStorage.removeItem(BM_KEY);
+        localStorage.removeItem(BM_KEY + '_page');
+        bookmarkCfi = null;
+        updateBookmarkBtn(loc);
+        showToast('Bookmark removed');
+    } else {
+        if (bookmarkCfi) removeHighlight(bookmarkCfi);
+        bookmarkCfi = cfi;
+        localStorage.setItem(BM_KEY, cfi);
+        applyHighlight(cfi);
+        if (locationsReady && totalLocs) {
+            const pageNum = book.locations.locationFromCfi(cfi);
+            localStorage.setItem(BM_KEY + '_page', `${pageNum}/${totalLocs}`);
+        } else {
+            localStorage.removeItem(BM_KEY + '_page');
+        }
+        updateBookmarkBtn(loc);
+        showToast('Bookmark saved');
+    }
+}
+
+// ── Footer ────────────────────────────────────────────────────────────────
+function updateFooter(cfi) {
+    const el = document.getElementById('footerPageInfo');
+    if (locationsReady && totalLocs) {
+        const n = book.locations.locationFromCfi(cfi);
+        el.textContent = `${n} / ${totalLocs}`;
+    } else {
+        const pct = book.locations.percentageFromCfi(cfi);
+        el.textContent = pct ? `${Math.round(pct * 100)}%` : '\u2014';
+    }
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────
+function epubNext() { if (rendition) rendition.next(); }
+function epubPrev() { if (rendition) rendition.prev(); }
+
+// ── Init ──────────────────────────────────────────────────────────────────
+async function initEpub() {
+    try {
+        const resp = await fetch(fileUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const buffer = await resp.arrayBuffer();
+        book = ePub(buffer);
+
+        rendition = book.renderTo('epubViewer', {
+            width: '100%',
+            height: '100%',
+            spread: 'none',
+            allowScriptedContent: true
+        });
+
+        // Inject a Kindle-friendly theme:
+        // - Serif font reads better on e-ink
+        // - Larger font size and line-height
+        // - No background colour override (keep #fff from CSS)
+        // - Generous side margins so text doesn't run to the bezel
+        rendition.themes.register('kindle', {
+            'body': {
+                'font-family': 'Georgia, "Times New Roman", serif !important',
+                'font-size':   '1.05rem !important',
+                'line-height': '1.75 !important',
+                'color':       '#111 !important',
+                'background':  '#fff !important',
+                'margin':      '0 !important',
+                'padding':     '12px 18px !important'
+            },
+            'p': {
+                'margin-bottom': '0.8em !important',
+                'text-align':    'justify !important'
+            },
+            'h1, h2, h3': {
+                'font-family': 'Arial, sans-serif !important',
+                'margin':      '1em 0 0.5em !important'
+            },
+            'a': {
+                'color': '#333 !important'   /* avoid bright link colours on e-ink */
+            }
+        });
+        rendition.themes.select('kindle');
+
+        await rendition.display(bookmarkCfi || undefined);
+
+        // Title
+        const meta = await book.loaded.metadata;
+        document.getElementById('bookTitle').textContent = meta.title || 'Book';
+        document.title = meta.title || 'Reader';
+
+        // Show viewer, hide loading message
+        document.getElementById('statusMsg').style.display  = 'none';
+        document.getElementById('epubViewer').style.display = 'block';
+
+        if (bookmarkCfi) applyHighlight(bookmarkCfi);
+
+        // TOC
+        book.loaded.navigation.then(nav => {
+            if (nav?.toc?.length) buildToc(nav.toc);
+            else document.getElementById('tocBtn').style.display = 'none';
+        });
+
+        // Location tracking
+        rendition.on('relocated', location => {
+            updateFooter(location.start.cfi);
+            updateBookmarkBtn(location);
+        });
+        updateBookmarkBtn(rendition.currentLocation());
+
+        // Generate locations
+        // Use 2400 instead of desktop's 1600 — Paperwhite renders wider
+        // virtual pages so fewer slices give the same granularity
+        book.ready.then(async () => {
+            const locCached = sessionStorage.getItem(LOC_KEY);
+            if (locCached) {
+                try {
+                    book.locations.load(locCached);
+                    totalLocs = book.locations.total;
+                    locationsReady = true;
+                    const l = rendition.currentLocation();
+                    if (l) updateFooter(l.start.cfi);
+                    return;
+                } catch(e) { /* stale — regenerate */ }
+            }
+            await book.locations.generate(2400);
+            totalLocs = book.locations.total;
+            locationsReady = true;
+            try { sessionStorage.setItem(LOC_KEY, book.locations.save()); } catch(e) {}
+            const l = rendition.currentLocation();
+            if (l) updateFooter(l.start.cfi);
+        });
+
+        // ── Hardware page-turn buttons on Paperwhite ──────────────────────
+        // The Paperwhite's physical page-turn buttons send ArrowRight /
+        // ArrowLeft key events through the browser. This is also how the
+        // on-screen tap zones work, so one handler covers both.
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') epubNext();
+            if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp'   || e.key === 'PageUp')   epubPrev();
+        });
+
+        // ── Swipe ────────────────────────────────────────────────────────
+        // Threshold raised to 60px — Paperwhite touch registration is less
+        // precise than a phone screen and short swipes can misfire.
+        let tx = 0;
+        document.addEventListener('touchstart', e => {
+            tx = e.touches[0].clientX;
+        }, { passive: true });
+        document.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].clientX - tx;
+            if (Math.abs(dx) > 60) { dx < 0 ? epubNext() : epubPrev(); }
+        });
+
+    } catch (err) {
+        document.getElementById('statusMsg').innerHTML =
+            `<p style="color:#c00;padding:0 20px;font-family:Arial,sans-serif;">
+                Failed to load book:<br><small>${err.message}</small>
+             </p>
+             <button class="tb-btn" style="margin-top:16px;" onclick="goBack()">&#8592; Back to Library</button>`;
+        console.error(err);
+    }
+}
+
+initEpub();
+</script>
+{% endif %}
+
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "243831617",
+  "title": "Crave the Villain",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/184/cover.jpg?lastWrite=638791900700000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1743593162i/230880374.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

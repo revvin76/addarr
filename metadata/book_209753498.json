@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "209753498",
+  "title": "Where's Molly",
+  "author": {
+    "authorName": "H.D. Carlton"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/42/cover.jpg?lastWrite=638391928600000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1703580121i/203760167.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

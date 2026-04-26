@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42924197",
+  "title": "The Broken Tethers That Bind Us",
+  "author": {
+    "authorName": "Ker Dukey"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/675/cover.jpg?lastWrite=636433457210000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1415378638i/23364779.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

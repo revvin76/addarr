@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "283951842",
+  "title": "Sky's Edge",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1058/cover.jpg?lastWrite=639081685990000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1772571721i/249252036.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

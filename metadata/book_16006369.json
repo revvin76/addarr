@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "16006369",
+  "title": "Deadly Captive",
+  "author": {
+    "authorName": "Bianca Sommerland"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/331/cover.jpg?lastWrite=636040820580000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1323194689i/12363622.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "6597789",
+  "title": "Stolen",
+  "author": {
+    "authorName": "Lucy Christopher"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/313/cover.jpg?lastWrite=636040696000000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1311064295i/6408862.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

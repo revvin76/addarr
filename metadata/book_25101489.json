@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25101489",
+  "title": "Underestimated",
+  "author": {
+    "authorName": "Jettie Woodruff"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/278/cover.jpg?lastWrite=636041015440000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1369909523i/17913288.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

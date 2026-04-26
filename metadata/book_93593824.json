@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "93593824",
+  "title": "Mercy",
+  "author": {
+    "authorName": "Sara Cate"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/251/cover.jpg?lastWrite=637948224740000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1658970456i/59420470.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

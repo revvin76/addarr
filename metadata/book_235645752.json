@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "235645752",
+  "title": "Exile",
+  "author": {
+    "authorName": "Steph Macca"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/47/cover.jpg?lastWrite=638791501590000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1743553138i/227792959.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

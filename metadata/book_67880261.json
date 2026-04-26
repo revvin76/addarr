@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "67880261",
+  "title": "Bound",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/547/cover.jpg?lastWrite=636938892340000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1558291041i/45886576.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

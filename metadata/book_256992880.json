@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "256992880",
+  "title": "Don't You Forget about Me",
+  "author": {
+    "authorName": "Tarryn Fisher"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1074/cover.jpg?lastWrite=638966803840000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1761083576i/239898096.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "58511985",
+  "title": "Twist Me & Capture Me",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/629/cover.jpg?lastWrite=636477762570000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1512179424i/36716224.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

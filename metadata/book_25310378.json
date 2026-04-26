@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25310378",
+  "title": "Kaleidoscope",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/985/cover.jpg?lastWrite=636041734630000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1383759220i/18038459.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

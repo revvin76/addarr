@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "16657777",
+  "title": "Chosen",
+  "author": {
+    "authorName": "Barbara Elsborg"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/340/cover.jpg",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1323176344i/11710170.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

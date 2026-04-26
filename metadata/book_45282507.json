@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "45282507",
+  "title": "Baby Please Don't Go",
+  "author": {
+    "authorName": "Frank Freudberg"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/425/cover.jpg?lastWrite=636432019990000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1431102129i/25504651.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

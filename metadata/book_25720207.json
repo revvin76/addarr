@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25720207",
+  "title": "Until You",
+  "author": {
+    "authorName": "Penelope Douglas"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/222/cover.jpg?lastWrite=636433824260000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1392309696i/20803962.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

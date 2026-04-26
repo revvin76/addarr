@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "44842618",
+  "title": "Wrong",
+  "author": {
+    "authorName": "L.P. Lovell"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/341/cover.jpg?lastWrite=636439998120000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1433277743i/25463193.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

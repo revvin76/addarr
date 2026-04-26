@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "16152938",
+  "title": "Rock Chick Revenge",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/953/cover.jpg?lastWrite=636040591160000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1328299988i/11227043.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

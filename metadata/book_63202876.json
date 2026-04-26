@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "63202876",
+  "title": "Untouchable",
+  "author": {
+    "authorName": "Sam Mariano"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/325/cover.jpg?lastWrite=636805264150000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1544929537i/40660802.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

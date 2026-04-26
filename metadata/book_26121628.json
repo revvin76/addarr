@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "26121628",
+  "title": "Deacon",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/986/cover.jpg?lastWrite=636434670540000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1406818567i/18464441.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

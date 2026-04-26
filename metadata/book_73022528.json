@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "73022528",
+  "title": "Corrupt Idol",
+  "author": {
+    "authorName": "Dinah Harper"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/373/cover.jpg?lastWrite=638737830480000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1737874685i/223996852.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

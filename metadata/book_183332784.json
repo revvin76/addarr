@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "183332784",
+  "title": "Under Your Scars",
+  "author": {
+    "authorName": "Ariel N. Anderson"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/61/cover.jpg?lastWrite=638226342810000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1686605498i/177121503.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

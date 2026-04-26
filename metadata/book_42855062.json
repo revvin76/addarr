@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42855062",
+  "title": "Dash: Volume 1",
+  "author": {
+    "authorName": "Shantel Tessier"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/5/cover.jpg?lastWrite=636433034850000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1413949098i/23298933.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

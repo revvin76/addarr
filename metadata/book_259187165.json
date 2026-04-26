@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "259187165",
+  "title": "The Fall of Summer",
+  "author": {
+    "authorName": "Rebecca Dale"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/362/cover.jpg?lastWrite=638979462760000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1762349450i/243608051.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

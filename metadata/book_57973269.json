@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "57973269",
+  "title": "Papa's Prey",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/703/cover.jpg?lastWrite=636441170810000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1507515867i/36379097.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

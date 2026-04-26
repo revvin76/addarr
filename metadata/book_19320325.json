@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "19320325",
+  "title": "Leashed",
+  "author": {
+    "authorName": "Skye Warren"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1086/cover.jpg?lastWrite=636040500470000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1367002556i/13699441.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "235569834",
+  "title": "Fierce Secrets",
+  "author": {
+    "authorName": "Amelia Payne"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/477/cover.jpg?lastWrite=638749256800000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1738960401i/227782669.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

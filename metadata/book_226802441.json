@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "226802441",
+  "title": "Sinfully His",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/744/cover.jpg?lastWrite=638634815210000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1727884022i/219871541.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

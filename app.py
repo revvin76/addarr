@@ -52,6 +52,24 @@ setup_basic_logging()
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
+@app.before_request
+def kindle_redirect():
+    """Auto-redirect Kindle/Silk browsers to the Kindle-optimised book view."""
+    from flask import request, redirect, url_for, session
+
+    # Only redirect on the very first hit per session — don't trap the user
+    if session.get('kindle_redirected'):
+        return
+
+    # Skip API calls, static files, auth routes and the kindle route itself
+    exempt_prefixes = ('/static', '/api', '/login', '/logout', '/kindle', '/offline')
+    if any(request.path.startswith(p) for p in exempt_prefixes):
+        return
+
+    if is_kindle_request():
+        session['kindle_redirected'] = True
+        return redirect(url_for('kindle_books'))
+
 CONFIG = LazyConfig()
 memory_manager = MemoryManager(CONFIG)
 update_manager = UpdateManager(CONFIG)
@@ -69,6 +87,16 @@ def get_ip_address():
     except Exception:
         ip_address = '127.0.0.1'
     return ip_address
+
+# ============ KINDLE DETECTION ============
+
+KINDLE_UA_TOKENS = ('kindle', 'silk', 'kftt', 'kfot', 'kfjwi', 'kfjwa', 'kfsowi', 'kfmewi', 'kfgiwi')
+
+def is_kindle_request():
+    """Return True if the current request came from a Kindle or Silk browser."""
+    from flask import request
+    ua = request.headers.get('User-Agent', '').lower()
+    return any(token in ua for token in KINDLE_UA_TOKENS)
 
 def display_enhanced_qr_code(url):
     """Display an enhanced QR code with better formatting"""
@@ -403,7 +431,8 @@ routes.init_routes(
     debug_decorator=conditional_debug_log,
     shared_utils=utils,
     network_info_func=get_network_info,
-    update_manager=update_manager
+    update_manager=update_manager,
+    kindle_detector=is_kindle_request
 )
 
 # ============ STARTUP AND SHUTDOWN ============

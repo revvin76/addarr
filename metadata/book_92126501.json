@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "92126501",
+  "title": "Psychos",
+  "author": {
+    "authorName": "Sheridan Anne"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/513/cover.jpg?lastWrite=638989926600000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1763395831i/58611655.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

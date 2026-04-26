@@ -13,7 +13,7 @@ from update_manager import UpdateManager
 
 
 # Import shared utilities (will be passed from app.py)
-def init_routes(app, config_manager, update_manager, auth_decorator, debug_decorator, shared_utils, network_info_func=None):
+def init_routes(app, config_manager, update_manager, auth_decorator, debug_decorator, shared_utils, network_info_func=None, kindle_detector=None):
     """
     Initialize all routes with shared dependencies
     """
@@ -25,6 +25,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     conditional_debug_log = debug_decorator
     utils = shared_utils
     update_manager = update_manager
+    is_kindle_request = kindle_detector or (lambda: False)
 
     # Library status cache — two-tier: in-memory (60s) + disk (5 min)
     # Only status fields (hasFile, monitored, statistics) go stale.
@@ -112,6 +113,52 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             logging.error(f"Error loading index: {str(e)}")
             return render_template('index.html', error="Page load failed")
 
+    @app.route('/manage-books')
+    @conditional_debug_log
+    @requires_auth
+    def manage_books():
+        try:
+            if not CONFIG.readarr.enabled:
+                return render_template('error.html', error="Readarr is not configured")
+            books = utils.get_readarr_books()
+            # Only show books that have at least one file on disk
+            downloaded = [
+                b for b in books
+                if (b.get('statistics', {}).get('bookFileCount', 0) > 0
+                    or b.get('statistics', {}).get('sizeOnDisk', 0) > 0)
+            ]
+            downloaded.sort(key=lambda x: x.get('title', '').lower())
+            return render_template(
+                'manage-books.html',
+                books=downloaded,
+                config=CONFIG._config,
+                total_in_library=len(books),
+                total_downloaded=len(downloaded)
+            )
+        except Exception as e:
+            logging.error(f"Error fetching books: {str(e)}")
+            return render_template('error.html', error="Failed to load books")
+
+
+    @app.route('/kindle')
+    @conditional_debug_log
+    @requires_auth
+    def kindle_books():
+        try:
+            all_books = utils.get_readarr_books()
+            # Filter to only books with at least one file — no Jinja continue needed
+            books = [b for b in all_books if b.get('statistics', {}).get('bookFileCount', 0) > 0]
+            total_downloaded = len(books)
+            return render_template(
+                'kindle.html',
+                books=books,
+                total_downloaded=total_downloaded,
+                config=CONFIG._config
+            )
+        except Exception as e:
+            logging.error(f"Kindle route error: {str(e)}")
+            return render_template('error.html', error="Failed to load book library")
+            
     @app.route('/trending')
     @conditional_debug_log
     @requires_auth  
@@ -319,14 +366,41 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 movies = movies_future.result()
                 series = series_future.result()
 
-            combined_media = []
-            for movie in movies:
-                movie['media_type'] = 'movie'
-                combined_media.append(movie)
-            for show in series:
-                show['media_type'] = 'tv'
-                combined_media.append(show)
+            def _poster_url(images):
+                """Return the first poster remoteUrl from an images list, or None."""
+                for img in (images or []):
+                    if img.get('coverType') == 'poster':
+                        return img.get('remoteUrl') or img.get('url')
+                return None
 
+            def _slim_movie(m):
+                poster = _poster_url(m.get('images', []))
+                return {
+                    'id':            m.get('id'),
+                    'tmdbId':        m.get('tmdbId'),
+                    'title':         m.get('title', ''),
+                    'year':          m.get('year'),
+                    'certification': m.get('certification'),
+                    'runtime':       m.get('runtime'),
+                    'images':        [{'coverType': 'poster', 'remoteUrl': poster}] if poster else [],
+                    'media_type':    'movie',
+                }
+
+            def _slim_show(s):
+                poster = _poster_url(s.get('images', []))
+                stats  = s.get('statistics', {})
+                return {
+                    'id':            s.get('id'),
+                    'tvdbId':        s.get('tvdbId'),
+                    'title':         s.get('title', ''),
+                    'year':          s.get('year'),
+                    'certification': s.get('certification'),
+                    'statistics':    {'seasonCount': stats.get('seasonCount', 0)},
+                    'images':        [{'coverType': 'poster', 'remoteUrl': poster}] if poster else [],
+                    'media_type':    'tv',
+                }
+
+            combined_media = [_slim_movie(m) for m in movies] + [_slim_show(s) for s in series]
             combined_media.sort(key=lambda x: x.get('title', '').lower())
 
             return render_template(
@@ -338,32 +412,6 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         except Exception as e:
             logging.error(f"Error fetching media: {str(e)}")
             return render_template('error.html', error="Failed to load media library")
-
-    @app.route('/manage-books')
-    @conditional_debug_log
-    @requires_auth
-    def manage_books():
-        try:
-            if not CONFIG.readarr.enabled:
-                return render_template('error.html', error="Readarr is not configured")
-            books = utils.get_readarr_books()
-            # Only show books that have at least one file on disk
-            downloaded = [
-                b for b in books
-                if (b.get('statistics', {}).get('bookFileCount', 0) > 0
-                    or b.get('statistics', {}).get('sizeOnDisk', 0) > 0)
-            ]
-            downloaded.sort(key=lambda x: x.get('title', '').lower())
-            return render_template(
-                'manage-books.html',
-                books=downloaded,
-                config=CONFIG._config,
-                total_in_library=len(books),
-                total_downloaded=len(downloaded)
-            )
-        except Exception as e:
-            logging.error(f"Error fetching books: {str(e)}")
-            return render_template('error.html', error="Failed to load books")
 
     @app.route('/get_media_details')
     @conditional_debug_log
@@ -1203,10 +1251,30 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         return jsonify({'torrents': torrents})
 
     # ============ EBOOK READER ROUTES ============
-
     @app.route('/read/<int:book_id>')
     @requires_auth
     def read_book(book_id):
+        """Serve the ebook reader page for a Readarr internal book ID."""
+        if not CONFIG.readarr.url:
+            return redirect('/')
+
+        file_path = utils.get_readarr_book_file_path(book_id)
+        if not file_path:
+            return render_template('error.html'), 404
+
+        ext = os.path.splitext(file_path)[1].lower()
+        file_type = 'epub' if ext == '.epub' else 'pdf' if ext == '.pdf' else None
+        if not file_type:
+            return render_template('error.html'), 415
+
+        # Pick the right template based on User-Agent
+        template = 'reader_kindle.html' if is_kindle_request() else 'reader.html'
+
+        return render_template(template,
+                            book_id=book_id,
+                            file_type=file_type,
+                            config=CONFIG._config)
+                            
         """Serve the ebook reader page for a Readarr internal book ID."""
         if not CONFIG.readarr.url:
             return redirect('/')

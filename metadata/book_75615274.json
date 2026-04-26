@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "75615274",
+  "title": "Ward",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/277/cover.jpg?lastWrite=637160735850000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1580476772i/50729938.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

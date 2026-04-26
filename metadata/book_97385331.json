@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "97385331",
+  "title": "Vicious Games",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/731/cover.jpg?lastWrite=637948616370000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1659026329i/61764172.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "210870190",
+  "title": "The Woman by the Lake",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1047/cover.jpg?lastWrite=638441634970000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1708198059i/204920712.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "58351946",
+  "title": "I'm Sawree",
+  "author": {
+    "authorName": "B.B. Blaque"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/498/cover.jpg?lastWrite=636463445850000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1510747760i/36599276.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

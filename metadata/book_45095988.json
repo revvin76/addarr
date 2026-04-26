@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "45095988",
+  "title": "The Mad Tatter",
+  "author": {
+    "authorName": "J.M. Darhower"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/778/cover.jpg?lastWrite=636439203460000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1429008180i/25354448.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "55247326",
+  "title": "Up in Smoke",
+  "author": {
+    "authorName": "T.M. Frazier"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/933/cover.jpg?lastWrite=636481641920000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1512567281i/34202199.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

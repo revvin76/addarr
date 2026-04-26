@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "25482079",
+  "title": "The Case of the Diffident Dom",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/838/cover.jpg?lastWrite=636041435280000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1372534476i/18138739.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

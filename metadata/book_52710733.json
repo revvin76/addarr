@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "52710733",
+  "title": "Kiss the Boys",
+  "author": {
+    "authorName": "Chris Myers"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/364/cover.jpg?lastWrite=636434189180000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1475362300i/32065887.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

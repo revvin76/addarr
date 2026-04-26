@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "246535462",
+  "title": "Defending Love",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/594/cover.jpg?lastWrite=638835500200000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1747952474i/234759960.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "74853124",
+  "title": "The Wrong Family",
+  "author": {
+    "authorName": "Tarryn Fisher"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1071/cover.jpg?lastWrite=637393416000000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1594398916i/49875586.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

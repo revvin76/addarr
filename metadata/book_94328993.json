@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "94328993",
+  "title": "Terrible Beauty",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/637/cover.jpg?lastWrite=638463397720000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1710479439i/59906907.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

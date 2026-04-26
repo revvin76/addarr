@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "14245059",
+  "title": "The Night Circus",
+  "author": {
+    "authorName": "Erin Morgenstern"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/4885/cover.jpg?lastWrite=636040570400000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1387124618i/9361589.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

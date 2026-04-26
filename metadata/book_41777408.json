@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "41777408",
+  "title": "Leverage",
+  "author": {
+    "authorName": "Nancy S. Thompson"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/366/cover.jpg?lastWrite=636442744240000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1397920901i/21538964.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

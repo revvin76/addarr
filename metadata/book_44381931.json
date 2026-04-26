@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "44381931",
+  "title": "Entwined",
+  "author": {
+    "authorName": "Marissa Honeycutt"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/646/cover.jpg?lastWrite=636437320540000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1426269475i/25135749.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

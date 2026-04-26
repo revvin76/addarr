@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "94647868",
+  "title": "Does It Hurt?",
+  "author": {
+    "authorName": "H.D. Carlton"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/40/cover.jpg?lastWrite=637908445170000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1655247714i/60034351.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

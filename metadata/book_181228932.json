@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "181228932",
+  "title": "All Too Well",
+  "author": {
+    "authorName": "Steph Macca"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/92/cover.jpg?lastWrite=638551095030000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1719463545i/173354433.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

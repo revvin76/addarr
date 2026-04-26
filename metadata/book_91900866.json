@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "91900866",
+  "title": "Empire of Desire",
+  "author": {
+    "authorName": "Rina Kent"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/172/cover.jpg?lastWrite=638958969210000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1760300036i/124928087.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

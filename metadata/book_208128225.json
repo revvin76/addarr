@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "208128225",
+  "title": "Chained Fate",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/641/cover.jpg?lastWrite=638957024680000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1760105659i/202636766.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

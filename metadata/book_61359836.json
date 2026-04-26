@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "61359836",
+  "title": "Rock Chick Reborn",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1010/cover.jpg?lastWrite=636587353540000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1522724848i/39707733.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

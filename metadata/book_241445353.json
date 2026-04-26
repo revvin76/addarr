@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "241445353",
+  "title": "Twisted Proposal",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/746/cover.jpg?lastWrite=638779337750000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1742336419i/229306226.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

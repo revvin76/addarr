@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "55511702",
+  "title": "The Gunfighter's Pursuit",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/700/cover.jpg?lastWrite=636434582380000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1488218949i/34408448.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

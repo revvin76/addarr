@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21880254",
+  "title": "The Edge of Never",
+  "author": {
+    "authorName": "J.A. Redmerski"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/785/cover.jpg?lastWrite=636084539570000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1358810128i/16081272.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

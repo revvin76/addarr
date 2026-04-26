@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "71654666",
+  "title": "Dream Maker",
+  "author": {
+    "authorName": "Kristen Ashley"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/1016/cover.jpg?lastWrite=637195389520000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1583942085i/52189666.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

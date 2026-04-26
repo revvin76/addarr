@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "43192190",
+  "title": "The X-Club",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/620/cover.jpg?lastWrite=636434849360000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1421630752i/23603352.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

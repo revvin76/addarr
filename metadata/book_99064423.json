@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "99064423",
+  "title": "Devil in Disguise",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/579/cover.jpg?lastWrite=638033088960000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1667306969i/63188045.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

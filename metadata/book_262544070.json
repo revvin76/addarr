@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "262544070",
+  "title": "Naughty and Nice",
+  "author": {
+    "authorName": "Aleatha Romig"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/596/cover.jpg?lastWrite=638976275480000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1762030733i/242325224.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

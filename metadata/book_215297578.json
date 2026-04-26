@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "215297578",
+  "title": "Blackthorn",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/219/cover.jpg?lastWrite=638990090190000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1763412210i/222376861.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

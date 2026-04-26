@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "42999399",
+  "title": "Chainsaw Alice in Wonderland",
+  "author": {
+    "authorName": "Khurt Khave"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/422/cover.jpg?lastWrite=636433829040000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1414111816i/23433969.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "47015",
+  "title": "Carmilla",
+  "author": {
+    "authorName": "J. Sheridan Le Fanu"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/428/cover.jpg?lastWrite=637937318290000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1657795822i/48037.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

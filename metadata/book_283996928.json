@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "283996928",
+  "title": "My Sweet Poison",
+  "author": {
+    "authorName": "Zoe Blake"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/750/cover.jpg?lastWrite=639082310540000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1772634189i/249281901.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

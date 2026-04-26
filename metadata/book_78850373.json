@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "78850373",
+  "title": "Kings of Quarantine",
+  "author": {
+    "authorName": "Caroline Peckham"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/507/cover.jpg?lastWrite=637210564450000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1585459559i/52775593.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "206730904",
+  "title": "Unhinged",
+  "author": {
+    "authorName": "Steph Macca"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/56/cover.jpg?lastWrite=638422137980000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1706190856i/201751727.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

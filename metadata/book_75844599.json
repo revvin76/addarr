@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "75844599",
+  "title": "The Land Where Sinners Atone",
+  "author": {
+    "authorName": "V.F. Mason"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/502/cover.jpg?lastWrite=637262029330000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1590605536i/53496718.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

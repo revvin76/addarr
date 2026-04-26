@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "48265635",
+  "title": "Griffin in Wonderland",
+  "author": {
+    "authorName": "Tiffany Reisz"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/869/cover.jpg?lastWrite=636433543130000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1495470905i/28234651.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

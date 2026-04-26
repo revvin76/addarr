@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "21864678",
+  "title": "Close Liaisons",
+  "author": {
+    "authorName": "Anna Zaires"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/613/cover.jpg?lastWrite=636040650340000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1363124958i/17608853.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}
