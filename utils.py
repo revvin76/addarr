@@ -14,9 +14,12 @@ METADATA_DIR  = os.path.join(_APP_DIR, 'metadata')
 def _ensure_metadata_dir():
     os.makedirs(METADATA_DIR, exist_ok=True)
 
-def save_book_metadata(book_data):
+def save_book_metadata(book_data, overwrite=True):
     """Persist a normalised book dict to the local metadata cache.
     Key is foreignBookId (string). Silently ignores errors.
+
+    Static fields (title, author, cover, pages) are permanent — pass
+    overwrite=False to skip writing if a cache file already exists.
     """
     try:
         fid = str(book_data.get('foreignBookId', '')).strip()
@@ -24,6 +27,9 @@ def save_book_metadata(book_data):
             return
         _ensure_metadata_dir()
         path = os.path.join(METADATA_DIR, f'book_{fid}.json')
+        if not overwrite and os.path.isfile(path):
+            logging.debug(f"[cache] skipped overwrite for book {fid} (permanent cache)")
+            return
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(book_data, f, ensure_ascii=False, indent=2)
         logging.debug(f"[cache] saved metadata for book {fid}")
@@ -43,6 +49,44 @@ def load_book_metadata(foreign_book_id):
     except Exception as e:
         logging.warning(f"[cache] load_book_metadata error: {e}")
         return None
+
+# ── Generic media library cache (movies / series / books) ─────────────────────
+# Static metadata (posters, titles, authors, page counts, TMDB details) never
+# expires — once written it is good forever.
+# Status data (hasFile, monitored, statistics) refreshes on a short cycle.
+STATIC_CACHE_TTL = None   # never expire — write once, read forever
+STATUS_CACHE_TTL = 300    # 5 minutes for library/status data (*arr lists)
+DISK_CACHE_TTL   = STATUS_CACHE_TTL  # backward-compat alias
+
+def save_media_cache(cache_type, data):
+    """Persist a library snapshot to disk.
+    cache_type examples: 'movies', 'series', 'books', 'tmdb_movie_123'
+    """
+    try:
+        _ensure_metadata_dir()
+        path = os.path.join(METADATA_DIR, f'lib_{cache_type}.json')
+        payload = {'timestamp': time.time(), 'data': data}
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False)
+        logging.debug(f"[cache] saved media cache: {cache_type} ({len(data) if isinstance(data, list) else 1} items)")
+    except Exception as e:
+        logging.warning(f"[cache] save_media_cache({cache_type}) error: {e}")
+
+def load_media_cache(cache_type):
+    """Load a cached library snapshot.
+    Returns (data, timestamp) — both None/0 if cache is absent or unreadable.
+    """
+    try:
+        path = os.path.join(METADATA_DIR, f'lib_{cache_type}.json')
+        if not os.path.isfile(path):
+            return None, 0
+        with open(path, 'r', encoding='utf-8') as f:
+            payload = json.load(f)
+        logging.debug(f"[cache] loaded media cache: {cache_type}")
+        return payload.get('data'), payload.get('timestamp', 0)
+    except Exception as e:
+        logging.warning(f"[cache] load_media_cache({cache_type}) error: {e}")
+        return None, 0
 
 class SharedUtils:
     def __init__(self, config_manager):

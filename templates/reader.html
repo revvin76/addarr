@@ -317,6 +317,7 @@ function toggleBookmark() {
         // ── Remove ──
         removeHighlight(bookmarkCfi);
         localStorage.removeItem(BM_KEY);
+        localStorage.removeItem(BM_KEY + '_page');
         bookmarkCfi = null;
         updateBookmarkBtn(loc);
         showToast('Bookmark removed');
@@ -326,6 +327,13 @@ function toggleBookmark() {
         bookmarkCfi = cfi;
         localStorage.setItem(BM_KEY, cfi);
         applyHighlight(cfi);
+        // Store page number so manage-books can show a badge
+        if (locationsReady && totalLocs) {
+            const pageNum = book.locations.locationFromCfi(cfi);
+            localStorage.setItem(BM_KEY + '_page', `${pageNum}/${totalLocs}`);
+        } else {
+            localStorage.removeItem(BM_KEY + '_page');
+        }
         updateBookmarkBtn(loc);
         showToast('📖 Bookmark saved — opens here next time');
     }
@@ -352,7 +360,8 @@ async function initEpub() {
         book = ePub(buffer);
 
         rendition = book.renderTo('epubViewer', {
-            width: '100%', height: '100%', spread: 'none'
+            width: '100%', height: '100%', spread: 'none',
+            allowScriptedContent: true   // prevents epub.js sandboxing its iframe without allow-scripts
         });
 
         // Open at bookmark position (if saved), otherwise start of book

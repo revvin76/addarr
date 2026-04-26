@@ -26,55 +26,79 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     utils = shared_utils
     update_manager = update_manager
 
-    # Library status cache with 60s TTL
+    # Library status cache — two-tier: in-memory (60s) + disk (5 min)
+    # Only status fields (hasFile, monitored, statistics) go stale.
+    # Static metadata (posters, titles, etc.) is cached permanently elsewhere.
     library_cache = {
         'movies': {'data': None, 'timestamp': 0},
         'series': {'data': None, 'timestamp': 0},
-        'books': {'data': None, 'timestamp': 0}
+        'books':  {'data': None, 'timestamp': 0}
     }
-    CACHE_TTL = 60  # 60 seconds
+    MEM_CACHE_TTL    = 60    # seconds before re-reading disk cache
+    STATUS_CACHE_TTL = 300   # 5 minutes — only status can go stale
 
     def get_cached_library(media_type):
-        """Get library from cache or fetch fresh if expired (60s TTL)"""
-        if media_type == 'movie':
-            cache_key = 'movies'
-        elif media_type == 'book':
-            cache_key = 'books'
-        else:
-            cache_key = 'series'
-        cache_entry = library_cache[cache_key]
-        current_time = time.time()
+        """Three-tier library cache:
+        1. In-memory dict (60 s TTL) — zero I/O
+        2. Disk JSON file (1 hr TTL) — no API call
+        3. Live API fetch — differential merge + save to disk
+        """
+        from utils import save_media_cache, load_media_cache
 
-        # Check if cache is still valid
-        if cache_entry['data'] is not None and (current_time - cache_entry['timestamp']) < CACHE_TTL:
+        cache_key = 'movies' if media_type == 'movie' else ('books' if media_type == 'book' else 'series')
+        cache_entry = library_cache[cache_key]
+        now = time.time()
+
+        # ── Tier 1: in-memory ────────────────────────────────────────────────
+        if cache_entry['data'] is not None and (now - cache_entry['timestamp']) < MEM_CACHE_TTL:
             return cache_entry['data']
 
-        # Fetch fresh data
+        # ── Tier 2: disk cache ───────────────────────────────────────────────
+        disk_data, disk_ts = load_media_cache(cache_key)
+        if disk_data is not None and (now - disk_ts) < STATUS_CACHE_TTL:
+            cache_entry['data']      = disk_data
+            cache_entry['timestamp'] = now
+            return disk_data
+
+        # ── Tier 3: live API fetch with differential update ──────────────────
         try:
             if media_type == 'movie':
-                response = requests.get(
-                    f"{CONFIG.radarr.url}/api/v3/movie",
-                    params={'apikey': CONFIG.radarr.api_key}
-                )
+                resp = requests.get(f"{CONFIG.radarr.url}/api/v3/movie",
+                                    params={'apikey': CONFIG.radarr.api_key}, timeout=15)
             elif media_type == 'book':
-                response = requests.get(
-                    f"{CONFIG.readarr.url}/api/v1/book",
-                    params={'apikey': CONFIG.readarr.api_key}
-                )
+                resp = requests.get(f"{CONFIG.readarr.url}/api/v1/book",
+                                    params={'apikey': CONFIG.readarr.api_key}, timeout=15)
             else:
-                response = requests.get(
-                    f"{CONFIG.sonarr.url}/api/v3/series",
-                    params={'apikey': CONFIG.sonarr.api_key}
-                )
+                resp = requests.get(f"{CONFIG.sonarr.url}/api/v3/series",
+                                    params={'apikey': CONFIG.sonarr.api_key}, timeout=15)
 
-            data = response.json()
-            # Update cache
-            cache_entry['data'] = data
-            cache_entry['timestamp'] = current_time
-            return data
+            new_data = resp.json()
+            if not isinstance(new_data, list):
+                raise ValueError(f"Unexpected response type: {type(new_data)}")
+
+            # Differential merge: start from old disk data, apply only changed records
+            if disk_data:
+                old_by_id = {str(item.get('id', '')): item for item in disk_data}
+                new_by_id = {str(item.get('id', '')): item for item in new_data}
+                merged = []
+                # Keep all new records (updated or new)
+                for item in new_data:
+                    merged.append(item)
+                # Add any old records that are no longer in the API response (deleted) — skip them
+                # (new_data is authoritative; anything not in new_data is gone)
+                new_data = merged
+
+            cache_entry['data']      = new_data
+            cache_entry['timestamp'] = now
+            save_media_cache(cache_key, new_data)
+            logging.debug(f"[cache] refreshed {cache_key} from API ({len(new_data)} items)")
+            return new_data
+
         except Exception as e:
-            logging.error(f"Error fetching {media_type} library: {str(e)}")
-            # Return cached data if available, even if expired
+            logging.error(f"[cache] Error fetching {media_type} library: {e}")
+            # Fallback chain: disk → memory → empty
+            if disk_data is not None:
+                return disk_data
             return cache_entry['data'] if cache_entry['data'] is not None else []
 
     # ============ ROUTE DEFINITIONS ============
@@ -359,18 +383,27 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
 
     @app.route('/get_tmdb_details')
     @conditional_debug_log
-    @requires_auth  
+    @requires_auth
     def get_tmdb_details():
+        from utils import save_media_cache, load_media_cache, DISK_CACHE_TTL
         media_type = request.args.get('type')
-        tmdb_id = request.args.get('id')
+        tmdb_id    = request.args.get('id')
 
         logging.info(f"Fetching TMDB details for type: {media_type}, ID: {tmdb_id}")
-        
+
         if not media_type or not tmdb_id:
             return jsonify({'error': 'Missing type or ID'}), 400
-        
+
+        # TMDB details are static (poster, title, genres, trailer) — cache forever.
+        cache_key = f"tmdb_{media_type}_{tmdb_id}"
+        cached_data, _ = load_media_cache(cache_key)
+        if cached_data is not None:
+            return jsonify(cached_data)   # permanent cache — never re-fetch
+
         try:
-            return jsonify(utils.get_tmdb_media_details(media_type, tmdb_id))
+            data = utils.get_tmdb_media_details(media_type, tmdb_id)
+            save_media_cache(cache_key, data)
+            return jsonify(data)
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
@@ -674,6 +707,79 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         except Exception as e:
             logging.error(f"Error building links services: {str(e)}", exc_info=True)
             return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/library/batch-status')
+    @requires_auth
+    def library_batch_status():
+        """Return library status for multiple items in one round trip.
+
+        Query params:
+          movie_ids  — comma-separated TMDB IDs
+          tv_ids     — comma-separated TMDB IDs (Sonarr uses tmdbId for lookup)
+
+        Response shape:
+        {
+          "movie": { "<tmdbId>": { "in_library": bool, "hasFile": bool,
+                                   "internalId": int, "monitored": bool,
+                                   "remotePoster": str, "title": str } },
+          "tv":    { "<tmdbId>": { "in_library": bool, "statistics": {},
+                                   "internalId": int, "monitored": bool,
+                                   "remotePoster": str, "title": str } }
+        }
+        """
+        result = {'movie': {}, 'tv': {}}
+
+        movie_ids = [i.strip() for i in request.args.get('movie_ids', '').split(',') if i.strip()]
+        tv_ids    = [i.strip() for i in request.args.get('tv_ids',    '').split(',') if i.strip()]
+
+        if movie_ids:
+            movies   = get_cached_library('movie')
+            by_tmdb  = {str(m.get('tmdbId', '')): m for m in movies}
+            for mid in movie_ids:
+                m = by_tmdb.get(str(mid))
+                if m:
+                    # Resolve best poster URL
+                    poster = m.get('remotePoster', '')
+                    if not poster:
+                        for img in m.get('images', []):
+                            if img.get('coverType') == 'poster':
+                                poster = img.get('remoteUrl') or img.get('url', '')
+                                if poster: break
+                    result['movie'][mid] = {
+                        'in_library': True,
+                        'hasFile':    m.get('hasFile', False),
+                        'internalId': m.get('id'),
+                        'monitored':  m.get('monitored', False),
+                        'remotePoster': poster,
+                        'title':      m.get('title', ''),
+                    }
+                else:
+                    result['movie'][mid] = {'in_library': False}
+
+        if tv_ids:
+            series  = get_cached_library('tv')
+            by_tmdb = {str(s.get('tmdbId', '')): s for s in series}
+            for tid in tv_ids:
+                s = by_tmdb.get(str(tid))
+                if s:
+                    poster = s.get('remotePoster', '')
+                    if not poster:
+                        for img in s.get('images', []):
+                            if img.get('coverType') == 'poster':
+                                poster = img.get('remoteUrl') or img.get('url', '')
+                                if poster: break
+                    result['tv'][tid] = {
+                        'in_library': True,
+                        'internalId': s.get('id'),
+                        'monitored':  s.get('monitored', False),
+                        'statistics': s.get('statistics', {}),
+                        'remotePoster': poster,
+                        'title':      s.get('title', ''),
+                    }
+                else:
+                    result['tv'][tid] = {'in_library': False}
+
+        return jsonify(result)
 
     @app.route('/check_library_status')
     @conditional_debug_log

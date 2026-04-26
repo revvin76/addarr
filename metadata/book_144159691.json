@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "144159691",
+  "title": "Fall Into You",
+  "author": {
+    "authorName": "J.T. Geissinger"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/218/cover.jpg?lastWrite=638958052450000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1760208411i/122884476.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

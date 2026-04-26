@@ -8,90 +8,96 @@
     <link href="/static/css/styles.css" rel="stylesheet">
     <link href="/static/css/manage-page.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* ── A-Z navigation ── */
+        #azLetters { display: none; flex-wrap: wrap; gap: 4px; padding: 6px 0; }
+        #azLetters.open { display: flex; }
+        .az-btn {
+            background: #2a2a2a; border: 1px solid #3a3a3a; color: #bbb;
+            border-radius: 4px; padding: 3px 7px; font-size: 0.7rem;
+            cursor: pointer; line-height: 1.4;
+        }
+        .az-btn:hover:not([disabled]) { background: #3a3a3a; color: #fff; border-color: #555; }
+        .az-btn[disabled] { opacity: 0.22; cursor: default; }
+        #azToggle.az-active { border-color: #6ab759; color: #6ab759; }
+    </style>
     <script>
+    // Sequential batch image loader.
+    // Loads thumbnails 20 at a time: waits for the whole batch to
+    // load (or fail) before starting the next, so the browser is
+    // never flooded with simultaneous image requests.
+    function startProgressiveLoading() {
+        const items = [...document.querySelectorAll('.media-item')];
+        if (!items.length) return;
 
-    // Lazy loading configuration
-    let lazyLoadConfig = {
-        batchSize: 20,
-        currentBatch: 0,
-        isLoading: false,
-        observer: null
-    };
+        let batchStart = 0;
+        const BATCH = 20;
 
-    // Initialize lazy loading
-    function initLazyLoading() {
-        const mediaItems = document.querySelectorAll('.media-item');
-        if (mediaItems.length === 0) return;
+        function loadBatch() {
+            const slice = items.slice(batchStart, batchStart + BATCH);
+            if (!slice.length) return;
+            batchStart += BATCH;
 
-        // Load first batch immediately
-        loadNextBatch();
-
-        // Set up intersection observer for infinite scroll
-        if ('IntersectionObserver' in window) {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting && !lazyLoadConfig.isLoading) {
-                        loadNextBatch();
-                    }
+            const promises = slice.map(item => {
+                const img = item.querySelector('.manage-result-thumbnail');
+                if (!img) return Promise.resolve();
+                const src = img.getAttribute('data-src');
+                if (!src) return Promise.resolve();
+                // Already set (e.g. after a filter re-run)
+                if (img.src && img.src.endsWith(src)) return Promise.resolve();
+                return new Promise(resolve => {
+                    img.onload  = resolve;
+                    img.onerror = resolve;
+                    img.src = src;
                 });
-            }, {
-                rootMargin: '100px 0px' // Load 100px before entering viewport
             });
 
-            // Observe the last item to trigger loading more
-            if (mediaItems.length > 0) {
-                observer.observe(mediaItems[mediaItems.length - 1]);
-            }
-
-            lazyLoadConfig.observer = observer;
-        } else {
-            // Fallback: load all if IntersectionObserver not supported
-            console.warn('IntersectionObserver not supported, loading all images');
-            loadAllImages();
+            Promise.all(promises).then(loadBatch);
         }
+
+        loadBatch();
     }
 
-    function loadNextBatch() {
-        if (lazyLoadConfig.isLoading) return;
-        
-        lazyLoadConfig.isLoading = true;
-        const mediaItems = document.querySelectorAll('.media-item');
-        const startIndex = lazyLoadConfig.currentBatch * lazyLoadConfig.batchSize;
-        const endIndex = startIndex + lazyLoadConfig.batchSize;
+    // ── A-Z quick navigation ─────────────────────────────────────────────────
+    function buildAzNav() {
+        const letters = document.getElementById('azLetters');
+        if (!letters) return;
 
-        console.log(`Loading batch ${lazyLoadConfig.currentBatch + 1}: items ${startIndex}-${endIndex}`);
-
-        for (let i = startIndex; i < endIndex && i < mediaItems.length; i++) {
-            const item = mediaItems[i];
-            loadImageForItem(item);
-        }
-
-        lazyLoadConfig.currentBatch++;
-        lazyLoadConfig.isLoading = false;
-
-        // Update observer to watch the new last item
-        if (lazyLoadConfig.observer && endIndex < mediaItems.length) {
-            lazyLoadConfig.observer.observe(mediaItems[endIndex - 1]);
-        }
-    }
-
-    function loadImageForItem(item) {
-        const img = item.querySelector('.manage-result-thumbnail');
-        if (!img) return;
-
-        const dataSrc = img.getAttribute('data-src');
-        if (dataSrc && !img.src.includes(dataSrc)) {
-            img.src = dataSrc;
-        }
-    }
-
-    function loadAllImages() {
-        const images = document.querySelectorAll('.manage-result-thumbnail[data-src]');
-        images.forEach(img => {
-            img.src = img.getAttribute('data-src');
+        const used = new Set();
+        document.querySelectorAll('.media-item[data-title]').forEach(item => {
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
+            const c = t.charAt(0);
+            if (/[0-9]/.test(c)) used.add('0');
+            else if (/[a-z]/i.test(c)) used.add(c.toLowerCase());
         });
+
+        const chars = ['0', ...'abcdefghijklmnopqrstuvwxyz'];
+        letters.innerHTML = chars.map(c => {
+            const label  = c === '0' ? '0–9' : c.toUpperCase();
+            const active = used.has(c);
+            return `<button class="az-btn" ${active ? `onclick="scrollToMediaLetter('${c}')"` : 'disabled'}>${label}</button>`;
+        }).join('');
     }
-    
+
+    function toggleAzNav() {
+        const isOpen = document.getElementById('azLetters').classList.toggle('open');
+        document.getElementById('azToggle').classList.toggle('az-active', isOpen);
+    }
+
+    function scrollToMediaLetter(letter) {
+        for (const item of document.querySelectorAll('.media-item[data-title]')) {
+            if (item.style.display === 'none') continue;
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
+            const c = t.charAt(0).toLowerCase();
+            const match = letter === '0' ? /[0-9]/.test(c) : c === letter;
+            if (match) {
+                document.getElementById('azLetters').classList.remove('open');
+                document.getElementById('azToggle').classList.remove('az-active');
+                item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+        }
+    }
     </script>
 </head>
 
@@ -128,6 +134,14 @@
                     </button>
                 </div>
             </div>
+        </div>
+
+        <!-- A-Z quick navigation -->
+        <div class="d-flex align-items-start gap-2 mb-2 flex-wrap">
+            <button class="btn btn-sm btn-outline-secondary" id="azToggle" onclick="toggleAzNav()">
+                <i class="fas fa-sort-alpha-down me-1"></i>A–Z
+            </button>
+            <div id="azLetters"></div>
         </div>
 
         <!-- Media Grid -->
@@ -296,31 +310,18 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded, initializing manage page...');
-        
         initializeManageGrid();
-
-        // Initialize lazy loading first
-        initLazyLoading();
-        
-        // Initialize clear search
         initializeClearSearch();
-        
-        // Set up event listeners for filtering and search
+        buildAzNav();
+        startProgressiveLoading();
+
         const mediaFilter = document.getElementById('mediaFilter');
         const searchButton = document.getElementById('searchButton');
-        
-        if (mediaFilter) {
-            mediaFilter.addEventListener('change', updateMediaDisplay);
-        }
-        
-        if (searchButton) {
-            searchButton.addEventListener('click', updateMediaDisplay);
-        }
-        
-        // Initial display update
+        if (mediaFilter)   mediaFilter.addEventListener('change', updateMediaDisplay);
+        if (searchButton)  searchButton.addEventListener('click',  updateMediaDisplay);
+
         updateMediaDisplay();
-});
+    });
 
     </script>
 

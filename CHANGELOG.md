@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.26] - 2026-04-26
+
+### Added
+- **Two-tier library cache** — `get_cached_library()` in `routes.py` now operates across three layers: in-memory (60 s), disk JSON (5 min), and live API fetch. The disk layer (`metadata/lib_movies.json`, `lib_series.json`, `lib_books.json`) survives server restarts, so the first page load after a restart no longer triggers a full Radarr/Sonarr API call.
+- **`/api/library/batch-status` endpoint** — accepts `?movie_ids=1,2&tv_ids=3,4` (TMDB IDs) and returns library status for all requested items in a single round trip, including `hasFile`, `statistics`, `internalId`, and `remotePoster`. Replaces the previous N×2 pattern of individual `/check_library_status` + `/get_media_details` calls.
+- **TMDB details disk cache** — `/get_tmdb_details` now writes responses to `metadata/lib_tmdb_{type}_{id}.json`. Subsequent calls for the same item are served from disk instantly with no TMDB API call. TMDB data (poster, title, genres, trailer) is treated as permanent and never expires.
+- **`save_media_cache()` / `load_media_cache()`** — generic disk-cache helpers in `utils.py`, used by both the library status cache and the TMDB details cache.
+- **`STATUS_CACHE_TTL` / `STATIC_CACHE_TTL`** constants in `utils.py` — make the cache lifetime policy explicit: static metadata never expires; status data refreshes every 5 minutes.
+- **Trending page progress indicator** — a small spinner bar ("Checking library status for N titles…") appears at the top of the Trending page while the batch status request is in flight and disappears when complete.
+- **Trending page dual filter** — the media-type filter and library-status filter now apply together with AND logic. Changing either filter no longer resets the other. The status filter re-evaluates correctly as library status loads asynchronously.
+- **Background fetch priority management** — `showDetails()` and `showManageDetails()` now call `_pauseBackgroundFetches()` the moment a card is tapped. Any in-flight background request (batch library status, manage grid detail fetches, book enrichment batches) is aborted via `AbortController`, freeing the browser's connection pool for the detail request. Aborted tasks register a resume callback and restart automatically when the modal closes (`hidden.bs.modal`).
+- **Bookmark badge in book details modal** — the book details card now shows a gold 🔖 badge (with page number) when a bookmark is stored for that book. The badge is a clickable button that removes the bookmark immediately from both the modal and the card list.
+
+### Fixed
+- **EPUB reader sandbox error** — epub.js sets `sandbox="allow-same-origin"` on its rendering iframe by default, blocking script execution inside it and breaking rendering. Fixed by passing `allowScriptedContent: true` to `book.renderTo()`, which prevents epub.js from adding the sandbox attribute.
+- **Bookmark badge not appearing on manage-books page** — `applyBookmarkBadges()` ran only on `DOMContentLoaded`, which fires once on initial page load. If the user opened the reader in a new tab, set a bookmark, then returned to the manage-books tab, the badge never appeared. Fixed by also running `applyBookmarkBadges()` on `visibilitychange` (tab becomes active) and `pageshow` (bfcache restore).
+- **Bookmark badge not clearing after removal** — `applyBookmarkBadges()` only added badges and never removed them. If a bookmark was deleted in the reader and the user returned to the manage-books page, the old badge persisted. Fixed by checking each card: if the localStorage key is absent the existing badge is removed; if present the badge is created or updated in-place.
+- **Bookmark removal not reflected in open details modal** — `applyBookmarkBadges()` now also checks for `#bmRemoveBtn` (the bookmark badge in the details modal) and removes it if the corresponding localStorage key is gone, so both the card list and any open modal stay in sync.
+
+### Changed
+- **Trending page library status** — replaced the previous lazy per-card loop (one `fetch` per card, triggered on scroll) with a single `loadAllStatuses()` call on `DOMContentLoaded`. All 40 cards are now updated in one HTTP request.
+- **Search results page library status** — `initializeMediaGrid()` in `main.js` now fires a single batch request to `/api/library/batch-status` instead of one `checkLibraryStatus` call per card. Cards are updated in parallel from the single response with no follow-up `/get_media_details` calls for in-library items.
+- **`save_book_metadata()`** — now accepts an `overwrite=False` flag. Callers that know a richer cache entry already exists can skip the write, preserving previously enriched data.
+- **Library status disk TTL** — reduced from 1 hour to 5 minutes (`STATUS_CACHE_TTL = 300`). Status fields (`hasFile`, `monitored`, `statistics`) can change when items are added or deleted; 5 minutes balances freshness against API load.
+- **TMDB cache TTL** — changed from 1 hour to permanent (no expiry). Poster paths, titles, genres, and trailers never change for a given TMDB ID.
+
+---
 ## [1.1.25] - 2026-04-24
 
 ### Added

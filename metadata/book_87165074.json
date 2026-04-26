@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "87165074",
+  "title": "Free Fall",
+  "author": {
+    "authorName": "Sara Cate"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/244/cover.jpg?lastWrite=637510733780000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1615476575i/55951319.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}

@@ -3,6 +3,36 @@ let deferredPrompt;
 let player = null;
 const installButton = document.getElementById('install-button'); // Add this button to your HTML
 
+// ── Background fetch priority management ─────────────────────────────────────
+// showDetails / showManageDetails call _pauseBackgroundFetches() the moment
+// they fire. Any in-flight background request (batch library status, manage
+// grid details, book enrichment) is aborted so the browser's connection pool
+// is freed for the detail request. Aborted tasks register a resume callback
+// and restart automatically when the details modal closes.
+const _bg = {
+    controller:  new AbortController(),
+    resumeQueue: [],
+    get signal() { return this.controller.signal; }
+};
+// Expose to inline page scripts (trending.html, manage-books.html)
+window._bg = _bg;
+window._registerBgResume = fn => _bg.resumeQueue.push(fn);
+
+function _pauseBackgroundFetches() {
+    _bg.controller.abort();
+    _bg.controller = new AbortController();   // fresh controller for next use
+}
+function _resumeBackgroundFetches() {
+    const fns = _bg.resumeQueue.splice(0);
+    fns.forEach(fn => { try { fn(); } catch(e) { console.error('[bg resume]', e); } });
+}
+// Wire modal close → resume (works for both detailsModal and confirmModal)
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.modal').forEach(el => {
+        el.addEventListener('hidden.bs.modal', _resumeBackgroundFetches);
+    });
+});
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -140,6 +170,7 @@ function showFullImage(src) {
 }
 
 function showManageDetails(mediaType, externalId, internalId) {
+    _pauseBackgroundFetches();
     console.log('Showing details for:', mediaType, externalId, internalId);
     
     const modalEl = document.getElementById('detailsModal');
@@ -227,6 +258,33 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
     const onDisk = fullData.on_disk || false;
     const monitored = fullData.monitored || false;
 
+    // Bookmark info from localStorage (key matches epub reader's BM_KEY)
+    const bmId   = internalId || mediaData.id;
+    const bmCfi  = bmId ? localStorage.getItem(`epub_bm_${bmId}`) : null;
+    const bmPage = bmId ? localStorage.getItem(`epub_bm_${bmId}_page`) : null;
+    let bmBadge  = '';
+    if (bmCfi) {
+        const bmLabel = bmPage
+            ? (() => { const [pg, total] = bmPage.split('/'); return `🔖 p.${pg} / ${total}`; })()
+            : '🔖 Bookmarked';
+        const bmTitle = bmPage
+            ? (() => { const [pg, total] = bmPage.split('/'); return `Bookmarked at page ${pg} of ${total} — click to remove`; })()
+            : 'Bookmarked — click to remove';
+        bmBadge = `<button id="bmRemoveBtn"
+            class="badge border-0 me-1"
+            data-bm-id="${bmId}"
+            style="background:#f39c12;color:#000;cursor:pointer;"
+            title="${bmTitle}"
+            onclick="(function(){
+                localStorage.removeItem('epub_bm_${bmId}');
+                localStorage.removeItem('epub_bm_${bmId}_page');
+                document.getElementById('bmRemoveBtn').remove();
+                if (typeof applyBookmarkBadges === 'function') applyBookmarkBadges();
+            })()">
+            ${bmLabel}
+        </button>`;
+    }
+
     const html = `
         <div class="row mb-3">
             <div class="col-4 pe-0">
@@ -250,6 +308,7 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
                     <span class="badge ${monitored ? 'bg-success' : 'bg-secondary'}">
                         ${monitored ? 'Monitored' : 'Not Monitored'}
                     </span>
+                    ${bmBadge}
                 </div>
             </div>
         </div>
@@ -951,6 +1010,7 @@ function redirectToSearch(name, year) {
     window.location.href = `/search?q=${encodeURIComponent(query)}`;
 }
 function showDetails(mediaType, mediaId, tmdb=false) {
+    _pauseBackgroundFetches();
     const modalEl = document.getElementById('detailsModal');
     const modal = new bootstrap.Modal(modalEl);
     const modalTitle = document.getElementById('detailsModalLabel');
@@ -2723,28 +2783,95 @@ function handleMediaClick(mediaType, mediaId, internalId) {
     }
 }
 
-// Check library status for all items on page load
+// Check library status for all items on page load — uses batch endpoint
 function initializeMediaGrid() {
     const cards = document.querySelectorAll('.search-result-card');
-    
+    if (!cards.length) return;
+
+    const needsCheck = [];   // cards that don't already have an internal ID
+    const movieIds = [];
+    const tvIds    = [];
+
     cards.forEach(card => {
-        const mediaType = card.dataset.mediaType;
-        const mediaId = card.dataset.mediaId;
+        const mediaType  = card.dataset.mediaType;
+        const mediaId    = card.dataset.mediaId;
         const internalId = card.dataset.internalId;
-        
-        // If we already have an internal ID (from manage page), item is in library
+
         if (internalId && internalId !== 'null') {
-            const statusBadge = card.querySelector('.status-badge');
+            // Already known — fast path
+            const statusBadge    = card.querySelector('.status-badge');
             const manageControls = card.querySelector('.manage-controls');
-            
-            statusBadge.textContent = 'In Library';
-            statusBadge.className = 'status-badge text-xs badge bg-success';
+            if (statusBadge) {
+                statusBadge.textContent = 'In Library';
+                statusBadge.className   = 'status-badge text-xs badge bg-success';
+            }
             showManageControls(mediaType, mediaId, internalId, manageControls, true);
-        } else {
-            // Check library status via API
-            checkLibraryStatus(mediaType, mediaId, card);
+        } else if (mediaType && mediaId) {
+            needsCheck.push(card);
+            if (mediaType === 'movie') movieIds.push(mediaId);
+            else if (mediaType === 'tv') tvIds.push(mediaId);
         }
     });
+
+    if (!needsCheck.length) return;
+
+    // Single batch request for all unknown items
+    const params = new URLSearchParams();
+    if (movieIds.length) params.set('movie_ids', movieIds.join(','));
+    if (tvIds.length)    params.set('tv_ids',    tvIds.join(','));
+
+    fetch(`/api/library/batch-status?${params}`, { signal: _bg.signal })
+        .then(r => r.json())
+        .then(batch => {
+            needsCheck.forEach(card => {
+                const mediaType  = card.dataset.mediaType;
+                const mediaId    = card.dataset.mediaId;
+                const statusBadge   = card.querySelector('.status-badge');
+                const extraBadges   = card.querySelector('.media-extra-badges');
+                const manageControls = card.querySelector('.manage-controls');
+
+                const info = (batch[mediaType] || {})[mediaId];
+                if (info && info.in_library) {
+                    if (statusBadge) {
+                        statusBadge.textContent = 'In Library';
+                        statusBadge.className   = 'status-badge text-xs badge bg-success';
+                    }
+                    const parentItem = card.closest('.media-item') || card.closest('.result-item');
+                    if (parentItem) parentItem.dataset.internalId = info.internalId;
+
+                    // Build a minimal itemData from batch response to avoid a second fetch
+                    const itemData = {
+                        id:         info.internalId,
+                        hasFile:    info.hasFile,
+                        statistics: info.statistics || {},
+                        monitored:  info.monitored,
+                        images:     info.images || [],
+                        remotePoster: info.remotePoster || '',
+                        title:      info.title || '',
+                    };
+                    if (extraBadges)    updateExtraBadges(mediaType, itemData, extraBadges);
+                    if (manageControls) showManageControls(mediaType, mediaId, info.internalId, manageControls, true, itemData);
+                } else {
+                    // Not in library
+                    if (statusBadge) {
+                        statusBadge.textContent = 'Not Added';
+                        statusBadge.className   = 'status-badge text-xs badge bg-secondary';
+                    }
+                    if (extraBadges)    { extraBadges.style.display = 'none'; extraBadges.innerHTML = ''; }
+                    if (manageControls) { manageControls.style.display = 'none'; manageControls.innerHTML = ''; }
+                }
+            });
+        })
+        .catch(err => {
+            if (err.name === 'AbortError') {
+                // Paused for a detail view — re-queue for when modal closes
+                window._registerBgResume(() => initializeMediaGrid());
+                return;
+            }
+            console.error('[initializeMediaGrid] batch status error:', err);
+            // Fallback to individual checks
+            needsCheck.forEach(card => checkLibraryStatus(card.dataset.mediaType, card.dataset.mediaId, card));
+        });
 }
 
 // Initialize manage page grid — all items are already in the library so we skip
@@ -2769,7 +2896,7 @@ function initializeManageGrid() {
         }
 
         // Fetch details to get on-disk status + controls
-        fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
+        fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`, { signal: _bg.signal })
             .then(r => r.json())
             .then(details => {
                 if (details.error) return; // silently skip if lookup failed
@@ -2778,7 +2905,19 @@ function initializeManageGrid() {
                 if (extraBadges)    updateExtraBadges(mediaType, itemData, extraBadges);
                 if (manageControls) showManageControls(mediaType, mediaId, internalId, manageControls, true, itemData);
             })
-            .catch(err => console.error('[initializeManageGrid] details fetch error:', err));
+            .catch(err => {
+                if (err.name === 'AbortError') {
+                    if (!initializeManageGrid._resumeQueued) {
+                        initializeManageGrid._resumeQueued = true;
+                        window._registerBgResume(() => {
+                            initializeManageGrid._resumeQueued = false;
+                            initializeManageGrid();
+                        });
+                    }
+                    return;
+                }
+                console.error('[initializeManageGrid] details fetch error:', err);
+            });
     });
 }
 

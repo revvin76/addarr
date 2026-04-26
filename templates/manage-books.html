@@ -27,7 +27,19 @@
         .book-title { font-size: 0.95rem; font-weight: 600; color: #fff; }
         .book-author { font-size: 0.78rem; color: #c0392b; }
         .book-meta  { font-size: 0.72rem; color: #aaa; }
-        .book-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+        .book-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
+
+        /* ── A-Z navigation ── */
+        #azLetters { display: none; flex-wrap: wrap; gap: 4px; padding: 6px 0; }
+        #azLetters.open { display: flex; }
+        .az-btn {
+            background: #2a2a2a; border: 1px solid #3a3a3a; color: #bbb;
+            border-radius: 4px; padding: 3px 7px; font-size: 0.7rem;
+            cursor: pointer; line-height: 1.4;
+        }
+        .az-btn:hover:not([disabled]) { background: #3a3a3a; color: #fff; border-color: #555; }
+        .az-btn[disabled] { opacity: 0.22; cursor: default; }
+        #azToggle.az-active { border-color: #c0392b; color: #c0392b; }
     </style>
 </head>
 {% set current_page = 'manage-books' %}
@@ -42,7 +54,6 @@
                 <h4 class="mb-0" style="color:#c0392b;">Manage Books</h4>
                 <span class="badge bg-secondary ms-1" title="Downloaded books">{{ total_downloaded }}</span>
             </div>
-            <span class="text-muted small">{{ total_downloaded }} of {{ total_in_library }} in library downloaded</span>
         </div>
 
         <!-- Search -->
@@ -52,6 +63,14 @@
             <button class="btn btn-outline-secondary" id="clearBookSearch" disabled>
                 <i class="fas fa-times"></i>
             </button>
+        </div>
+
+        <!-- A-Z quick navigation -->
+        <div class="d-flex align-items-start gap-2 mb-2 flex-wrap">
+            <button class="btn btn-sm btn-outline-secondary" id="azToggle" onclick="toggleAzNav()">
+                <i class="fas fa-sort-alpha-down me-1"></i>A–Z
+            </button>
+            <div id="azLetters"></div>
         </div>
 
         <!-- Book grid -->
@@ -71,6 +90,7 @@
             <div class="book-card p-3 mb-2 d-flex gap-3 book-item"
                  data-title="{{ book.title|lower }}"
                  data-foreign-id="{{ book.foreignBookId }}"
+                 data-internal-id="{{ book.id }}"
                  onclick="openBookDetails('{{ book.foreignBookId }}', {{ book.id }}, this)">
 
                 {% if poster_url %}
@@ -129,6 +149,10 @@
         </div>
     </div>
 
+    <div id="backToTop" class="back-to-top">
+        <i class="fas fa-chevron-up"></i>
+    </div>
+
     <div id="overlay-backdrop" class="overlay-backdrop"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
@@ -160,19 +184,13 @@
     });
 
     // ── Client-side book data cache ──────────────────────────────────────────
-    // Map<foreignBookId, bookData> — populated on first load and after each
-    // detail fetch so repeat clicks never hit the server again.
     const bookDataCache = new Map();
 
     // ── Card patch helper ────────────────────────────────────────────────────
-    // Handles two response shapes:
-    //   • Batch cache endpoint: { authorName, posterUrl, title, overview }
-    //   • Details endpoint data object: { author: { authorName }, images: [...], remotePoster }
     function patchBookCard(foreignBookId, bookData) {
         const card = document.querySelector(`.book-item[data-foreign-id="${foreignBookId}"]`);
         if (!card || !bookData) return;
 
-        // Author — flat shape first, then nested
         const authorName = bookData.authorName || bookData.author?.authorName;
         if (authorName) {
             const authorEl = card.querySelector('.book-author');
@@ -181,7 +199,6 @@
             }
         }
 
-        // Poster — flat shape first, then images array, then remotePoster
         const posterUrl = bookData.posterUrl
             || (bookData.images || []).find(i => i.coverType === 'poster' || i.coverType === 'cover')?.remoteUrl
             || bookData.remotePoster;
@@ -203,15 +220,162 @@
         }
     }
 
-    // ── First-load cache population ──────────────────────────────────────────
-    // Collect all foreignBookIds, ask the server for whatever it has in the
-    // local metadata cache (fast disk reads — no Readarr/Apify HTTP calls),
-    // then patch every card that was missing author or thumbnail.
+    // ── Bookmark badges ──────────────────────────────────────────────────────
+    // Reads localStorage for epub_bm_{internalId}. If set, prepends a gold
+    // 🔖 badge (with page number when available) to each bookmarked card.
+    function applyBookmarkBadges() {
+        // ── Card list ────────────────────────────────────────────────────────
+        document.querySelectorAll('.book-item[data-internal-id]').forEach(card => {
+            const internalId    = card.dataset.internalId;
+            const bmKey         = `epub_bm_${internalId}`;
+            const actionsDiv    = card.querySelector('.book-actions');
+            const existingBadge = actionsDiv ? actionsDiv.querySelector('.bm-badge') : null;
+
+            if (!localStorage.getItem(bmKey)) {
+                if (existingBadge) existingBadge.remove();
+                return;
+            }
+            if (!actionsDiv) return;
+
+            const pageInfo = localStorage.getItem(bmKey + '_page') || '';
+            const badge = existingBadge || document.createElement('span');
+            badge.className     = 'bm-badge badge';
+            badge.style.cssText = 'background:#f39c12;color:#000;font-size:0.7rem;cursor:default;';
+            if (pageInfo) {
+                const [pg, total] = pageInfo.split('/');
+                badge.textContent = `🔖 p.${pg}`;
+                badge.title = `Bookmarked at page ${pg} of ${total}`;
+            } else {
+                badge.textContent = '🔖';
+                badge.title = 'Bookmarked';
+            }
+            if (!existingBadge) actionsDiv.prepend(badge);
+        });
+
+        // ── Details modal (if open) ──────────────────────────────────────────
+        // If the modal is showing a book whose bookmark was just removed,
+        // pull the badge out of the modal too.
+        const modalBtn = document.getElementById('bmRemoveBtn');
+        if (modalBtn) {
+            const bmId = modalBtn.dataset.bmId;
+            if (bmId && !localStorage.getItem(`epub_bm_${bmId}`)) {
+                modalBtn.remove();
+            }
+        }
+    }
+
+    // ── First-load enrichment for cards still missing thumbnails ─────────────
+    // After the fast disk-cache pass, any card still showing a placeholder
+    // gets the full enrichment chain (cache → Apify → Readarr) via
+    // /get_media_details — the same call that fires when clicking a book.
+    // Processed in sequential batches of 20 to avoid hammering the server.
+    function enrichMissingBooks() {
+        const missing = [...document.querySelectorAll('.book-item[data-foreign-id]')]
+            .filter(card => {
+                if (bookDataCache.has(card.dataset.foreignId)) return false;
+                return card.querySelector('.book-thumb-placeholder') !== null;
+            });
+        if (!missing.length) return;
+
+        let batchStart = 0;
+        const BATCH = 20;
+
+        function nextBatch() {
+            // Yield to detail view if one has been opened
+            if (window._bg && window._bg.controller.signal.aborted) {
+                if (window._registerBgResume) window._registerBgResume(enrichMissingBooks);
+                return;
+            }
+
+            const slice = missing.slice(batchStart, batchStart + BATCH);
+            if (!slice.length) return;
+            batchStart += BATCH;
+
+            const signal = window._bg ? window._bg.signal : undefined;
+            Promise.all(slice.map(card => {
+                const fid = card.dataset.foreignId;
+                return fetch(`/get_media_details?type=book&id=${fid}`, signal ? { signal } : {})
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data?.data) {
+                            bookDataCache.set(fid, data.data);
+                            patchBookCard(fid, data.data);
+                        }
+                    })
+                    .catch(err => { if (err.name === 'AbortError') throw err; });
+            }))
+            .then(nextBatch)
+            .catch(err => {
+                if (err.name === 'AbortError') {
+                    // Re-queue from scratch — already-patched books are filtered
+                    // out by enrichMissingBooks() via bookDataCache.has() check
+                    if (window._registerBgResume) window._registerBgResume(enrichMissingBooks);
+                }
+            });
+        }
+
+        nextBatch();
+    }
+
+    // ── A-Z quick navigation ─────────────────────────────────────────────────
+    function buildAzNav() {
+        const letters = document.getElementById('azLetters');
+        if (!letters) return;
+
+        const used = new Set();
+        document.querySelectorAll('.book-item[data-title]').forEach(item => {
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
+            const c = t.charAt(0);
+            if (/[0-9]/.test(c)) used.add('0');
+            else if (/[a-z]/i.test(c)) used.add(c.toLowerCase());
+        });
+
+        const chars = ['0', ...'abcdefghijklmnopqrstuvwxyz'];
+        letters.innerHTML = chars.map(c => {
+            const label  = c === '0' ? '0–9' : c.toUpperCase();
+            const active = used.has(c);
+            return `<button class="az-btn" ${active ? `onclick="scrollToLetter('${c}')"` : 'disabled'}>${label}</button>`;
+        }).join('');
+    }
+
+    function toggleAzNav() {
+        const isOpen = document.getElementById('azLetters').classList.toggle('open');
+        document.getElementById('azToggle').classList.toggle('az-active', isOpen);
+    }
+
+    function scrollToLetter(letter) {
+        for (const item of document.querySelectorAll('.book-item[data-title]')) {
+            if (item.style.display === 'none') continue;
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
+            const c = t.charAt(0).toLowerCase();
+            const match = letter === '0' ? /[0-9]/.test(c) : c === letter;
+            if (match) {
+                document.getElementById('azLetters').classList.remove('open');
+                document.getElementById('azToggle').classList.remove('az-active');
+                item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+        }
+    }
+
+    // ── Refresh bookmark badges when tab becomes active ──────────────────────
+    // DOMContentLoaded fires only once. If the user opens the reader in a new
+    // tab, sets a bookmark, then returns here, we need to re-read localStorage.
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) applyBookmarkBadges();
+    });
+    window.addEventListener('pageshow', applyBookmarkBadges); // bfcache restore
+
+    // ── Initialise ───────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function() {
+        applyBookmarkBadges();
+        buildAzNav();
+
         const ids = [...document.querySelectorAll('.book-item[data-foreign-id]')]
             .map(el => el.dataset.foreignId).filter(Boolean);
         if (!ids.length) return;
 
+        // Pass 1 — fast disk-cache reads (milliseconds, no HTTP calls)
         fetch('/api/book/metadata-cache?ids=' + ids.join(','))
             .then(r => r.json())
             .then(data => {
@@ -219,27 +383,26 @@
                     bookDataCache.set(fid, bookData);
                     patchBookCard(fid, bookData);
                 });
+                // Pass 2 — full enrichment for anything still missing a thumbnail
+                enrichMissingBooks();
             })
-            .catch(() => {});
+            .catch(() => enrichMissingBooks());
     });
 
     // ── Click handler ────────────────────────────────────────────────────────
     function openBookDetails(foreignBookId, internalId) {
-        // Always open the modal (main.js fetches + renders detail view)
         showManageDetails('book', foreignBookId, internalId);
 
-        // If we already have this book's data, patch the card immediately
         const cached = bookDataCache.get(foreignBookId);
         if (cached) {
             patchBookCard(foreignBookId, cached);
             return;
         }
 
-        // Not in cache — fetch enriched data, store in cache, then patch
         fetch(`/get_media_details?type=book&id=${foreignBookId}`)
             .then(r => r.json())
             .then(data => {
-                if (data && data.data) {
+                if (data?.data) {
                     bookDataCache.set(foreignBookId, data.data);
                     patchBookCard(foreignBookId, data.data);
                 }

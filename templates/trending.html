@@ -44,6 +44,12 @@
                 <h3 class="text-light">Trending This Week</h3>
                 <p class="text-light">Popular movies and TV shows from TMDB</p>
 
+                <!-- Library status progress indicator -->
+                <div id="libraryStatusBar" class="alert alert-secondary py-1 px-3 mb-2 d-flex align-items-center gap-2" style="font-size:0.8rem; display:none !important;">
+                    <div class="spinner-border spinner-border-sm text-secondary" role="status" style="width:14px;height:14px;border-width:2px;"></div>
+                    <span id="libraryStatusMsg">Checking library status…</span>
+                </div>
+
                 <div class="col-md-12 mb-2">
                     <div class="flex-container"> <!-- Added custom class -->
                         <div class="input-group input-group-flex"> <!-- Added custom class -->
@@ -197,163 +203,158 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-    // Filter functionality
-    document.addEventListener('DOMContentLoaded', function() {
-        const mediaFilter = document.getElementById('mediaFilter');
-        const statusFilter = document.getElementById('statusFilter');
-        
-        mediaFilter.addEventListener('change', function() {
-            const filter = this.value;
-            const items = document.querySelectorAll('.result-item');
-            
-            // Filter result items
-            items.forEach(item => {
-                if (filter === 'all') {
-                    item.style.display = 'block';
-                } else {
-                    item.style.display = item.getAttribute('data-media-type') === filter ? 'block' : 'none';
-                }
-            });
-        });
-        statusFilter.addEventListener('change', function() {
-            const filter = this.value;
-            const items = document.querySelectorAll('.result-item');
-            
-            // Filter result items based on library status
-            items.forEach(item => {
+    // ── Combined filter — media type AND library status applied together ────
+    function applyFilters() {
+        const mediaVal  = (document.getElementById('mediaFilter')  || {}).value || 'all';
+        const statusVal = (document.getElementById('statusFilter') || {}).value || 'status_all';
+
+        document.querySelectorAll('.result-item').forEach(item => {
+            // Media-type gate
+            const mediaOk = mediaVal === 'all' || item.dataset.mediaType === mediaVal;
+
+            // Status gate
+            let statusOk = true;
+            if (statusVal !== 'status_all') {
                 const badge = item.querySelector('.status-badge');
-                if (badge) {
-                    const inLibrary = badge.textContent.trim() === 'In Library';
-                    if (filter === 'status_all') {
-                        item.style.display = 'block';
-                    } else if (filter === 'status_in_library') {
-                        item.style.display = inLibrary ? 'block' : 'none';
-                    } else if (filter === 'status_not_added') {
-                        item.style.display = !inLibrary ? 'block' : 'none';
-                    }
+                const text  = badge ? badge.textContent.trim() : '';
+                if (text === 'Checking...') {
+                    statusOk = true;   // don't hide items whose status hasn't loaded yet
+                } else {
+                    // "in library" = On Disk or Missing (success/danger classes)
+                    const inLib = badge &&
+                        (badge.classList.contains('text-bg-success') ||
+                         badge.classList.contains('text-bg-danger'));
+                    statusOk = statusVal === 'status_in_library' ? inLib : !inLib;
                 }
-            });
+            }
+
+            item.style.display = (mediaOk && statusOk) ? '' : 'none';
         });
-        // Lazy-load library status for visible items - SAME FUNCTIONALITY AS RESULTS PAGE
-        const lazyLoadStatus = () => {
-            const cards = document.querySelectorAll('.search-result-card:not(.status-checked)');
-            
-            cards.forEach(card => {
-                if (isElementInViewport(card)) {
-                    const mediaType = card.dataset.mediaType;
-                    const mediaId = card.dataset.mediaId;
-                    checkLibraryStatus(mediaType, mediaId, card);
-                    card.classList.add('status-checked');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('mediaFilter') .addEventListener('change', applyFilters);
+        document.getElementById('statusFilter').addEventListener('change', applyFilters);
+
+        // ── Progress bar helpers ──────────────────────────────────────────────
+        const statusBar = document.getElementById('libraryStatusBar');
+        const statusMsg = document.getElementById('libraryStatusMsg');
+        function showStatusBar(msg) {
+            statusBar.style.setProperty('display', 'flex', 'important');
+            statusMsg.textContent = msg;
+        }
+        function hideStatusBar() {
+            statusBar.style.setProperty('display', 'none', 'important');
+        }
+
+        // ── Apply badge for a single card from batch result info ─────────────
+        function applyCardStatus(card, mediaType, info) {
+            const badge     = card.querySelector('.status-badge');
+            const deleteBtn = card.querySelector('.delete-btn');
+            if (!badge) return;
+
+            if (info && info.in_library) {
+                const stats    = info.statistics || {};
+                const isOnDisk = mediaType === 'movie'
+                    ? (info.hasFile || false)
+                    : (stats.episodeFileCount || 0) > 0;
+
+                if (isOnDisk) {
+                    badge.textContent = mediaType === 'tv'
+                        ? `[${stats.episodeFileCount}/${stats.episodeCount} eps]`
+                        : 'On Disk';
+                    badge.className = 'status-badge text-xs badge text-bg-success';
+                } else {
+                    badge.textContent = 'Missing';
+                    badge.className   = 'status-badge text-xs badge text-bg-danger';
                 }
+                if (deleteBtn) {
+                    deleteBtn.style.display        = 'block';
+                    deleteBtn.dataset.mediaType    = mediaType;
+                    deleteBtn.dataset.mediaId      = card.dataset.mediaId;
+                    deleteBtn.onclick              = deleteFromLibrary;
+                }
+            } else {
+                badge.textContent = 'Not Added';
+                badge.className   = 'status-badge text-xs badge bg-secondary';
+                if (deleteBtn) deleteBtn.style.display = 'none';
+            }
+        }
+
+        // ── Single batch request for all cards ───────────────────────────────
+        function loadAllStatuses() {
+            const cards     = [...document.querySelectorAll('.search-result-card')];
+            const movieIds  = [];
+            const tvIds     = [];
+            const cardMap   = {};  // "<type>_<id>" → card element
+
+            cards.forEach(card => {
+                const mt = card.dataset.mediaType;
+                const id = card.dataset.mediaId;
+                if (!mt || !id) return;
+                cardMap[`${mt}_${id}`] = card;
+                if (mt === 'movie') movieIds.push(id);
+                else if (mt === 'tv') tvIds.push(id);
             });
-        };
 
-        // Check if element is visible
-        const isElementInViewport = (el) => {
-            const rect = el.getBoundingClientRect();
-            return (
-                rect.top <= (window.innerHeight || document.documentElement.clientHeight) &&
-                rect.bottom >= 0
-            );
-        };
+            if (!movieIds.length && !tvIds.length) return;
 
-        // Fetch library status and update badge with delete button
-        const checkLibraryStatus = (mediaType, mediaId, card) => {
-            
-            fetch(`/check_library_status?type=${mediaType}&id=${mediaId}&source=tmdb`)
-                .then(response => response.json())
-                .then(data => {
-                    const badge = card.querySelector('.status-badge');
-                    const deleteBtn = card.querySelector('.delete-btn');
-                    console.log('Library status for', mediaType, mediaId, data);
-                    if (!badge) return;
-                    
-                    if (data.in_library) {
-                        // Fetch details to check if on disk or missing
-                        fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
-                            .then(response => response.json())
-                            .then(details => {
-                                const itemData = details.data || details;
-                                const stats = data.statistics || {};
-                                console.log('Details for', mediaType, mediaId, itemData);
-                                let isOnDisk = false;
-                                
-                                if (mediaType === 'movie') {
-                                    isOnDisk = itemData.hasFile || false;
-                                } else {
-                                    isOnDisk = (stats.episodeFileCount || 0) > 0;
-                                }
-                                
-                                // Update badge
-                                if (isOnDisk) {
-                                    badge.textContent = mediaType === 'tv' ? ` [${stats.episodeFileCount}/ ${stats.episodeCount}] eps)` : 'On Disk';
-                                    badge.className = 'status-badge text-xs badge text-bg-success';
-                                } else {
-                                    badge.textContent = 'Missing';
-                                    badge.className = 'status-badge text-xs badge text-bg-danger';
-                                }
-                                
-                                // Show delete button
-                                if (deleteBtn) {
-                                    deleteBtn.style.display = 'block';
-                                    deleteBtn.dataset.mediaType = mediaType;
-                                    deleteBtn.dataset.mediaId = mediaId;
-                                    deleteBtn.onclick = deleteFromLibrary;
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Error fetching details:', error);
-                                badge.textContent = 'Error';
-                                badge.className = 'status-badge text-xs badge bg-danger';
-                            });
-                    } else {
-                        badge.textContent = 'Not Added';
-                        badge.className = 'status-badge text-xs badge bg-secondary';
-                        if (deleteBtn) {
-                            deleteBtn.style.display = 'none';
-                        }
-                    }
+            const total = movieIds.length + tvIds.length;
+            showStatusBar(`Checking library status for ${total} titles…`);
+
+            const params = new URLSearchParams();
+            if (movieIds.length) params.set('movie_ids', movieIds.join(','));
+            if (tvIds.length)    params.set('tv_ids',    tvIds.join(','));
+
+            const signal = window._bg ? window._bg.signal : undefined;
+            fetch(`/api/library/batch-status?${params}`, signal ? { signal } : {})
+                .then(r => r.json())
+                .then(batch => {
+                    cards.forEach(card => {
+                        const mt   = card.dataset.mediaType;
+                        const id   = card.dataset.mediaId;
+                        const info = (batch[mt] || {})[id];
+                        applyCardStatus(card, mt, info);
+                    });
+                    applyFilters();
+                    hideStatusBar();
                 })
-                .catch(error => {
-                    console.error('Error checking library status:', error);
-                    const badge = card.querySelector('.status-badge');
-                    if (badge) {
-                        badge.textContent = 'Error';
-                        badge.className = 'status-badge text-xs badge bg-danger';
+                .catch(err => {
+                    if (err.name === 'AbortError') {
+                        // Detail view opened — re-queue for when modal closes
+                        if (window._registerBgResume) window._registerBgResume(loadAllStatuses);
+                        hideStatusBar();
+                        return;
                     }
+                    console.error('[trending] batch status error:', err);
+                    hideStatusBar();
                 });
-        };
+        }
 
-        // Delete from library
+        // ── Delete from library (re-checks status after delete) ──────────────
         window.deleteFromLibrary = function(e) {
             e.stopPropagation();
             const mediaType = this.dataset.mediaType;
-            const mediaId = this.dataset.mediaId;
-            
+            const mediaId   = this.dataset.mediaId;
+
             if (confirm('Are you sure you want to delete this from your library?')) {
-                fetch(`/api/${mediaType}/${mediaId}`, {
-                    method: 'DELETE'
-                })
-                .then(response => {
-                    if (response.ok) {
-                        alert('✅ Item deleted successfully');
-                        // Refresh the library status
-                        const card = this.closest('.search-result-card');
-                        checkLibraryStatus(mediaType, mediaId, card);
-                    } else {
-                        throw new Error('Failed to delete item');
-                    }
-                })
-                .catch(error => {
-                    console.error(error);
-                    alert('❌ Failed to delete item');
-                });
+                fetch(`/api/${mediaType}/${mediaId}`, { method: 'DELETE' })
+                    .then(response => {
+                        if (response.ok) {
+                            alert('✅ Item deleted successfully');
+                            loadAllStatuses();   // refresh all badges
+                        } else {
+                            throw new Error('Failed to delete item');
+                        }
+                    })
+                    .catch(error => {
+                        console.error(error);
+                        alert('❌ Failed to delete item');
+                    });
             }
         };
 
-        // Initial load and scroll event
-        lazyLoadStatus();
-        window.addEventListener('scroll', lazyLoadStatus);
+        loadAllStatuses();
     });
 
     // Register service worker

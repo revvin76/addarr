@@ -1,0 +1,17 @@
+{
+  "foreignBookId": "2639048",
+  "title": "Dark Possession",
+  "author": {
+    "authorName": "Christine Feehan"
+  },
+  "images": [
+    {
+      "url": "/MediaCover/Books/3150/cover.jpg?lastWrite=636041081520000000",
+      "coverType": "poster",
+      "extension": ".jpg",
+      "remoteUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1310966440i/9447492.jpg"
+    }
+  ],
+  "remotePoster": "",
+  "overview": ""
+}
