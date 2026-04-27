@@ -14,25 +14,33 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a1a" />
     <style>
-        .book-card {
-            background: #2a2a2a;
-            border-radius: 10px;
-            border-left: 4px solid #c0392b;
-            transition: box-shadow 0.2s;
-            cursor: pointer;
+        /* ── Book-specific overlays on top of the shared .search-result-card ── */
+        .book-author {
+            color: #c0392b;
+            font-size: 0.75rem;
+            margin-bottom: 2px;
         }
-        .book-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
-        .book-thumb { width: 70px; height: 100px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
-        .book-thumb-placeholder { width: 70px; height: 100px; background: #333; border-radius: 6px;
-            display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .book-title  { font-size: 0.95rem; font-weight: 600; color: #fff; }
-        .book-author { font-size: 0.78rem; color: #c0392b; }
-        .book-meta   { font-size: 0.72rem; color: #aaa; }
-        .book-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
+        .book-meta {
+            font-size: 0.7rem;
+        }
+        .book-meta .ext-badge {
+            color: #888;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .book-actions {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 6px;
+        }
+        .book-actions .btn { padding: 0.15rem 0.4rem; font-size: 0.7rem; }
 
-        /* source pill shown on unenriched cards */
+        /* Source pill shown on unenriched cards */
         .source-pill {
-            font-size: 0.65rem; padding: 2px 6px; border-radius: 20px;
+            font-size: 0.62rem; padding: 2px 6px; border-radius: 20px;
             background: #3a3a3a; color: #bbb; white-space: nowrap;
         }
         .source-pill.needs-manual { background: #5a2d0c; color: #f39c12; }
@@ -58,36 +66,72 @@
         #importModal .form-control:focus { border-color: #c0392b; box-shadow: 0 0 0 .15rem rgba(192,57,43,.25); }
         #importCoverPreview { max-height: 120px; border-radius: 6px; display: none; }
     </style>
+    <script>
+    // Sequential batch image loader — 20 at a time. Mirrors manage.html.
+    function startProgressiveLoading() {
+        const items = [...document.querySelectorAll('.book-item')];
+        if (!items.length) return;
+        let batchStart = 0;
+        const BATCH = 20;
+        function loadBatch() {
+            const slice = items.slice(batchStart, batchStart + BATCH);
+            if (!slice.length) return;
+            batchStart += BATCH;
+            const promises = slice.map(item => {
+                const img = item.querySelector('.search-result-thumbnail');
+                if (!img) return Promise.resolve();
+                const src = img.getAttribute('data-src');
+                if (!src) return Promise.resolve();
+                if (img.src && img.src.endsWith(src)) return Promise.resolve();
+                return new Promise(resolve => {
+                    img.onload  = resolve;
+                    img.onerror = resolve;
+                    img.src = src;
+                });
+            });
+            Promise.all(promises).then(loadBatch);
+        }
+        loadBatch();
+    }
+    </script>
 </head>
 {% set current_page = 'manage-books' %}
 <body>
     {% include 'partials/navbar.html' %}
 
-    <!-- ── Sticky controls header ── -->
+    <!-- ── Sticky controls header (matches manage.html layout) ── -->
     <div class="page-sticky-controls" id="stickyControls">
         <div class="container py-2">
-            <!-- Header row: title + search -->
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="fas fa-book" style="color:#c0392b;"></i>
-                <span class="fw-semibold" style="color:#c0392b; white-space:nowrap;">
-                    Manage Books
-                    <span class="badge bg-secondary ms-1" title="Books found on disk" style="font-size:0.7rem;">{{ total_downloaded }}</span>
-                </span>
-                {% if root_folder %}
-                <small class="text-muted d-none d-md-inline text-truncate">
-                    <i class="fas fa-folder-open me-1"></i>{{ root_folder }}
-                </small>
-                {% endif %}
-                <!-- Search -->
-                <div class="input-group input-group-sm ms-auto" style="max-width:280px;">
-                    <input type="text" id="bookSearch" class="form-control form-control-sm bg-dark text-light border-secondary"
-                           placeholder="Search books…" autocomplete="off">
-                    <button class="btn btn-outline-secondary btn-sm" id="clearBookSearch" disabled>
-                        <i class="fas fa-times"></i>
-                    </button>
+            <!-- Title + count + search row -->
+            <div class="row g-2 mb-2 align-items-center">
+                <div class="col-12 col-md-5">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-book" style="color:#c0392b;"></i>
+                        <span class="fw-semibold" style="color:#c0392b; white-space:nowrap;">Manage Books</span>
+                        <span class="badge bg-secondary" title="Books found on disk" style="font-size:0.7rem;">
+                            {{ total_downloaded }}
+                        </span>
+                        {% if root_folder %}
+                        <small class="text-muted d-none d-md-inline text-truncate" title="{{ root_folder }}">
+                            <i class="fas fa-folder-open me-1"></i>{{ root_folder }}
+                        </small>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-12 col-md-7">
+                    <div class="input-group input-group-sm">
+                        <span class="btn btn-primary input-group-text">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" id="bookSearch" class="form-control form-control-sm"
+                               placeholder="Search books…" autocomplete="off">
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="clearBookSearch" disabled>
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
-            <!-- A-Z nav + back-to-top -->
+            <!-- A-Z + back-to-top row -->
             <div class="d-flex align-items-center gap-2">
                 <button class="btn btn-sm btn-outline-secondary flex-shrink-0" id="azToggle" onclick="toggleAzNav()">
                     <i class="fas fa-sort-alpha-down me-1"></i>A–Z
@@ -101,12 +145,12 @@
         </div>
     </div>
 
+    <!-- ── Book Grid (poster-card layout shared with manage / trending / results) ── -->
     <div class="container mt-3">
-        <!-- Book grid -->
         {% if books %}
-        <div id="booksGrid">
+        <div class="row" id="booksGrid">
             {% for book in books %}
-            <div class="book-card p-3 mb-2 d-flex gap-3 book-item"
+            <div class="col-6 col-md-4 col-lg-12 mb-3 media-item book-item"
                  data-title="{{ (book.title or book.filename)|lower }}"
                  data-file-path="{{ book.file_path }}"
                  data-db-id="{{ book.id or '' }}"
@@ -115,58 +159,65 @@
                  data-foreign-id="{{ book.foreign_book_id or '' }}"
                  onclick="openBookDetails(this)">
 
-                <!-- Thumbnail -->
-                {% if book.cover_url %}
-                <img src="{{ book.cover_url }}" class="book-thumb" alt="{{ book.title or book.filename }}"
-                     onerror="this.onerror=null;this.src='/static/images/apple-touch-icon.png'">
-                {% else %}
-                <div class="book-thumb-placeholder"><i class="fas fa-book text-muted fa-2x"></i></div>
-                {% endif %}
-
-                <!-- Info -->
-                <div class="flex-grow-1" style="min-width:0;">
-                    <div class="book-title text-truncate">{{ book.title or book.filename }}</div>
-                    <div class="book-author">{{ book.author or '' }}</div>
-                    <div class="book-meta mt-1">
-                        {% if book.year %}{{ book.year }}{% endif %}
-                        {% if book.pages %} · {{ book.pages }} pages{% endif %}
-                        {% if book.file_size %} · {{ (book.file_size / 1048576) | round(1) }} MB{% endif %}
-                        <span class="ms-1 text-uppercase" style="font-size:0.65rem;color:#555;">
-                            {{ book.extension or '' }}
-                        </span>
+                <div class="search-result-card manage-result-card h-100 book-card">
+                    <!-- Poster -->
+                    <div class="search-result-thumbnail-container">
+                        <img data-src="{{ book.cover_url or '/static/images/apple-touch-icon.png' }}"
+                             src="/static/images/placeholder.png"
+                             class="search-result-thumbnail book-thumb"
+                             alt="{{ book.title or book.filename }}"
+                             onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
+                        <div class="fade-overlay"></div>
+                        <div class="watermark-icon position-absolute">
+                            <i class="fas fa-book"></i>
+                        </div>
                     </div>
-                    <div class="book-actions" onclick="event.stopPropagation()">
-                        <!-- Read button: local DB id preferred, falls back to Readarr internal id -->
-                        {% if book.id %}
-                        <a href="/read/local/{{ book.id }}" target="_blank"
-                           class="btn btn-sm btn-outline-success">
-                            <i class="fas fa-book-open me-1"></i>Read
-                        </a>
-                        {% elif book.internal_id %}
-                        <a href="/read/{{ book.internal_id }}" target="_blank"
-                           class="btn btn-sm btn-outline-success">
-                            <i class="fas fa-book-open me-1"></i>Read
-                        </a>
-                        {% endif %}
 
-                        <!-- Source indicator / import button -->
-                        {% set src = book.source or 'unknown' %}
-                        {% if src in ['file', 'filename', 'unknown'] %}
-                        <button class="btn btn-sm btn-outline-warning import-btn"
-                                onclick="event.stopPropagation(); triggerImport(this)"
-                                data-file-path="{{ book.file_path }}"
-                                title="No full metadata found — click to import manually">
-                            <i class="fas fa-file-import me-1"></i>Import
-                        </button>
-                        <span class="source-pill enriching" data-fp="{{ book.file_path }}"
-                              title="Looking up metadata…">
-                            <span class="spinner-border spinner-border-sm"
-                                  style="width:8px;height:8px;border-width:1px;"></span>
-                            enriching…
-                        </span>
-                        {% else %}
-                        <span class="source-pill" title="Metadata source: {{ src }}">{{ src }}</span>
-                        {% endif %}
+                    <!-- Card content: title, author, meta, actions -->
+                    <div class="search-result-content">
+                        <h6 class="text-white truncate book-title">{{ book.title or book.filename }}</h6>
+                        <div class="book-author text-truncate">{{ book.author or '' }}</div>
+                        <div class="d-flex justify-content-between align-items-center book-meta text-muted">
+                            <span>
+                                {% if book.year %}{{ book.year }}{% endif %}
+                                {% if book.pages %}{% if book.year %} · {% endif %}{{ book.pages }}p{% endif %}
+                                {% if book.file_size %}{% if book.year or book.pages %} · {% endif %}{{ (book.file_size / 1048576) | round(1) }} MB{% endif %}
+                            </span>
+                            <span class="ext-badge">{{ book.extension or '' }}</span>
+                        </div>
+                        <div class="book-actions" onclick="event.stopPropagation()">
+                            <!-- Read button: local DB id preferred, falls back to Readarr internal id -->
+                            {% if book.id %}
+                            <a href="/read/local/{{ book.id }}" target="_blank"
+                               class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-book-open me-1"></i>Read
+                            </a>
+                            {% elif book.internal_id %}
+                            <a href="/read/{{ book.internal_id }}" target="_blank"
+                               class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-book-open me-1"></i>Read
+                            </a>
+                            {% endif %}
+
+                            <!-- Source indicator / import button -->
+                            {% set src = book.source or 'unknown' %}
+                            {% if src in ['file', 'filename', 'unknown'] %}
+                            <button class="btn btn-sm btn-outline-warning import-btn"
+                                    onclick="event.stopPropagation(); triggerImport(this)"
+                                    data-file-path="{{ book.file_path }}"
+                                    title="No full metadata found — click to import manually">
+                                <i class="fas fa-file-import me-1"></i>Import
+                            </button>
+                            <span class="source-pill enriching" data-fp="{{ book.file_path }}"
+                                  title="Looking up metadata…">
+                                <span class="spinner-border spinner-border-sm"
+                                      style="width:8px;height:8px;border-width:1px;"></span>
+                                enriching…
+                            </span>
+                            {% else %}
+                            <span class="source-pill" title="Metadata source: {{ src }}">{{ src }}</span>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -318,14 +369,10 @@
 
         const coverUrl = book.cover_url;
         if (coverUrl) {
-            const placeholder = card.querySelector('.book-thumb-placeholder');
-            if (placeholder) {
-                const img = document.createElement('img');
-                img.src       = coverUrl;
-                img.className = 'book-thumb';
-                img.alt       = title || '';
-                img.onerror   = () => { img.onerror = null; img.src = '/static/images/apple-touch-icon.png'; };
-                placeholder.replaceWith(img);
+            const img = card.querySelector('.book-thumb');
+            if (img) {
+                img.src = coverUrl;
+                img.setAttribute('data-src', coverUrl);
             }
         }
 
@@ -355,14 +402,12 @@
         }
 
         // Update meta line
-        const metaEl = card.querySelector('.book-meta');
+        const metaEl = card.querySelector('.book-meta > span:first-child');
         if (metaEl) {
             const parts = [];
             if (book.year)  parts.push(book.year);
-            if (book.pages) parts.push(`${book.pages} pages`);
-            const ext = card.querySelector('.book-meta .text-uppercase');
-            const extText = ext ? ext.outerHTML : '';
-            metaEl.innerHTML = parts.join(' · ') + (parts.length ? ' ' : '') + extText;
+            if (book.pages) parts.push(`${book.pages}p`);
+            metaEl.textContent = parts.join(' · ');
         }
     }
 
@@ -650,10 +695,20 @@
     });
     window.addEventListener('pageshow', applyBookmarkBadges);
 
+    // ── Service worker (matches manage.html) ──────────────────────────────────
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(() => console.log('ServiceWorker registration successful'))
+                .catch(err => console.log('ServiceWorker registration failed: ', err));
+        });
+    }
+
     // ── Init ──────────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function() {
         applyBookmarkBadges();
         buildAzNav();
+        startProgressiveLoading();
         // Kick off background enrichment for books without full metadata
         setTimeout(enrichPendingBooks, 200);
 

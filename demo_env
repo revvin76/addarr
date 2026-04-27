@@ -1,5 +1,5 @@
 # =========================================
-# Addarr v1.1.28 - Environment Configuration
+# Addarr v1.1.30 - Environment Configuration
 # =========================================
 # VERSION: See VERSION file at project root
 # Last Updated: 2026-04-16
@@ -53,7 +53,7 @@ ENABLE_AUTO_UPDATE=true
 
 # === FLASK APP SETTINGS ===
 UPDATE_CHANNEL=prod # Options: prod, dev
-APP_VERSION=1.1.28
+APP_VERSION=1.1.30
 APP_COMMIT=abc1234
 FLASK_DEBUG=false
 SERVER_PORT=5000

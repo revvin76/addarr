@@ -437,6 +437,18 @@ def conditional_debug_log(func):
             raise
     return wrapper
 
+# ── Pinggy tunnel: suppress interstitial injection ────────────────────────────
+# Pinggy injects its own HTML into responses when the X-Pinggy-No-Screen header
+# is absent from the *response*.  Without it, the injected bytes push the actual
+# response body past the Content-Length Flask declared, which Chrome reports as
+# ERR_CONTENT_LENGTH_MISMATCH and the truncated page means JS never runs.
+# Sending this header on every response costs nothing and is harmless on non-
+# Pinggy requests.
+@app.after_request
+def add_pinggy_bypass_header(response):
+    response.headers['X-Pinggy-No-Screen'] = 'bypass'
+    return response
+
 # Initialize routes
 routes.init_routes(
     app=app,

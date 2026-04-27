@@ -929,6 +929,10 @@ input:checked + .toggle-slider:before {
     color: var(--tv-accent);
 }
 
+.book-item .watermark-icon {
+    color: #c0392b;
+}
+
 
 
 /* Add to your :root variables if not already present */

@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.30] - 2026-04-27
+
+### Fixed
+- **`ERR_CONTENT_LENGTH_MISMATCH` via Pinggy tunnel** — Pinggy's free/pro tunnel injects its own interstitial HTML into responses when the `X-Pinggy-No-Screen` header is absent from the *response*. The injected bytes cause the actual response body to exceed the `Content-Length` Flask declared, so Chrome reports the mismatch and the page is treated as truncated. The truncated page means `startProgressiveLoading()` never executes, which is why thumbnails also failed to load through the tunnel. Fixed by adding an `@app.after_request` handler in `app.py` that stamps `X-Pinggy-No-Screen: bypass` on every Flask response. The header is harmless on direct/LAN requests.
+
+---
+## [1.1.29] - 2026-04-27
+
+### Added
+- sw.js: bump cache to v3, purge old caches on activate, skip /api/* and cross-origin,
+  network-first HTML, stale-while-revalidate static assets. Fixes ERR_CONTENT_LENGTH_MISMATCH
+  from a stale/truncated main.js poisoning addarr-cache-v1, which silently killed page JS.
+- manage-books: switch from horizontal book-card to the shared .search-result-card poster
+  layout used by manage / trending / results; align sticky controls header with manage.html.
+  All .book-item JS hooks (search, A-Z, enrichment, import, bookmarks) preserved.
+- styles.css: add .book-item .watermark-icon color to match movie/tv pattern.
+
 ---
 ## [1.1.28] - 2026-04-27
 
