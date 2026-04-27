@@ -92,6 +92,8 @@ instance/
 *.local
 
 metadata/*.*
+metadata/thumb_cache/*.*
+metadata/img_cache/*.*
 updates/
 !updates/.gitkeep
 HOWTO.txt
