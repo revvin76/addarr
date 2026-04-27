@@ -211,8 +211,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
 <script>
-const bookId  = {{ book_id }};
-const fileUrl = `/api/book/file/${bookId}`;
+const bookId  = "{{ book_id }}";
+const fileUrl = bookId.startsWith('local_')
+    ? `/api/book/file/local/${bookId.slice(6)}`
+    : `/api/book/file/${bookId}`;
 const BM_KEY  = `epub_bm_${bookId}`;   // bookmark CFI in localStorage
 const LOC_KEY = `epub_loc_${bookId}`;  // generated locations in sessionStorage
 
@@ -364,8 +366,24 @@ async function initEpub() {
             allowScriptedContent: true   // prevents epub.js sandboxing its iframe without allow-scripts
         });
 
-        // Open at bookmark position (if saved), otherwise start of book
-        await rendition.display(bookmarkCfi || undefined);
+        // Load navigation first so we can open at the first TOC entry when
+        // there is no bookmark — avoids landing on a blank cover/wrapper page.
+        const nav = await book.loaded.navigation;
+
+        // Strip any fragment identifier from the TOC href (e.g. "ch01.xhtml#start"
+        // → "ch01.xhtml"). epub.js spine lookup keys on bare filenames; a fragment
+        // causes spine.get() to return null which throws "no section found".
+        const rawHref = nav?.toc?.[0]?.href;
+        const firstContentHref = rawHref ? rawHref.split('#')[0] : undefined;
+
+        // Open at: bookmark → first TOC entry → epub.js default (spine[0])
+        try {
+            await rendition.display(bookmarkCfi || firstContentHref || undefined);
+        } catch (displayErr) {
+            // href didn't resolve (e.g. relative path mismatch) — fall back to spine[0]
+            console.warn('display() failed, falling back to spine[0]:', displayErr.message);
+            await rendition.display(undefined);
+        }
 
         // Title
         const meta = await book.loaded.metadata;
@@ -379,11 +397,9 @@ async function initEpub() {
         // Apply saved bookmark highlight (shows on the bookmarked page automatically)
         if (bookmarkCfi) applyHighlight(bookmarkCfi);
 
-        // TOC
-        book.loaded.navigation.then(nav => {
-            if (nav?.toc?.length) buildToc(nav.toc);
-            else document.getElementById('tocBtn').style.display = 'none';
-        });
+        // TOC — nav is already resolved above, build synchronously
+        if (nav?.toc?.length) buildToc(nav.toc);
+        else document.getElementById('tocBtn').style.display = 'none';
 
         // Track location changes: update footer + bookmark button state
         rendition.on('relocated', location => {
@@ -450,8 +466,10 @@ initEpub();
 {% else %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-const bookId  = {{ book_id }};
-const fileUrl = `/api/book/file/${bookId}`;
+const bookId  = "{{ book_id }}";
+const fileUrl = bookId.startsWith('local_')
+    ? `/api/book/file/local/${bookId.slice(6)}`
+    : `/api/book/file/${bookId}`;
 const BM_KEY  = `pdf_bm_${bookId}`;
 
 let pdfDoc = null, currentPage = 1, rendering = false, pendingPage = null;

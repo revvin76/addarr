@@ -1,4 +1,24 @@
 let currentShowId = null; // track show id for delete/search actions
+
+/**
+ * imgProxy(url, w, h, title)
+ * Routes any remote image URL through the local caching proxy (/api/img).
+ * The server normalises TMDB /original/ → /w342/ before fetching, so
+ * downloads are ~10× smaller while still looking sharp at card sizes.
+ * Local and relative URLs (starting with '/') are returned unchanged.
+ * The optional title appears in addarr.log so cache events are readable.
+ *
+ * @param {string} url   - Remote image URL
+ * @param {number} w     - Target display width  (default 174)
+ * @param {number} h     - Target display height (default 261)
+ * @param {string} title - Human-readable label for server logs (optional)
+ */
+function imgProxy(url, w = 174, h = 261, title = '') {
+    if (!url || url.startsWith('/')) return url;
+    let qs = `/api/img?url=${encodeURIComponent(url)}&w=${w}&h=${h}`;
+    if (title) qs += `&t=${encodeURIComponent(title)}`;
+    return qs;
+}
 let deferredPrompt;
 let player = null;
 const installButton = document.getElementById('install-button'); // Add this button to your HTML
@@ -246,7 +266,7 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
     const detailsContent = document.getElementById('detailsContent');
 
     const posterImage = mediaData.images?.find(img => img.coverType === 'poster' || img.coverType === 'cover');
-    const posterUrl = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
+    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 300, 450, mediaData.title);
 
     const author = mediaData.author?.authorName || 'Unknown Author';
     const releaseYear = mediaData.releaseDate ? mediaData.releaseDate.substring(0, 4) : 'N/A';
@@ -361,11 +381,11 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
 
 function renderMovieDetails(mediaData, fullData, mediaType, internalId) {
     const detailsContent = document.getElementById('detailsContent');
-    
+
     // Get poster image
     const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
-    const posterUrl = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
-    
+    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 300, 450, mediaData.title);
+
     // Format runtime
     const runtime = mediaData.runtime ? `${Math.floor(mediaData.runtime / 60)}h ${mediaData.runtime % 60}m` : 'N/A';
     
@@ -548,8 +568,8 @@ function renderTVDetails(mediaData, fullData, mediaType, internalId) {
     
     // Get poster image
     const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
-    const posterUrl = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
-    
+    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 300, 450, mediaData.title);
+
     // Format file size
     const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
     
@@ -1129,17 +1149,17 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                 const certification = 'NR'; // Default for TMDB-only
                 
                 // POSTER: TMDB only
-                let posterUrl = hasTmdbData && tmdbData.poster_path 
-                    ? `https://image.tmdb.org/t/p/original${tmdbData.poster_path}`
+                let posterUrl = hasTmdbData && tmdbData.poster_path
+                    ? imgProxy(`https://image.tmdb.org/t/p/original${tmdbData.poster_path}`, 300, 450, title)
                     : '/static/images/logo.png';
 
                 const posterHtml = `
-                    <img src="${posterUrl}" 
-                        class="img-fluid h-100 object-fit-cover" 
+                    <img src="${posterUrl}"
+                        class="img-fluid h-100 object-fit-cover"
                         alt="${title} poster"
                         onerror="this.onerror=null; this.src='/static/images/logo.png'"
                         style="background-color: #2c3e50; background-image: url('/static/images/logo.png'); background-size: 60%; background-position: center; background-repeat: no-repeat;">`;
-                
+
                 // TRAILER: TMDB only
                 let trailerHtml = '';
                 let trailerKey = null;
@@ -1180,7 +1200,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                     if (tmdbData.images.posters) {
                         tmdbData.images.posters.slice(0, 10).forEach(poster => {
                             allImages.push({
-                                url: `https://image.tmdb.org/t/p/w300${poster.file_path}`,
+                                url: imgProxy(`https://image.tmdb.org/t/p/w342${poster.file_path}`, 150, 225),
                                 fullUrl: `https://image.tmdb.org/t/p/original${poster.file_path}`,
                                 type: 'poster'
                             });
@@ -1189,7 +1209,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                     if (tmdbData.images.backdrops) {
                         tmdbData.images.backdrops.slice(0, 10).forEach(backdrop => {
                             allImages.push({
-                                url: `https://image.tmdb.org/t/p/w300${backdrop.file_path}`,
+                                url: imgProxy(`https://image.tmdb.org/t/p/w342${backdrop.file_path}`, 225, 127),
                                 fullUrl: `https://image.tmdb.org/t/p/original${backdrop.file_path}`,
                                 type: 'backdrop'
                             });
@@ -1295,17 +1315,17 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                 // POSTER: TMDB first, then internal
                 let posterUrl;
                 if (hasTmdbData && tmdbData.poster_path && tmdb!==false) {
-                    posterUrl = `https://image.tmdb.org/t/p/original${tmdbData.poster_path}`;
+                    posterUrl = imgProxy(`https://image.tmdb.org/t/p/original${tmdbData.poster_path}`, 300, 450, title);
                 } else if (internalDataObj.images) {
                     const posterImage = internalDataObj.images.find(img => img.coverType === 'poster');
-                    posterUrl = posterImage?.remoteUrl || posterImage?.url;
+                    posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url, 300, 450, title);
                 } else {
                     posterUrl = '/static/images/logo.png';
                 }
 
                 const posterHtml = `
-                    <img src="${posterUrl}" 
-                        class="img-fluid h-100 object-fit-cover" 
+                    <img src="${posterUrl}"
+                        class="img-fluid h-100 object-fit-cover"
                         alt="${title} poster"
                         onerror="this.onerror=null; this.src='/static/images/logo.png'"
                         style="background-color: #2c3e50; background-image: url('/static/images/logo.png'); background-size: 60%; background-position: center; background-repeat: no-repeat;">`;
@@ -1356,7 +1376,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                     if (tmdbData.images.posters) {
                         tmdbData.images.posters.slice(0, 10).forEach(poster => {
                             allImages.push({
-                                url: `https://image.tmdb.org/t/p/w300${poster.file_path}`,
+                                url: imgProxy(`https://image.tmdb.org/t/p/w342${poster.file_path}`, 150, 225),
                                 fullUrl: `https://image.tmdb.org/t/p/original${poster.file_path}`,
                                 type: 'poster'
                             });
@@ -1365,7 +1385,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                     if (tmdbData.images.backdrops) {
                         tmdbData.images.backdrops.slice(0, 10).forEach(backdrop => {
                             allImages.push({
-                                url: `https://image.tmdb.org/t/p/w300${backdrop.file_path}`,
+                                url: imgProxy(`https://image.tmdb.org/t/p/w342${backdrop.file_path}`, 225, 127),
                                 fullUrl: `https://image.tmdb.org/t/p/original${backdrop.file_path}`,
                                 type: 'backdrop'
                             });
@@ -2876,49 +2896,69 @@ function initializeMediaGrid() {
 
 // Initialize manage page grid — all items are already in the library so we skip
 // the library-status round-trip and go straight to fetching details.
-function initializeManageGrid() {
-    const mediaItems = document.querySelectorAll('.media-item');
+// Requests are sent in parallel batches of 8 so the server handles them
+// concurrently rather than one-at-a-time (the old forEach issued them all
+// at once but the browser's 6-connection limit serialised them anyway).
+async function initializeManageGrid() {
+    const mediaItems = Array.from(document.querySelectorAll('.media-item'));
     if (!mediaItems.length) return;
+
+    // Pre-stamp all badges as "In Library" synchronously — no waiting
     mediaItems.forEach(item => {
-        const mediaType = item.dataset.mediaType;
-        const mediaId   = item.dataset.id;
-        const card      = item.querySelector('.manage-result-card, .search-result-card');
-        if (!card || !mediaType || !mediaId) return;
-
-        const statusBadge   = card.querySelector('.status-badge');
-        const extraBadges   = card.querySelector('.media-extra-badges');
-        const manageControls = card.querySelector('.manage-controls');
-
-        // Mark as in-library immediately (all manage-page items are in library)
+        const card        = item.querySelector('.manage-result-card, .search-result-card');
+        const statusBadge = card?.querySelector('.status-badge');
         if (statusBadge) {
             statusBadge.textContent = 'In Library';
             statusBadge.className   = 'status-badge text-xs badge bg-success';
         }
-
-        // Fetch details to get on-disk status + controls
-        fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`, { signal: _bg.signal })
-            .then(r => r.json())
-            .then(details => {
-                if (details.error) return; // silently skip if lookup failed
-                const itemData   = details.data || details;
-                const internalId = itemData.id;
-                if (extraBadges)    updateExtraBadges(mediaType, itemData, extraBadges);
-                if (manageControls) showManageControls(mediaType, mediaId, internalId, manageControls, true, itemData);
-            })
-            .catch(err => {
-                if (err.name === 'AbortError') {
-                    if (!initializeManageGrid._resumeQueued) {
-                        initializeManageGrid._resumeQueued = true;
-                        window._registerBgResume(() => {
-                            initializeManageGrid._resumeQueued = false;
-                            initializeManageGrid();
-                        });
-                    }
-                    return;
-                }
-                console.error('[initializeManageGrid] details fetch error:', err);
-            });
     });
+
+    // Build work list
+    const tasks = mediaItems.map(item => {
+        const mediaType     = item.dataset.mediaType;
+        const mediaId       = item.dataset.id;
+        const card          = item.querySelector('.manage-result-card, .search-result-card');
+        const extraBadges   = card?.querySelector('.media-extra-badges');
+        const manageControls = card?.querySelector('.manage-controls');
+        if (!card || !mediaType || !mediaId) return null;
+        return { mediaType, mediaId, extraBadges, manageControls };
+    }).filter(Boolean);
+
+    // Process in parallel batches of 8
+    const BATCH = 8;
+    for (let i = 0; i < tasks.length; i += BATCH) {
+        const slice = tasks.slice(i, i + BATCH);
+        try {
+            await Promise.all(slice.map(async ({ mediaType, mediaId, extraBadges, manageControls }) => {
+                try {
+                    const r = await fetch(
+                        `/get_media_details?type=${mediaType}&id=${mediaId}`,
+                        { signal: _bg.signal }
+                    );
+                    const details    = await r.json();
+                    if (details.error) return;
+                    const itemData   = details.data || details;
+                    const internalId = itemData.id;
+                    if (extraBadges)     updateExtraBadges(mediaType, itemData, extraBadges);
+                    if (manageControls)  showManageControls(mediaType, mediaId, internalId, manageControls, true, itemData);
+                } catch (err) {
+                    if (err.name === 'AbortError') throw err; // propagate abort
+                    console.error('[initializeManageGrid] detail error:', err);
+                }
+            }));
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                if (!initializeManageGrid._resumeQueued) {
+                    initializeManageGrid._resumeQueued = true;
+                    window._registerBgResume(() => {
+                        initializeManageGrid._resumeQueued = false;
+                        initializeManageGrid();
+                    });
+                }
+                return;
+            }
+        }
+    }
 }
 
 // Fetch library status and update UI

@@ -6,18 +6,16 @@
     <title>Trending Media - Addarr</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/styles.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a1a" />
-    
-    <!-- Load main.js early to ensure showDetails is available -->
+
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    
-    <!-- Placeholder function - will be overridden by main.js -->
+
     <script>
         if (typeof showDetails === 'undefined') {
             window.showDetails = function(mediaType, mediaId, tmdbOnly = false) {
@@ -25,11 +23,8 @@
                 const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
                 document.getElementById('detailsContent').innerHTML = '<p class="text-center">Loading...</p>';
                 modal.show();
-                // Retry after a short delay
                 setTimeout(() => {
-                    if (typeof showDetails !== 'undefined') {
-                        showDetails(mediaType, mediaId, tmdbOnly);
-                    }
+                    if (typeof showDetails !== 'undefined') showDetails(mediaType, mediaId, tmdbOnly);
                 }, 500);
             };
         }
@@ -39,133 +34,127 @@
 <body>
     {% include 'partials/navbar.html' %}
 
-        <div class="container mt-4">
-            <div class="text-center mb-4">
-                <h3 class="text-light">Trending This Week</h3>
-                <p class="text-light">Popular movies and TV shows from TMDB</p>
+    <!-- Page title (not sticky) -->
+    <div class="container mt-3 mb-1 text-center">
+        <h3 class="text-light mb-0">Trending This Week</h3>
+        <p class="text-muted small mb-0">Popular movies and TV shows from TMDB</p>
+        <div id="libraryStatusBar" class="alert alert-secondary py-1 px-3 mt-2 d-flex align-items-center gap-2"
+             style="font-size:0.8rem; display:none !important;">
+            <div class="spinner-border spinner-border-sm text-secondary" role="status"
+                 style="width:14px;height:14px;border-width:2px;"></div>
+            <span id="libraryStatusMsg">Checking library status…</span>
+        </div>
+    </div>
 
-                <!-- Library status progress indicator -->
-                <div id="libraryStatusBar" class="alert alert-secondary py-1 px-3 mb-2 d-flex align-items-center gap-2" style="font-size:0.8rem; display:none !important;">
-                    <div class="spinner-border spinner-border-sm text-secondary" role="status" style="width:14px;height:14px;border-width:2px;"></div>
-                    <span id="libraryStatusMsg">Checking library status…</span>
+    <!-- ── Sticky controls header ── -->
+    <div class="page-sticky-controls" id="stickyControls">
+        <div class="container py-2">
+            <div class="d-flex gap-2 align-items-center">
+                <div class="input-group input-group-sm flex-grow-1">
+                    <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                    <select id="mediaFilter" class="form-select form-select-sm">
+                        <option value="all">All Media</option>
+                        <option value="movie">Movies Only</option>
+                        <option value="tv">TV Shows Only</option>
+                    </select>
                 </div>
+                <div class="input-group input-group-sm flex-grow-1">
+                    <span class="input-group-text"><i class="fas fa-circle-dot"></i></span>
+                    <select id="statusFilter" class="form-select form-select-sm">
+                        <option value="status_all">All Statuses</option>
+                        <option value="status_in_library">In Library</option>
+                        <option value="status_not_added">Not Added</option>
+                    </select>
+                </div>
+                <button id="backToTop" class="btn btn-sm btn-outline-secondary btn-back-to-top"
+                        title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+            </div>
+        </div>
+    </div>
 
-                <div class="col-md-12 mb-2">
-                    <div class="flex-container"> <!-- Added custom class -->
-                        <div class="input-group input-group-flex"> <!-- Added custom class -->
-                            <span class="input-group-text">
-                                <i class="fas fa-filter"></i>
+    <!-- ── Media grid ── -->
+    <div class="container mt-3 mb-5">
+        <div class="row">
+        {% if media_type in ['all', 'movie'] and trending_data.movies %}
+            {% for movie in trending_data.movies %}
+            <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="movie">
+                <div class="search-result-card h-100 movie-card"
+                     data-media-type="movie"
+                     data-media-id="{{ movie.id }}"
+                     onclick="showDetails('movie', {{ movie.id }})">
+                    <div class="search-result-thumbnail-container">
+                        <img src="{% if movie.poster_path %}{{ ('https://image.tmdb.org/t/p/w342' + movie.poster_path) | imgproxy(174, 261, movie.title) }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
+                            class="search-result-thumbnail" alt="{{ movie.title }}"
+                            onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
+                        <div class="fade-overlay"></div>
+                        <div class="watermark-icon position-absolute"><i class="fas fa-film"></i></div>
+                    </div>
+                    <div class="search-result-content">
+                        <h6 class="text-white truncate">{{ movie.title }}</h6>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-xs text-muted">{{ movie.release_date[:4] if movie.release_date else 'N/A' }}</span>
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-star me-1"></i>{{ "%.1f"|format(movie.vote_average) }}
                             </span>
-                            <select id="mediaFilter" class="form-select">
-                                <option value="all">All Media</option>
-                                <option value="movie">Movies Only</option>
-                                <option value="tv">TV Shows Only</option>
-                            </select>
                         </div>
-                        <div class="input-group input-group-flex"> <!-- Added custom class -->
-                            <span class="input-group-text">
-                                <i class="fas fa-filter"></i>
-                            </span>
-                            <select id="statusFilter" class="form-select">
-                                <option value="status_all">All Statuses</option>
-                                <option value="status_in_library">In Library</option>
-                                <option value="status_not_added">Not Added</option>
-                            </select>
+                        <div class="media-status-section d-flex justify-content-between align-items-center mt-2 gap-2">
+                            <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
+                            <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="mb-5">
-            <div class="row">
-            <!-- Trending Movies -->
-            {% if media_type in ['all', 'movie'] and trending_data.movies %}
-                {% for movie in trending_data.movies %}
-                <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="movie">
-                    <div class="search-result-card h-100 movie-card" 
-                         data-media-type="movie"
-                         data-media-id="{{ movie.id }}"
-                         onclick="showDetails('movie', {{ movie.id }})">
-                        <div class="search-result-thumbnail-container">
-                            <img src="{% if movie.poster_path %}https://image.tmdb.org/t/p/w300{{ movie.poster_path }}{% else %}/static/images/apple-touch-icon.png{% endif %}" 
-                                class="search-result-thumbnail"
-                                alt="{{ movie.title }}"
-                                onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                            <div class="fade-overlay"></div>
-                            <div class="watermark-icon position-absolute">
-                                <i class="fas fa-film"></i>
-                            </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if media_type in ['all', 'tv'] and trending_data.tv_shows %}
+            {% for show in trending_data.tv_shows %}
+            <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="tv">
+                <div class="search-result-card h-100 tv-card"
+                     data-media-type="tv"
+                     data-media-id="{{ show.id }}"
+                     onclick="showDetails('tv', {{ show.id }}, true)">
+                    <div class="search-result-thumbnail-container">
+                        <img src="{% if show.poster_path %}{{ ('https://image.tmdb.org/t/p/w342' + show.poster_path) | imgproxy(174, 261, show.name) }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
+                            class="search-result-thumbnail" alt="{{ show.name }}"
+                            onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
+                        <div class="fade-overlay"></div>
+                        <div class="watermark-icon position-absolute"><i class="fas fa-tv"></i></div>
+                    </div>
+                    <div class="search-result-content">
+                        <h6 class="text-white truncate">{{ show.name }}</h6>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-xs text-muted">{{ show.first_air_date[:4] if show.first_air_date else 'N/A' }}</span>
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-star me-1"></i>{{ "%.1f"|format(show.vote_average) }}
+                            </span>
                         </div>
-                        <div class="search-result-content">
-                            <h6 class="text-white truncate">{{ movie.title }}</h6>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-xs text-muted">{{ movie.release_date[:4] if movie.release_date else 'N/A' }}</span>
-                                <span class="badge bg-warning text-dark">
-                                    <i class="fas fa-star me-1"></i>{{ "%.1f"|format(movie.vote_average) }}
-                                </span>
-                            </div>
-                            <!-- Library Status Badge with Delete Button -->
-                            <div class="media-status-section d-flex justify-content-between align-items-center mt-2 gap-2">
-                                <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
-                                <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
+                        <div class="media-status-section d-flex justify-content-between align-items-center mt-2 gap-2">
+                            <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
+                            <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
-                {% endfor %}
-            {% endif %}
-
-            <!-- Trending TV Shows -->
-            {% if media_type in ['all', 'tv'] and trending_data.tv_shows %}
-                {% for show in trending_data.tv_shows %}
-                <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="tv">
-                    <div class="search-result-card h-100 tv-card" 
-                         data-media-type="tv"
-                         data-media-id="{{ show.id }}"
-                         onclick="showDetails('tv', {{ show.id }}, true)">
-                        <div class="search-result-thumbnail-container">
-                            <img src="{% if show.poster_path %}https://image.tmdb.org/t/p/w300{{ show.poster_path }}{% else %}/static/images/apple-touch-icon.png{% endif %}" 
-                                class="search-result-thumbnail"
-                                alt="{{ show.name }}"
-                                onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                            <div class="fade-overlay"></div>
-                            <div class="watermark-icon position-absolute">
-                                <i class="fas fa-tv"></i>
-                            </div>
-                        </div>
-                        <div class="search-result-content">
-                            <h6 class="text-white truncate">{{ show.name }}</h6>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-xs text-muted">{{ show.first_air_date[:4] if show.first_air_date else 'N/A' }}</span>
-                                <span class="badge bg-warning text-dark">
-                                    <i class="fas fa-star me-1"></i>{{ "%.1f"|format(show.vote_average) }}
-                                </span>
-                            </div>
-                            <!-- Library Status Badge with Delete Button -->
-                            <div class="media-status-section d-flex justify-content-between align-items-center mt-2 gap-2">
-                                <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
-                                <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-
-            {% endif %}
             </div>
+            {% endfor %}
+        {% endif %}
         </div>
-        {% if not trending_data.movies and not trending_data.tv_shows %}
+    </div>
+
+    {% if not trending_data.movies and not trending_data.tv_shows %}
+    <div class="container">
         <div class="alert alert-warning text-center">
             <i class="fas fa-exclamation-triangle me-2"></i>
             No trending data available. Please check your TMDB API configuration.
         </div>
-        {% endif %}
     </div>
+    {% endif %}
 
     <!-- Modal for details -->
     <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-modal="true">
@@ -175,9 +164,7 @@
                     <h5 class="modal-title" id="detailsModalLabel">Media Details</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body" id="detailsContent">
-                    Loading...
-                </div>
+                <div class="modal-body" id="detailsContent">Loading...</div>
             </div>
         </div>
     </div>
@@ -192,10 +179,6 @@
             <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
         </div>
     </div>
-    
-    <div id="backToTop" class="back-to-top">
-        <i class="fas fa-chevron-up"></i>
-    </div>
 
     <div id="overlay-backdrop" class="overlay-backdrop"></div>
     <div id="modal-overlay-backdrop" class="overlay-backdrop modal-overlay-backdrop"></div>
@@ -203,31 +186,25 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-    // ── Combined filter — media type AND library status applied together ────
     function applyFilters() {
         const mediaVal  = (document.getElementById('mediaFilter')  || {}).value || 'all';
         const statusVal = (document.getElementById('statusFilter') || {}).value || 'status_all';
 
         document.querySelectorAll('.result-item').forEach(item => {
-            // Media-type gate
             const mediaOk = mediaVal === 'all' || item.dataset.mediaType === mediaVal;
-
-            // Status gate
             let statusOk = true;
             if (statusVal !== 'status_all') {
                 const badge = item.querySelector('.status-badge');
                 const text  = badge ? badge.textContent.trim() : '';
                 if (text === 'Checking...') {
-                    statusOk = true;   // don't hide items whose status hasn't loaded yet
+                    statusOk = true;
                 } else {
-                    // "in library" = On Disk or Missing (success/danger classes)
                     const inLib = badge &&
                         (badge.classList.contains('text-bg-success') ||
                          badge.classList.contains('text-bg-danger'));
                     statusOk = statusVal === 'status_in_library' ? inLib : !inLib;
                 }
             }
-
             item.style.display = (mediaOk && statusOk) ? '' : 'none';
         });
     }
@@ -236,18 +213,16 @@
         document.getElementById('mediaFilter') .addEventListener('change', applyFilters);
         document.getElementById('statusFilter').addEventListener('change', applyFilters);
 
-        // ── Progress bar helpers ──────────────────────────────────────────────
+        window.addEventListener('scroll', function() {
+            document.getElementById('backToTop')
+                    .classList.toggle('show', window.pageYOffset > 200);
+        });
+
         const statusBar = document.getElementById('libraryStatusBar');
         const statusMsg = document.getElementById('libraryStatusMsg');
-        function showStatusBar(msg) {
-            statusBar.style.setProperty('display', 'flex', 'important');
-            statusMsg.textContent = msg;
-        }
-        function hideStatusBar() {
-            statusBar.style.setProperty('display', 'none', 'important');
-        }
+        function showStatusBar(msg) { statusBar.style.setProperty('display', 'flex', 'important'); statusMsg.textContent = msg; }
+        function hideStatusBar()    { statusBar.style.setProperty('display', 'none', 'important'); }
 
-        // ── Apply badge for a single card from batch result info ─────────────
         function applyCardStatus(card, mediaType, info) {
             const badge     = card.querySelector('.status-badge');
             const deleteBtn = card.querySelector('.delete-btn');
@@ -255,24 +230,20 @@
 
             if (info && info.in_library) {
                 const stats    = info.statistics || {};
-                const isOnDisk = mediaType === 'movie'
-                    ? (info.hasFile || false)
-                    : (stats.episodeFileCount || 0) > 0;
-
+                const isOnDisk = mediaType === 'movie' ? (info.hasFile || false) : (stats.episodeFileCount || 0) > 0;
                 if (isOnDisk) {
                     badge.textContent = mediaType === 'tv'
-                        ? `[${stats.episodeFileCount}/${stats.episodeCount} eps]`
-                        : 'On Disk';
+                        ? `[${stats.episodeFileCount}/${stats.episodeCount} eps]` : 'On Disk';
                     badge.className = 'status-badge text-xs badge text-bg-success';
                 } else {
                     badge.textContent = 'Missing';
                     badge.className   = 'status-badge text-xs badge text-bg-danger';
                 }
                 if (deleteBtn) {
-                    deleteBtn.style.display        = 'block';
-                    deleteBtn.dataset.mediaType    = mediaType;
-                    deleteBtn.dataset.mediaId      = card.dataset.mediaId;
-                    deleteBtn.onclick              = deleteFromLibrary;
+                    deleteBtn.style.display     = 'block';
+                    deleteBtn.dataset.mediaType = mediaType;
+                    deleteBtn.dataset.mediaId   = card.dataset.mediaId;
+                    deleteBtn.onclick           = deleteFromLibrary;
                 }
             } else {
                 badge.textContent = 'Not Added';
@@ -281,27 +252,19 @@
             }
         }
 
-        // ── Single batch request for all cards ───────────────────────────────
         function loadAllStatuses() {
-            const cards     = [...document.querySelectorAll('.search-result-card')];
-            const movieIds  = [];
-            const tvIds     = [];
-            const cardMap   = {};  // "<type>_<id>" → card element
+            const cards    = [...document.querySelectorAll('.search-result-card')];
+            const movieIds = [], tvIds = [];
 
             cards.forEach(card => {
-                const mt = card.dataset.mediaType;
-                const id = card.dataset.mediaId;
+                const mt = card.dataset.mediaType, id = card.dataset.mediaId;
                 if (!mt || !id) return;
-                cardMap[`${mt}_${id}`] = card;
                 if (mt === 'movie') movieIds.push(id);
                 else if (mt === 'tv') tvIds.push(id);
             });
-
             if (!movieIds.length && !tvIds.length) return;
 
-            const total = movieIds.length + tvIds.length;
-            showStatusBar(`Checking library status for ${total} titles…`);
-
+            showStatusBar(`Checking library status for ${movieIds.length + tvIds.length} titles…`);
             const params = new URLSearchParams();
             if (movieIds.length) params.set('movie_ids', movieIds.join(','));
             if (tvIds.length)    params.set('tv_ids',    tvIds.join(','));
@@ -311,62 +274,40 @@
                 .then(r => r.json())
                 .then(batch => {
                     cards.forEach(card => {
-                        const mt   = card.dataset.mediaType;
-                        const id   = card.dataset.mediaId;
-                        const info = (batch[mt] || {})[id];
-                        applyCardStatus(card, mt, info);
+                        const mt = card.dataset.mediaType, id = card.dataset.mediaId;
+                        applyCardStatus(card, mt, (batch[mt] || {})[id]);
                     });
                     applyFilters();
                     hideStatusBar();
                 })
                 .catch(err => {
                     if (err.name === 'AbortError') {
-                        // Detail view opened — re-queue for when modal closes
                         if (window._registerBgResume) window._registerBgResume(loadAllStatuses);
-                        hideStatusBar();
-                        return;
+                        hideStatusBar(); return;
                     }
                     console.error('[trending] batch status error:', err);
                     hideStatusBar();
                 });
         }
 
-        // ── Delete from library (re-checks status after delete) ──────────────
         window.deleteFromLibrary = function(e) {
             e.stopPropagation();
-            const mediaType = this.dataset.mediaType;
-            const mediaId   = this.dataset.mediaId;
-
+            const mediaType = this.dataset.mediaType, mediaId = this.dataset.mediaId;
             if (confirm('Are you sure you want to delete this from your library?')) {
                 fetch(`/api/${mediaType}/${mediaId}`, { method: 'DELETE' })
-                    .then(response => {
-                        if (response.ok) {
-                            alert('✅ Item deleted successfully');
-                            loadAllStatuses();   // refresh all badges
-                        } else {
-                            throw new Error('Failed to delete item');
-                        }
-                    })
-                    .catch(error => {
-                        console.error(error);
-                        alert('❌ Failed to delete item');
-                    });
+                    .then(r => { if (r.ok) { alert('✅ Item deleted successfully'); loadAllStatuses(); } else throw new Error(); })
+                    .catch(() => alert('❌ Failed to delete item'));
             }
         };
 
         loadAllStatuses();
     });
 
-    // Register service worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/static/sw.js')
-            .then(registration => {
-                console.log('ServiceWorker registration successful');
-            })
-            .catch(err => {
-                console.log('ServiceWorker registration failed: ', err);
-            });
+            .then(() => console.log('ServiceWorker registration successful'))
+            .catch(err => console.log('ServiceWorker registration failed: ', err));
         });
     }
     </script>

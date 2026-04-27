@@ -2044,3 +2044,27 @@ body.spinner-active {
 .flex-container .input-group {
     width: 49%;
 }
+
+/* ── Sticky page controls (filters / search / A-Z / back-to-top) ── */
+.page-sticky-controls {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background-color: #1e1e1e;
+    border-bottom: 1px solid #3a3a3a;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.55);
+}
+
+/* Inline back-to-top inside the sticky controls bar */
+.btn-back-to-top {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    flex-shrink: 0;
+    padding: 4px 9px;
+}
+
+.btn-back-to-top.show {
+    opacity: 1;
+    pointer-events: auto;
+}

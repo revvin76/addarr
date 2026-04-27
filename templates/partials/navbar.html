@@ -21,8 +21,19 @@
                 {% if current_page != 'index' %}
                 <li><a class="dropdown-item" href="/"><i class="fas fa-home me-2"></i>Home</a></li>
                 {% endif %}
-                {% if current_page != 'manage' %}
-                <li><a class="dropdown-item" href="/manage"><i class="fas fa-list me-2"></i>Manage Library</a></li>
+                {% if current_page != 'manage' and (config.radarr.enabled or config.sonarr.enabled) %}
+                    <li>
+                        <a class="dropdown-item" href="/manage">
+                            <i class="fas fa-list me-2"></i>
+                            {% if config.radarr.enabled and config.sonarr.enabled %}
+                                Manage Movies &amp; TV
+                            {% elif config.radarr.enabled %}
+                                Manage Movies
+                            {% else %}
+                                Manage TV
+                            {% endif %}
+                        </a>
+                    </li>
                 {% endif %}
                 {% if config.readarr.enabled and current_page != 'manage-books' %}
                 <li><a class="dropdown-item" href="/manage-books"><i class="fas fa-book me-2"></i>Manage Books</a></li>

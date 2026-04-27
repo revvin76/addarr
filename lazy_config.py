@@ -39,17 +39,19 @@ class LazyConfig:
         
         config_data = {
             'radarr': {
-                'url': os.getenv('RADARR_URL'),
-                'api_key': os.getenv('RADARR_API_KEY'),
-                'root_folder': os.getenv('RADARR_ROOT_FOLDER'),
-                'quality_profile_id': os.getenv('RADARR_QUALITY_PROFILE')
+                'url': os.getenv('RADARR_URL', ''),
+                'api_key': os.getenv('RADARR_API_KEY', ''),
+                'root_folder': os.getenv('RADARR_ROOT_FOLDER', ''),
+                'quality_profile_id': os.getenv('RADARR_QUALITY_PROFILE', ''),
+                'enabled': bool(os.getenv('RADARR_URL', ''))
             },
             'sonarr': {
-                'url': os.getenv('SONARR_URL'),
-                'api_key': os.getenv('SONARR_API_KEY'),
-                'root_folder': os.getenv('SONARR_ROOT_FOLDER'),
-                'quality_profile_id': os.getenv('SONARR_QUALITY_PROFILE'),
-                'language_profile_id': os.getenv('SONARR_LANGUAGE_PROFILE')
+                'url': os.getenv('SONARR_URL', ''),
+                'api_key': os.getenv('SONARR_API_KEY', ''),
+                'root_folder': os.getenv('SONARR_ROOT_FOLDER', ''),
+                'quality_profile_id': os.getenv('SONARR_QUALITY_PROFILE', ''),
+                'language_profile_id': os.getenv('SONARR_LANGUAGE_PROFILE', ''),
+                'enabled': bool(os.getenv('SONARR_URL', ''))
             },
             'tmdb': {
                 'key': os.getenv('TMDB_KEY', ''),

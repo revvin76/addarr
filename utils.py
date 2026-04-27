@@ -5,7 +5,179 @@ import json
 import logging
 from datetime import datetime
 import time
+import zipfile
+import xml.etree.ElementTree as ET
+import re
 from packaging import version
+
+# ── Book file extensions we recognise ────────────────────────────────────────
+BOOK_EXTENSIONS = {'.epub', '.pdf', '.mobi', '.azw3', '.cbz', '.cbr'}
+
+
+# ── Filesystem scanner ────────────────────────────────────────────────────────
+
+def scan_books_folder(root_folder):
+    """Recursively scan *root_folder* for book files.
+
+    Returns a list of dicts:
+        file_path, filename, extension, file_size, rel_path
+    Sorted by rel_path for stable ordering.
+    """
+    if not root_folder or not os.path.isdir(root_folder):
+        logging.warning("[scan] folder not found or not configured: %r", root_folder)
+        return []
+
+    books = []
+    for dirpath, dirs, files in os.walk(root_folder):
+        dirs[:] = sorted(d for d in dirs if not d.startswith('.'))
+        for filename in sorted(files):
+            ext = os.path.splitext(filename)[1].lower()
+            if ext in BOOK_EXTENSIONS:
+                full_path = os.path.join(dirpath, filename)
+                try:
+                    size = os.path.getsize(full_path)
+                    rel  = os.path.relpath(full_path, root_folder)
+                    books.append({
+                        'file_path': full_path,
+                        'filename':  filename,
+                        'extension': ext,
+                        'file_size': size,
+                        'rel_path':  rel,
+                    })
+                except OSError:
+                    pass
+    return books
+
+
+def _title_from_filename(filename):
+    """Guess a human-readable title from a filename.
+
+    Handles common patterns:
+      "Author - Title (Year).epub"  → "Title"
+      "Title.epub"                  → "Title"
+    """
+    stem = os.path.splitext(filename)[0]
+    # Strip year in parens at end
+    stem = re.sub(r'\s*\(\d{4}\)\s*$', '', stem)
+    # If there's an " - " separator, take everything after the first one
+    if ' - ' in stem:
+        stem = stem.split(' - ', 1)[1].strip()
+    return stem.strip() or filename
+
+
+def extract_epub_metadata(file_path):
+    """Extract Dublin Core metadata from an EPUB file.
+
+    Uses only the stdlib `zipfile` and `xml.etree.ElementTree` — no deps.
+    Returns a dict with whichever fields could be found.
+    """
+    try:
+        with zipfile.ZipFile(file_path, 'r') as z:
+            # container.xml → OPF path
+            container_xml = z.read('META-INF/container.xml')
+            container = ET.fromstring(container_xml)
+            ns_c = {'n': 'urn:oasis:names:tc:opendocument:xmlns:container'}
+            rootfile = container.find('.//n:rootfile', ns_c)
+            if rootfile is None:
+                return {}
+            opf_path = rootfile.get('full-path', '')
+            opf = ET.fromstring(z.read(opf_path))
+
+            DC  = 'http://purl.org/dc/elements/1.1/'
+            OPF = 'http://www.idpf.org/2007/opf'
+
+            def dc(tag):
+                el = opf.find(f'.//{{{DC}}}{tag}')
+                return el.text.strip() if el is not None and el.text else None
+
+            title   = dc('title')
+            author  = dc('creator')
+            desc    = dc('description')
+            date_s  = dc('date')
+            year    = None
+            if date_s and len(date_s) >= 4:
+                try:
+                    year = int(date_s[:4])
+                except ValueError:
+                    pass
+
+            # ISBN
+            isbn = None
+            for id_el in opf.findall(f'.//{{{DC}}}identifier'):
+                scheme = (id_el.get(f'{{{OPF}}}scheme', '')
+                          or id_el.get('scheme', '')).lower()
+                if 'isbn' in scheme and id_el.text:
+                    isbn = id_el.text.strip()
+                    break
+
+            # Cover image bytes (best-effort)
+            cover_data = None
+            manifest = opf.find(f'.//{{{OPF}}}manifest') or opf.find('.//manifest')
+            if manifest is not None:
+                for item in manifest:
+                    item_id  = item.get('id', '').lower()
+                    props    = item.get('properties', '')
+                    media    = item.get('media-type', '')
+                    is_cover = (item_id in ('cover', 'cover-image', 'cover_image')
+                                or props == 'cover-image'
+                                or ('image' in media and item_id == 'cover'))
+                    if is_cover:
+                        href = item.get('href', '')
+                        opf_dir = os.path.dirname(opf_path)
+                        cover_zip_path = '/'.join(
+                            p for p in [opf_dir, href] if p
+                        )
+                        try:
+                            cover_data = z.read(cover_zip_path)
+                        except Exception:
+                            pass
+                        break
+
+            return {
+                'title':      title,
+                'author':     author,
+                'overview':   desc,
+                'year':       year,
+                'isbn':       isbn,
+                'cover_data': cover_data,
+                'source':     'file',
+            }
+    except Exception as e:
+        logging.warning("[epub] metadata extraction error for %r: %s", file_path, e)
+        return {}
+
+
+def extract_pdf_metadata(file_path):
+    """Extract basic metadata from a PDF using pypdf (optional dep).
+
+    Falls back gracefully if pypdf is not installed.
+    """
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(file_path)
+        meta   = reader.metadata or {}
+        return {
+            'title':  meta.get('/Title') or meta.get('title'),
+            'author': meta.get('/Author') or meta.get('author'),
+            'pages':  len(reader.pages),
+            'source': 'file',
+        }
+    except ImportError:
+        logging.debug("[pdf] pypdf not installed — PDF metadata unavailable")
+        return {}
+    except Exception as e:
+        logging.warning("[pdf] metadata extraction error for %r: %s", file_path, e)
+        return {}
+
+
+def extract_file_metadata(file_path):
+    """Dispatch to the right extractor based on file extension."""
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext == '.epub':
+        return extract_epub_metadata(file_path)
+    if ext == '.pdf':
+        return extract_pdf_metadata(file_path)
+    return {}
 
 # ── Metadata cache ────────────────────────────────────────────────────────────
 _APP_DIR      = os.path.dirname(os.path.abspath(__file__))

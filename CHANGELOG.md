@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.1.28] - 2026-04-27
+
+### Added
+- **Sticky controls header** on all grid pages (Manage, Trending, Results, Manage Books) — filter dropdowns, search input, A-Z navigation, and the back-to-top button now live in a dark sticky bar that stays visible as you scroll through the media grid. The floating back-to-top circle button is removed; replaced by a compact chevron in the sticky bar that fades in after 200 px of scroll.
+- **`config.radarr.enabled` / `config.sonarr.enabled`** — added explicit `enabled` boolean to both config sections in `lazy_config.py`, derived from whether the respective URL env var is set (consistent with how `readarr`, `prowlarr`, and `qbit` already work).
+
+### Fixed
+- **Navbar "Manage Movies/TV" link never appearing** — `config.radarr.enabled` and `config.sonarr.enabled` didn't exist, so all three navbar conditions silently fell through. Fixed by adding the `enabled` field to both config sections and rewriting the navbar block as a single clean `if/elif/else` that can never fall through silently.
+- **Epub reader `GET /api/book/file/local/META-INF/container.xml` 404** — epub.js receives a URL with no `.epub` extension and treated it as a directory, appending `META-INF/container.xml` to the base path. Fixed by passing `{ openAs: 'epub' }` as the second argument to `ePub()` in `reader_kindle.html`.
+- **kindle.html missing Year and Pages** — the `/kindle` route's `save_book` call omitted `year` and `pages` from `extract_file_metadata`. Both fields are now passed, so new books scanned on the Kindle page display their metadata immediately.
+- **manage-books cards missing Year/Pages for previously-scanned books** — books first seen via the `/kindle` route were saved to the DB without year/pages. The `/manage-books` route now backfills those fields on first load: for any DB record missing both `year` and `pages`, it re-runs `extract_file_metadata` and updates the record in-place.
+
+### Changed
+- **Manage page — library status removed from grid cards** — status badges (`On Disk`, `Missing`, `Not Added`) and the background `initializeManageGrid()` fetch loop are removed from the Manage page. Cards now show only thumbnail, title, year, and runtime. Full Sonarr/Radarr details (including status) are still fetched and displayed when a card is clicked to open the detail modal.
+
+---
+## [1.1.27] - 2026-04-26
+
+### Added
+- Kindle optimised reading screen. When you browse on a Kindle device it kicks in automatically.
+
+---
 ## [1.1.26] - 2026-04-26
 
 ### Added

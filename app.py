@@ -26,6 +26,7 @@ from memory_manager import MemoryManager
 from update_manager import UpdateManager
 from utils import SharedUtils
 import routes
+import books_db
 
 # Global variables for tunnel functionality - define them at module level
 tunnel_process = None
@@ -50,7 +51,20 @@ setup_basic_logging()
 
 # Initialize core components
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY')
+app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.urandom(24)
+
+# ── Jinja filter: route any remote image URL through the local caching proxy ──
+from urllib.parse import quote as _url_quote
+
+@app.template_filter('imgproxy')
+def imgproxy_filter(url, w=174, h=261, title=''):
+    """{{ url | imgproxy }} or {{ url | imgproxy(174, 261, item.title) }}"""
+    if not url or url.startswith('/'):
+        return url or '/static/images/apple-touch-icon.png'
+    qs = f'/api/img?url={_url_quote(url, safe="")}&w={w}&h={h}'
+    if title:
+        qs += f'&t={_url_quote(str(title), safe="")}'
+    return qs
 
 @app.before_request
 def kindle_redirect():
@@ -471,6 +485,9 @@ def startup_sequence():
         print()  # New line after progress dots
 
     
+    # Initialise local books database
+    books_db.init_db()
+
     # Start update manager if enabled (background checks)
     if CONFIG.update.enabled:
         update_manager.start()

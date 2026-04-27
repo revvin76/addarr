@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         /* ── A-Z navigation ── */
-        #azLetters { display: none; flex-wrap: wrap; gap: 4px; padding: 6px 0; }
+        #azLetters { display: none; flex-wrap: wrap; gap: 4px; }
         #azLetters.open { display: flex; }
         .az-btn {
             background: #2a2a2a; border: 1px solid #3a3a3a; color: #bbb;
@@ -22,28 +22,21 @@
         #azToggle.az-active { border-color: #6ab759; color: #6ab759; }
     </style>
     <script>
-    // Sequential batch image loader.
-    // Loads thumbnails 20 at a time: waits for the whole batch to
-    // load (or fail) before starting the next, so the browser is
-    // never flooded with simultaneous image requests.
+    // Sequential batch image loader — 20 at a time.
     function startProgressiveLoading() {
         const items = [...document.querySelectorAll('.media-item')];
         if (!items.length) return;
-
         let batchStart = 0;
         const BATCH = 20;
-
         function loadBatch() {
             const slice = items.slice(batchStart, batchStart + BATCH);
             if (!slice.length) return;
             batchStart += BATCH;
-
             const promises = slice.map(item => {
                 const img = item.querySelector('.search-result-thumbnail');
                 if (!img) return Promise.resolve();
                 const src = img.getAttribute('data-src');
                 if (!src) return Promise.resolve();
-                // Already set (e.g. after a filter re-run)
                 if (img.src && img.src.endsWith(src)) return Promise.resolve();
                 return new Promise(resolve => {
                     img.onload  = resolve;
@@ -51,10 +44,8 @@
                     img.src = src;
                 });
             });
-
             Promise.all(promises).then(loadBatch);
         }
-
         loadBatch();
     }
 
@@ -62,7 +53,6 @@
     function buildAzNav() {
         const letters = document.getElementById('azLetters');
         if (!letters) return;
-
         const used = new Set();
         document.querySelectorAll('.media-item[data-title]').forEach(item => {
             const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
@@ -70,7 +60,6 @@
             if (/[0-9]/.test(c)) used.add('0');
             else if (/[a-z]/i.test(c)) used.add(c.toLowerCase());
         });
-
         const chars = ['0', ...'abcdefghijklmnopqrstuvwxyz'];
         letters.innerHTML = chars.map(c => {
             const label  = c === '0' ? '0–9' : c.toUpperCase();
@@ -105,46 +94,51 @@
 <body>
     {% include 'partials/navbar.html' %}
 
-    <div class="container mt-4">
-
-        <!-- Filter and Search Controls -->
-        <div class="row mb-4">
-            <div class="col-md-6 mb-2">
-                <div class="input-group">
-                    <span class="btn btn-primary input-group-text">
-                        <i class="fas fa-filter"></i>
-                    </span>
-                    <select id="mediaFilter" class="form-select">
-                        <option value="all">All Media</option>
-                        <option value="movie">Movies Only</option>
-                        <option value="tv">TV Shows Only</option>
-                    </select>
+    <!-- ── Sticky controls header ── -->
+    <div class="page-sticky-controls" id="stickyControls">
+        <div class="container py-2">
+            <!-- Filter + Search row -->
+            <div class="row g-2 mb-2">
+                <div class="col-6">
+                    <div class="input-group input-group-sm">
+                        <span class="btn btn-primary input-group-text">
+                            <i class="fas fa-filter"></i>
+                        </span>
+                        <select id="mediaFilter" class="form-select form-select-sm">
+                            <option value="all">All Media</option>
+                            <option value="movie">Movies Only</option>
+                            <option value="tv">TV Shows Only</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Search media...">
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="clearSearch" disabled>
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button class="btn btn-primary btn-sm" id="searchButton">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
-
-            <div class="col-md-6">
-                <div class="input-group">
-                    <input type="text" id="searchInput" class="form-control" placeholder="Search media...">
-                    <!-- Clear button -->
-                    <button type="button" class="btn btn-outline-danger" id="clearSearch" disabled>
-                        <i class="fas fa-times"></i>
-                    </button> 
-                    <button class="btn btn-primary" id="searchButton">
-                        <i class="fas fa-search"></i>
-                    </button>
-                </div>
+            <!-- A-Z nav + back-to-top -->
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-secondary flex-shrink-0" id="azToggle" onclick="toggleAzNav()">
+                    <i class="fas fa-sort-alpha-down me-1"></i>A–Z
+                </button>
+                <div id="azLetters" class="flex-grow-1"></div>
+                <button id="backToTop" class="btn btn-sm btn-outline-secondary btn-back-to-top"
+                        title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
             </div>
         </div>
+    </div>
 
-        <!-- A-Z quick navigation -->
-        <div class="d-flex align-items-start gap-2 mb-2 flex-wrap">
-            <button class="btn btn-sm btn-outline-secondary" id="azToggle" onclick="toggleAzNav()">
-                <i class="fas fa-sort-alpha-down me-1"></i>A–Z
-            </button>
-            <div id="azLetters"></div>
-        </div>
-
-        <!-- Media Grid -->
+    <!-- ── Media Grid ── -->
+    <div class="container mt-3">
         <div class="row" id="mediaGrid">
             {% for item in media %}
                 {% if item.media_type == 'movie' %}
@@ -163,7 +157,7 @@
                     <div class="search-result-card manage-result-card h-100 {{ item.media_type }}-card">
                         <!-- Poster -->
                         <div class="search-result-thumbnail-container">
-                            <img data-src="{% if item.images and item.images[0].remoteUrl %}{{ item.images[0].remoteUrl }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
+                            <img data-src="{% if item.images and item.images[0].remoteUrl %}{{ item.images[0].remoteUrl | imgproxy(174, 261, item.title) }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
                                  src="/static/images/placeholder.png"
                                  class="search-result-thumbnail"
                                  alt="{{ item.title }}"
@@ -178,7 +172,7 @@
                             </div>
                         </div>
 
-                        <!-- Card content -->
+                        <!-- Card content: title, year, runtime only — status loads on detail open -->
                         <div class="search-result-content">
                             <h6 class="text-white truncate">{{ item.title }}</h6>
                             <div class="d-flex justify-content-between align-items-center">
@@ -190,14 +184,6 @@
                                         {{ item.statistics.seasonCount }} seasons
                                     {% endif %}
                                 </span>
-                            </div>
-                            <!-- Status section — queried by initializeManageGrid() -->
-                            <div class="media-status-section mt-2">
-                                <div class="d-flex align-items-center gap-1 flex-wrap">
-                                    <span class="status-badge text-xs badge bg-secondary">In Library</span>
-                                    <div class="media-extra-badges" style="display: none;"></div>
-                                </div>
-                                <div class="manage-controls mt-1" style="display: none;"></div>
                             </div>
                         </div>
                     </div>
@@ -236,31 +222,13 @@
                 <div class="modal-body" id="detailsContent">
                 Loading...
                 </div>
-                <!-- <div class="modal-footer">
-                    <button class="btn btn-danger" id="deleteShowBtn">Delete Show</button>
-                    <button class="btn btn-warning" id="deleteAllFilesBtn">Delete All Files</button>
-                    <button class="btn btn-primary" id="searchAllMissingBtn">Search All Missing</button>
-                </div> -->
             </div>
         </div>
     </div>
 
-    <div class="d-flex justify-content-center">
-        <div class="spinner-border spinner-radarr" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    </div>
-
-    <div id="backToTop" class="back-to-top">
-        <i class="fas fa-chevron-up"></i>
-    </div>
-
     <div id="overlay-backdrop" class="overlay-backdrop"></div>
     <div id="modal-overlay-backdrop" class="overlay-backdrop modal-overlay-backdrop"></div>
-    <div class="spinner-border spinner-radarr" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>  
-    
+
     <!-- Global Loading Spinner -->
     <div id="globalLoadingSpinner" class="loading-spinner">
         <div class="spinner-container">
@@ -270,41 +238,42 @@
             </div>
             <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
         </div>
-    </div>  
-    
+    </div>
+
     <script>
     // Register service worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/static/sw.js')
-            .then(registration => {
-                console.log('ServiceWorker registration successful');
-            })
-            .catch(err => {
-                console.log('ServiceWorker registration failed: ', err);
-            });
+            .then(() => console.log('ServiceWorker registration successful'))
+            .catch(err => console.log('ServiceWorker registration failed: ', err));
         });
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        initializeManageGrid();
+        // No initializeManageGrid() — library status is fetched when a detail modal opens
         initializeClearSearch();
         buildAzNav();
         startProgressiveLoading();
 
-        const mediaFilter = document.getElementById('mediaFilter');
+        const mediaFilter  = document.getElementById('mediaFilter');
         const searchButton = document.getElementById('searchButton');
         if (mediaFilter)   mediaFilter.addEventListener('change', updateMediaDisplay);
         if (searchButton)  searchButton.addEventListener('click',  updateMediaDisplay);
 
         updateMediaDisplay();
-    });
 
+        // Back-to-top visibility
+        window.addEventListener('scroll', function() {
+            document.getElementById('backToTop')
+                    .classList.toggle('show', window.pageYOffset > 200);
+        });
+    });
     </script>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
 </body>
 </html>

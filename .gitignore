@@ -91,6 +91,7 @@ instance/
 .env
 *.local
 
+metadata/*.*
 updates/
 !updates/.gitkeep
 HOWTO.txt

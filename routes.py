@@ -10,6 +10,9 @@ import requests
 import re
 from datetime import datetime
 from update_manager import UpdateManager
+import books_db
+from PIL import Image
+import io, requests as req
 
 
 # Import shared utilities (will be passed from app.py)
@@ -117,26 +120,74 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @conditional_debug_log
     @requires_auth
     def manage_books():
+        """Filesystem-first book library.
+
+        Source priority per book:
+          1. Local DB (this app)  — instant, no network
+          2. (Client) Goodreads via Apify
+          3. (Client) Readarr API
+          4. (Client) Manual import dialog — pre-populated from file metadata
+        """
+        # Kindle Paperwhite gets its own simplified template
+        if is_kindle_request():
+            return redirect(url_for('kindle_books'))
         try:
-            if not CONFIG.readarr.enabled:
-                return render_template('error.html', error="Readarr is not configured")
-            books = utils.get_readarr_books()
-            # Only show books that have at least one file on disk
-            downloaded = [
-                b for b in books
-                if (b.get('statistics', {}).get('bookFileCount', 0) > 0
-                    or b.get('statistics', {}).get('sizeOnDisk', 0) > 0)
-            ]
-            downloaded.sort(key=lambda x: x.get('title', '').lower())
+            from utils import scan_books_folder, extract_file_metadata, _title_from_filename
+            books_db.init_db()
+            root_folder = CONFIG.readarr.root_folder if CONFIG.readarr.enabled else None
+
+            # ── Scan filesystem ────────────────────────────────────────────────
+            scanned = scan_books_folder(root_folder) if root_folder else []
+
+            # ── Batch DB lookup ────────────────────────────────────────────────
+            paths    = [b['file_path'] for b in scanned]
+            db_books = books_db.get_books_by_paths(paths)
+
+            # ── Merge: for new files, create a minimal DB record immediately ──
+            merged = []
+            for fs in scanned:
+                fp = fs['file_path']
+                if fp in db_books:
+                    rec = db_books[fp]
+                    # Backfill year/pages if the record was saved without them
+                    # (e.g. by the /kindle route which previously omitted them)
+                    if not rec.get('year') and not rec.get('pages'):
+                        meta = extract_file_metadata(fp)
+                        upd = {k: meta.get(k) for k in ('year', 'pages') if meta.get(k)}
+                        if upd:
+                            rec = books_db.save_book({'file_path': fp, **upd}) or rec
+                else:
+                    # Extract metadata from the file itself (no network, fast)
+                    meta = extract_file_metadata(fp)
+                    title = (meta.get('title')
+                             or _title_from_filename(fs['filename']))
+                    rec = books_db.save_book({
+                        'file_path': fp,
+                        'title':     title,
+                        'author':    meta.get('author'),
+                        'overview':  meta.get('overview'),
+                        'year':      meta.get('year'),
+                        'pages':     meta.get('pages'),
+                        'isbn':      meta.get('isbn'),
+                        'source':    meta.get('source', 'filename'),
+                    })
+
+                merged.append({
+                    **fs,            # file_path, filename, extension, file_size, rel_path
+                    **(rec or {}),   # DB fields override / supplement
+                })
+
+            merged.sort(key=lambda b: (b.get('title') or b['filename']).lower())
+
             return render_template(
                 'manage-books.html',
-                books=downloaded,
+                books=merged,
                 config=CONFIG._config,
-                total_in_library=len(books),
-                total_downloaded=len(downloaded)
+                total_downloaded=len(merged),
+                root_folder=root_folder or '',
             )
         except Exception as e:
-            logging.error(f"Error fetching books: {str(e)}")
+            logging.error(f"Error loading manage-books: {e}", exc_info=True)
             return render_template('error.html', error="Failed to load books")
 
 
@@ -145,18 +196,33 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @requires_auth
     def kindle_books():
         try:
-            all_books = utils.get_readarr_books()
-            # Filter to only books with at least one file — no Jinja continue needed
-            books = [b for b in all_books if b.get('statistics', {}).get('bookFileCount', 0) > 0]
-            total_downloaded = len(books)
-            return render_template(
-                'kindle.html',
-                books=books,
-                total_downloaded=total_downloaded,
-                config=CONFIG._config
-            )
+            from utils import scan_books_folder, extract_file_metadata, _title_from_filename
+            books_db.init_db()
+            root_folder = CONFIG.readarr.root_folder if CONFIG.readarr.enabled else None
+            scanned  = scan_books_folder(root_folder) if root_folder else []
+            paths    = [b['file_path'] for b in scanned]
+            db_books = books_db.get_books_by_paths(paths)
+            merged = []
+            for fs in scanned:
+                fp = fs['file_path']
+                if fp in db_books:
+                    rec = db_books[fp]
+                else:
+                    meta  = extract_file_metadata(fp)
+                    title = meta.get('title') or _title_from_filename(fs['filename'])
+                    rec   = books_db.save_book({
+                        'file_path': fp, 'title': title,
+                        'author': meta.get('author'),
+                        'year':   meta.get('year'),
+                        'pages':  meta.get('pages'),
+                        'source': meta.get('source', 'filename'),
+                    })
+                merged.append({**fs, **(rec or {})})
+            merged.sort(key=lambda b: (b.get('title') or b['filename']).lower())
+            return render_template('kindle.html', books=merged,
+                                total_downloaded=len(merged), config=CONFIG._config)
         except Exception as e:
-            logging.error(f"Kindle route error: {str(e)}")
+            logging.error(f"Kindle route error: {e}", exc_info=True)
             return render_template('error.html', error="Failed to load book library")
             
     @app.route('/trending')
@@ -629,6 +695,370 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     'overview':   cached.get('overview', ''),
                 }
         return jsonify(result)
+
+    # ── Local book DB API ──────────────────────────────────────────────────────
+
+    # Thumbnail disk-cache directory — lives next to books.db
+    _THUMB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              'metadata', 'thumb_cache')
+
+    def _bust_thumb_cache(book_id):
+        """Delete all cached thumbnail files for a given book_id.
+
+        Called whenever the cover_url is updated so stale resized images
+        don't persist in the cache.
+        """
+        import glob as _glob
+        for f in _glob.glob(os.path.join(_THUMB_DIR, f'{book_id}_*.jpg')):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+
+    @app.route('/api/book/cover/<int:book_id>')
+    @requires_auth
+    def book_cover(book_id):
+        try:
+            w = int(request.args.get('w', 60))
+            h = int(request.args.get('h', 90))
+
+            # ── Cache hit? ─────────────────────────────────────────────────────
+            # Cache key encodes book id + requested dimensions.
+            # If the cover_url changes (re-enrichment), the caller should DELETE
+            # the cached file or the whole thumb_cache dir to force a refresh.
+            cache_file = os.path.join(_THUMB_DIR, f'{book_id}_{w}x{h}.jpg')
+            if os.path.isfile(cache_file):
+                logging.debug(f'[book_cover] HIT  book_{book_id}_{w}x{h}.jpg')
+                resp = send_file(cache_file, mimetype='image/jpeg')
+                resp.headers['Cache-Control'] = 'public, max-age=604800'  # 7 days
+                return resp
+
+            # ── Cache miss — resolve cover URL ─────────────────────────────────
+            logging.info(f'[book_cover] MISS book_id={book_id} ({w}×{h}px) — resolving cover')
+            # Priority 1: local DB cover_url (set by enrichment or manual import)
+            book = books_db.get_book_by_id(book_id)
+            cover_url = book.get('cover_url') if book else None
+
+            # Priority 2: Readarr API (covers stored in Readarr's mediacover cache)
+            if not cover_url and CONFIG.readarr.enabled:
+                try:
+                    resp = requests.get(
+                        f"{CONFIG.readarr.url}/api/v1/book/{book_id}",
+                        params={'apikey': CONFIG.readarr.api_key}, timeout=8
+                    )
+                    if resp.status_code == 200:
+                        rbook = resp.json()
+                        cover_url = rbook.get('remotePoster') or next((
+                            img.get('remoteUrl') or img.get('url')
+                            for img in rbook.get('images', [])
+                            if img.get('coverType') in ('poster', 'cover')
+                        ), None)
+                except Exception as e:
+                    logging.debug(f"[book_cover] Readarr fallback failed: {e}")
+
+            if not cover_url:
+                logging.debug(f"[book_cover] no cover found for book_id={book_id}")
+                return '', 404
+
+            # ── Fetch remote image ─────────────────────────────────────────────
+            if cover_url.startswith('/'):
+                img_resp = requests.get(
+                    CONFIG.readarr.url.rstrip('/') + cover_url,
+                    params={'apikey': CONFIG.readarr.api_key}, timeout=8
+                )
+            else:
+                img_resp = requests.get(cover_url, timeout=8)
+
+            if img_resp.status_code != 200:
+                return '', 404
+
+            # ── Resize + write to disk cache ───────────────────────────────────
+            try:
+                img = Image.open(io.BytesIO(img_resp.content)).convert('RGB')
+                img.thumbnail((w, h), Image.LANCZOS)
+                os.makedirs(_THUMB_DIR, exist_ok=True)
+                tmp = cache_file + '.tmp'
+                img.save(tmp, format='JPEG', quality=72, optimize=True)
+                os.replace(tmp, cache_file)
+                logging.info(f'[book_cover] SAVE book_{book_id}_{w}x{h}.jpg')
+                response = send_file(cache_file, mimetype='image/jpeg')
+            except Exception as exc:
+                # Pillow failed (corrupt image, etc.) — stream raw bytes, don't cache
+                logging.warning(f"[book_cover] resize failed for book_id={book_id}: {exc}")
+                response = Response(img_resp.content,
+                                    content_type=img_resp.headers.get('content-type', 'image/jpeg'))
+
+            response.headers['Cache-Control'] = 'public, max-age=604800'  # 7 days
+            return response
+
+        except Exception as e:
+            logging.error(f"[book_cover] Error for book_id={book_id}: {e}", exc_info=True)
+            return '', 404
+            
+    @app.route('/api/books/enrich', methods=['POST'])
+    @requires_auth
+    def books_enrich():
+        """Enrich a single book: Goodreads → Readarr.
+
+        Request JSON: { file_path, title, author }
+        Response:     { status: 'ok'|'needs_manual', book: {...} }
+        """
+        data      = request.get_json(force=True, silent=True) or {}
+        file_path = data.get('file_path', '').strip()
+        title     = data.get('title', '').strip()
+        author    = data.get('author', '').strip()
+
+        if not file_path:
+            return jsonify({'error': 'file_path required'}), 400
+
+        query = f"{title} {author}".strip() or os.path.splitext(
+            os.path.basename(file_path))[0]
+
+        # ── 1. Goodreads ───────────────────────────────────────────────────────
+        goodreads_result = None
+        if CONFIG.apify.enabled and query:
+            try:
+                results = utils.search_goodreads_apify(query)
+                if results:
+                    goodreads_result = results[0]
+            except Exception as e:
+                logging.warning("[books/enrich] Goodreads error: %s", e)
+
+        if goodreads_result:
+            book = books_db.save_book({
+                'file_path':   file_path,
+                'title':       goodreads_result.get('title') or title,
+                'author':      (goodreads_result.get('author', {}) or {}).get('authorName')
+                               or author,
+                'cover_url':   goodreads_result.get('remotePoster')
+                               or goodreads_result.get('cover_url'),
+                'overview':    goodreads_result.get('overview'),
+                'year':        goodreads_result.get('year'),
+                'pages':       goodreads_result.get('pageCount'),
+                'goodreads_id': goodreads_result.get('goodreadsId')
+                                or goodreads_result.get('foreignBookId'),
+                'source':      'goodreads',
+            })
+            if book and book.get('id'):
+                _bust_thumb_cache(book['id'])
+            return jsonify({'status': 'ok', 'book': book})
+
+        # ── 2. Readarr ─────────────────────────────────────────────────────────
+        readarr_result = None
+        if CONFIG.readarr.enabled and query:
+            try:
+                results = utils.search_readarr(query)
+                if results:
+                    readarr_result = results[0]
+            except Exception as e:
+                logging.warning("[books/enrich] Readarr error: %s", e)
+
+        if readarr_result:
+            author_obj = readarr_result.get('author') or {}
+            author_name = (author_obj.get('authorName') if isinstance(author_obj, dict)
+                           else str(author_obj)) or author
+            images = readarr_result.get('images') or []
+            cover_url = next(
+                (img.get('remoteUrl') or img.get('url')
+                 for img in images
+                 if img.get('coverType') in ('poster', 'cover')),
+                None
+            )
+            book = books_db.save_book({
+                'file_path':      file_path,
+                'title':          readarr_result.get('title') or title,
+                'author':         author_name,
+                'cover_url':      cover_url,
+                'overview':       readarr_result.get('overview'),
+                'year':           (readarr_result.get('releaseDate') or '')[:4] or None,
+                'pages':          readarr_result.get('pageCount'),
+                'foreign_book_id': str(readarr_result.get('foreignBookId', '')),
+                'source':         'readarr',
+            })
+            if book and book.get('id'):
+                _bust_thumb_cache(book['id'])
+            return jsonify({'status': 'ok', 'book': book})
+
+        # ── 3. Nothing found — caller should show manual import ────────────────
+        return jsonify({'status': 'needs_manual'})
+
+    @app.route('/api/books/file-metadata')
+    @requires_auth
+    def books_file_metadata():
+        """Extract and return raw metadata from a book file.
+
+        Used to pre-populate the manual import dialog.
+        Query: ?path=<absolute_file_path>
+        """
+        from utils import extract_file_metadata, _title_from_filename
+        file_path = request.args.get('path', '').strip()
+        if not file_path or not os.path.isfile(file_path):
+            return jsonify({'error': 'File not found'}), 404
+
+        # Validate path is within the configured root folder
+        root = CONFIG.readarr.root_folder if CONFIG.readarr.enabled else ''
+        if root:
+            try:
+                os.path.commonpath([root, file_path])
+                if not os.path.abspath(file_path).startswith(
+                        os.path.abspath(root)):
+                    return jsonify({'error': 'Path outside root folder'}), 403
+            except Exception:
+                return jsonify({'error': 'Invalid path'}), 400
+
+        meta = extract_file_metadata(file_path)
+        filename = os.path.basename(file_path)
+        meta.setdefault('title', _title_from_filename(filename))
+        meta.pop('cover_data', None)   # don't send binary over JSON
+        meta['filename']  = filename
+        meta['file_path'] = file_path
+        meta['extension'] = os.path.splitext(filename)[1].lower()
+        return jsonify(meta)
+
+    @app.route('/api/books/save-metadata', methods=['POST'])
+    @requires_auth
+    def books_save_metadata():
+        """Save (or overwrite) book metadata to the local DB.
+
+        Used by the manual import dialog and the enrichment chain.
+        Request JSON: { file_path, title, author, cover_url, overview,
+                        year, pages, isbn, goodreads_id, ... }
+        """
+        data = request.get_json(force=True, silent=True) or {}
+        if not data.get('file_path'):
+            return jsonify({'error': 'file_path required'}), 400
+
+        # Force source='manual' when called from the UI dialog
+        if not data.get('source'):
+            data['source'] = 'manual'
+
+        try:
+            book = books_db.save_book(data)
+            # Cover may have changed — drop stale cached thumbnails
+            if book and book.get('id') and data.get('cover_url'):
+                _bust_thumb_cache(book['id'])
+            return jsonify({'success': True, 'book': book})
+        except Exception as e:
+            logging.error("[books/save-metadata] error: %s", e)
+            return jsonify({'error': str(e)}), 500
+
+    # ── Reader route for local (non-Readarr) books ─────────────────────────────
+
+    @app.route('/read/local/<int:db_id>')
+    @requires_auth
+    def read_local_book(db_id):
+        """Open the reader for a book identified by its local DB id."""
+        book = books_db.get_book_by_id(db_id)
+        if not book or not book.get('file_path'):
+            return render_template('error.html'), 404
+        file_path = book['file_path']
+        if not os.path.isfile(file_path):
+            return render_template('error.html'), 404
+        ext = os.path.splitext(file_path)[1].lower()
+        file_type = 'epub' if ext == '.epub' else 'pdf' if ext == '.pdf' else None
+        if not file_type:
+            return render_template('error.html'), 415
+        template = 'reader_kindle.html' if is_kindle_request() else 'reader.html'
+        return render_template(template, book_id=f'local_{db_id}', file_type=file_type, config=CONFIG._config)            
+
+    @app.route('/api/book/file/local/<int:db_id>')
+    @requires_auth
+    def book_file_local(db_id):
+        """Stream a book file by local DB id (for the reader)."""
+        book = books_db.get_book_by_id(db_id)
+        if not book or not book.get('file_path'):
+            return jsonify({'error': 'Not found'}), 404
+        file_path = book['file_path']
+        if not os.path.isfile(file_path):
+            return jsonify({'error': 'File not found on disk'}), 404
+        ext  = os.path.splitext(file_path)[1].lower()
+        mime = 'application/epub+zip' if ext == '.epub' else 'application/pdf'
+        try:
+            resp = send_file(file_path, mimetype=mime,
+                             as_attachment=False, conditional=False)
+            resp.headers['Access-Control-Allow-Origin'] = '*'
+            resp.headers['Cache-Control'] = 'no-store'
+            return resp
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # ── General image proxy with disk cache ───────────────────────────────────
+    _IMG_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  'metadata', 'img_cache')
+
+    @app.route('/api/img')
+    @requires_auth
+    def img_proxy():
+        """Caching image proxy — redirect-on-miss with background fetch.
+
+        Cache HIT  → served from disk instantly, no outbound request.
+        Cache MISS → browser redirected to the optimised source URL immediately;
+                     a daemon thread fetches, resizes and writes to disk so the
+                     next request is always a hit.
+
+        All events logged at INFO with the item title so addarr.log is readable.
+        """
+        import hashlib, threading
+
+        title = request.args.get('t', '')       # human-readable label for logs
+        url   = request.args.get('url', '').strip()
+        try:
+            w = min(int(request.args.get('w', 174)), 800)
+            h = min(int(request.args.get('h', 261)), 1200)
+        except (ValueError, TypeError):
+            w, h = 174, 261
+
+        label = f'"{title}"' if title else url[:60]
+
+        try:
+            if not url or not url.startswith('http'):
+                logging.warning(f'[img_proxy] Bad URL for {label}: {url!r}')
+                return '', 400
+
+            # Normalise all TMDB size variants → /w342/ before fetching
+            norm_url   = re.sub(r'(image\.tmdb\.org/t/p/)[^/]+/', r'\1w342/', url)
+            cache_key  = hashlib.md5(norm_url.encode()).hexdigest()[:12]
+            cache_file = os.path.join(_IMG_CACHE_DIR, f'{cache_key}_{w}x{h}.jpg')
+
+            # ── Cache hit: serve from disk ─────────────────────────────────────
+            if os.path.isfile(cache_file):
+                logging.info(f'[img_proxy] HIT  {label} — serving from cache')
+                resp = send_file(cache_file, mimetype='image/jpeg')
+                resp.headers['Cache-Control'] = 'public, max-age=604800'
+                return resp
+
+            # ── Cache miss: redirect browser; fetch+save in background ─────────
+            logging.info(f'[img_proxy] MISS {label} — redirecting to source, caching in background')
+
+            def _fetch_and_cache(fetch_url, dest, tw, th, name):
+                try:
+                    r = requests.get(fetch_url, timeout=15,
+                                     headers={'User-Agent': 'addarr/1.0'})
+                    if r.status_code != 200:
+                        logging.warning(f'[img_proxy] Fetch failed {name!r}: HTTP {r.status_code}')
+                        return
+                    img = Image.open(io.BytesIO(r.content)).convert('RGB')
+                    img.thumbnail((tw, th), Image.LANCZOS)
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    tmp = dest + '.tmp'
+                    img.save(tmp, format='JPEG', quality=75, optimize=True)
+                    os.replace(tmp, dest)
+                    logging.info(f'[img_proxy] SAVE {name!r} → cache updated ({tw}×{th}px)')
+                except Exception as exc:
+                    logging.warning(f'[img_proxy] Cache error {name!r}: {exc}')
+
+            threading.Thread(
+                target=_fetch_and_cache,
+                args=(norm_url, cache_file, w, h, title or url[:60]),
+                daemon=True,
+                name=f'img-{cache_key}'
+            ).start()
+
+            return redirect(norm_url, 302)
+
+        except Exception as exc:
+            logging.error(f'[img_proxy] CRASH for {label}: {exc}', exc_info=True)
+            return '', 500
 
     @app.route('/api/readarr/cover')
     @requires_auth
@@ -1274,21 +1704,6 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                             book_id=book_id,
                             file_type=file_type,
                             config=CONFIG._config)
-                            
-        """Serve the ebook reader page for a Readarr internal book ID."""
-        if not CONFIG.readarr.url:
-            return redirect('/')
-        file_path = utils.get_readarr_book_file_path(book_id)
-        if not file_path:
-            return render_template('error.html'), 404
-        ext = os.path.splitext(file_path)[1].lower()
-        file_type = 'epub' if ext == '.epub' else 'pdf' if ext == '.pdf' else None
-        if not file_type:
-            return render_template('error.html'), 415
-        return render_template('reader.html',
-                               book_id=book_id,
-                               file_type=file_type,
-                               config=CONFIG._config)
 
     @app.route('/api/book/file/<int:book_id>')
     @requires_auth

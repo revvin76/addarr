@@ -10,22 +10,16 @@
     <link rel="icon" type="image/png" href="/static/images/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
     <link rel="shortcut icon" href="/static/images/favicon.ico" />
-    
-    <!-- Manifest -->
     <link rel="manifest" href="/static/manifest.json">
-
-    <!-- iOS support -->
     <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-capable" content="yes">
-
-    <!-- Theme color -->
     <meta name="theme-color" content="#1a1a1a" />
     <script src="https://www.youtube.com/iframe_api"></script>
-    
+
     <!-- Load main.js early to ensure showDetails is available -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    
+
     <!-- Placeholder function - will be overridden by main.js -->
     <script>
         if (typeof showDetails === 'undefined') {
@@ -34,11 +28,8 @@
                 const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
                 document.getElementById('detailsContent').innerHTML = '<p class="text-center">Loading...</p>';
                 modal.show();
-                // Retry after a short delay
                 setTimeout(() => {
-                    if (typeof showDetails !== 'undefined') {
-                        showDetails(mediaType, mediaId, tmdbOnly);
-                    }
+                    if (typeof showDetails !== 'undefined') showDetails(mediaType, mediaId, tmdbOnly);
                 }, 500);
             };
         }
@@ -48,38 +39,46 @@
 <body>
     {% include 'partials/navbar.html' %}
 
-    <div class="container mt-4 text-xs">
-        <!-- Search Form - Standardized -->
-        <div class="row mb-4">
-            <div class="col-md-6 mb-2">
-                <form action="/search" method="POST" onsubmit="return validateForm()" class="d-flex">
-                    <input type="text" class="form-control me-2" id="searchInput" 
-                        name="query" placeholder="Search movies, TV shows{% if readarr_enabled %} and books{% endif %}..."
-                        value="{{ query }}" required>        
-                    <!-- Clear button -->
-                    <button type="button" class="btn btn-outline-danger me-2" id="clearSearch" disabled>
-                        <i class="fas fa-times"></i>
-                    </button>                 
-                    <button type="submit" class="btn btn-primary">Search</button>
-                </form>
-            </div>
-
-            <div class="col-md-6">
-                <div class="input-group">
-                    <span class="input-group-text">
-                        <i class="fas fa-filter"></i>
-                    </span>
-                    <select id="mediaFilter" class="form-select">
-                        <option value="all">All Media ({{ all_results }})</option>
-                        <option value="movie">Movies Only ({{ movies }})</option>
-                        <option value="tv">TV Shows Only ({{ tv_shows }})</option>
-                        {% if readarr_enabled %}<option value="book">Books Only ({{ books }})</option>{% endif %}
-                    </select>
+    <!-- ── Sticky controls header ── -->
+    <div class="page-sticky-controls" id="stickyControls">
+        <div class="container py-2 text-xs">
+            <!-- Search form + filter row -->
+            <div class="row g-2 mb-2">
+                <div class="col-7 col-md-6">
+                    <form action="/search" method="POST" onsubmit="return validateForm()" class="d-flex gap-1">
+                        <input type="text" class="form-control form-control-sm me-1" id="searchInput"
+                            name="query" placeholder="Search movies, TV shows{% if readarr_enabled %} and books{% endif %}..."
+                            value="{{ query }}" required>
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="clearSearch" disabled>
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                    </form>
+                </div>
+                <div class="col-5 col-md-6">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                        <select id="mediaFilter" class="form-select form-select-sm">
+                            <option value="all">All ({{ all_results }})</option>
+                            <option value="movie">Movies ({{ movies }})</option>
+                            <option value="tv">TV ({{ tv_shows }})</option>
+                            {% if readarr_enabled %}<option value="book">Books ({{ books }})</option>{% endif %}
+                        </select>
+                    </div>
                 </div>
             </div>
+            <!-- Back-to-top row (right-aligned) -->
+            <div class="d-flex justify-content-end">
+                <button id="backToTop" class="btn btn-sm btn-outline-secondary btn-back-to-top"
+                        title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+            </div>
         </div>
+    </div>
 
-        <!-- Results Grid - Standardized Structure -->
+    <!-- ── Results Grid ── -->
+    <div class="container mt-3 text-xs">
         {% if results %}
             <div class="row" id="resultsGrid">
                 {% for result in results %}
@@ -96,14 +95,12 @@
                      onclick="showDetails('{{ result.media_type }}', {{ result_id }})">
 
                     <div class="search-result-card h-100 {% if result.media_type == 'movie' %}movie-card{% elif result.media_type == 'book' %}book-card{% else %}tv-card{% endif %}">
-                        <!-- Thumbnail container - standardized -->
                         <div class="search-result-thumbnail-container">
-                            <img src="{{ result.remotePoster if result.remotePoster else '/static/images/apple-touch-icon.png' }}"
+                            <img src="{{ (result.remotePoster | imgproxy(174, 261, result.title)) if result.remotePoster else '/static/images/apple-touch-icon.png' }}"
                                 class="search-result-thumbnail"
                                 alt="{{ result.title }}"
                                 onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
                             <div class="fade-overlay"></div>
-                            <!-- Media type watermark -->
                             <div class="watermark-icon position-absolute">
                                 {% if result.media_type == 'movie' %}
                                     <i class="fas fa-film"></i>
@@ -115,7 +112,6 @@
                             </div>
                         </div>
 
-                        <!-- Card content - standardized -->
                         <div class="search-result-content">
                             <div class="flex justify-between items-start mb-1">
                                 <h3 class="text-xs font-medium text-white truncate">
@@ -161,13 +157,12 @@
         </div>
     </div>
 
-    
     <div id="overlay-backdrop" class="overlay-backdrop"></div>
     <div id="modal-overlay-backdrop" class="overlay-backdrop modal-overlay-backdrop"></div>
     <div class="spinner-border spinner-radarr" role="status">
         <span class="visually-hidden">Loading...</span>
-    </div>  
-    
+    </div>
+
     <!-- Global Loading Spinner -->
     <div id="globalLoadingSpinner" class="loading-spinner">
         <div class="spinner-container">
@@ -178,15 +173,11 @@
             <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
         </div>
     </div>
-    
-    <div id="backToTop" class="back-to-top">
-        <i class="fas fa-chevron-up"></i>
-    </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Book data cache: keyed by foreignBookId so showDetails can render without an API round-trip -->
+    <!-- Book data cache -->
     <script>
     window.bookCache = new Map();
     {% for result in results %}{% if result.media_type == 'book' %}
@@ -195,84 +186,50 @@
     </script>
 
     <script>
-    // Simplified - No lazy loading, check all items on page load
     document.addEventListener('DOMContentLoaded', function() {
-        // Filter functionality
+        // Media type filter
         const mediaFilter = document.getElementById('mediaFilter');
-        
         mediaFilter.addEventListener('change', function() {
             const filter = this.value;
-            const items = document.querySelectorAll('.result-item');
-            
-            items.forEach(item => {
-                if (filter === 'all') {
-                    item.style.display = 'block';
-                } else {
-                    item.style.display = item.getAttribute('data-media-type') === filter ? 'block' : 'none';
-                }
+            document.querySelectorAll('.result-item').forEach(item => {
+                item.style.display = (filter === 'all' || item.getAttribute('data-media-type') === filter)
+                    ? 'block' : 'none';
             });
         });
 
-        // Check library status for all items - get data from result-item parent
-        const resultItems = document.querySelectorAll('.result-item');
-        
-        resultItems.forEach(resultItem => {
-            const mediaType = resultItem.dataset.mediaType;
-            const mediaId = resultItem.dataset.mediaId;
-            const card = resultItem.querySelector('.search-result-card');
-            checkLibraryStatus(mediaType, mediaId, card);
+        // Check library status for all items
+        document.querySelectorAll('.result-item').forEach(resultItem => {
+            checkLibraryStatus(resultItem.dataset.mediaType, resultItem.dataset.mediaId,
+                resultItem.querySelector('.search-result-card'));
+        });
+
+        initializeMediaGrid();
+        initializeClearSearch();
+
+        // Back-to-top visibility
+        window.addEventListener('scroll', function() {
+            document.getElementById('backToTop')
+                    .classList.toggle('show', window.pageYOffset > 200);
         });
     });
 
-    // Initialize when DOM is loaded
-    document.addEventListener('DOMContentLoaded', function() {
-        initializeMediaGrid();
-        initializeClearSearch();
-    });
-
-    // Fetch library status and update UI
     function checkLibraryStatus(mediaType, mediaId, card) {
-        if (!card) {
-            console.error('Card element not provided to checkLibraryStatus');
-            return;
-        }
-        
+        if (!card) return;
         const statusBadge = card.querySelector('.status-badge');
-        const deleteBtn = card.querySelector('.delete-btn');
-        
-        if (!statusBadge) {
-            console.error('Status badge not found in card for', mediaType, mediaId);
-            return;
-        }
-        
-        console.log(`[checkLibraryStatus] Checking ${mediaType} ID: ${mediaId}`);
-        
+        const deleteBtn   = card.querySelector('.delete-btn');
+        if (!statusBadge) return;
+
         fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
+            .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
             .then(data => {
-                console.log(`[checkLibraryStatus] Response for ${mediaType} ${mediaId}:`, data);
-                
                 if (data.in_library) {
-                    // Fetch detailed info to check if on disk or missing
                     fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
-                        .then(response => response.json())
+                        .then(r => r.json())
                         .then(details => {
                             const itemData = details.data || details;
-                            let isOnDisk = false;
-                            
-                            if (mediaType === 'movie') {
-                                isOnDisk = itemData.hasFile || false;
-                            } else {
-                                const stats = itemData.statistics || {};
-                                isOnDisk = (stats.episodeFileCount || 0) > 0;
-                            }
-                            
-                            // Update badge
+                            const isOnDisk = mediaType === 'movie'
+                                ? (itemData.hasFile || false)
+                                : (itemData.statistics?.episodeFileCount || 0) > 0;
                             if (isOnDisk) {
                                 statusBadge.textContent = 'On Disk';
                                 statusBadge.className = 'status-badge text-xs badge text-bg-success';
@@ -280,95 +237,55 @@
                                 statusBadge.textContent = 'Missing';
                                 statusBadge.className = 'status-badge text-xs badge text-bg-danger';
                             }
-                            
-                            // Show delete button and set up event listener
                             if (deleteBtn) {
                                 deleteBtn.style.display = 'block';
                                 deleteBtn.dataset.mediaType = mediaType;
-                                deleteBtn.dataset.mediaId = mediaId;
+                                deleteBtn.dataset.mediaId   = mediaId;
                                 deleteBtn.onclick = deleteFromLibrary;
                             }
                         })
-                        .catch(error => {
-                            console.error('Error fetching details:', error);
+                        .catch(() => {
                             statusBadge.textContent = 'Error';
                             statusBadge.className = 'status-badge text-xs badge bg-danger';
                         });
                 } else {
-                    console.log(`⊘ Not in library: ${mediaType} ${mediaId}`);
                     statusBadge.textContent = 'Not Added';
                     statusBadge.className = 'status-badge text-xs badge bg-secondary';
-                    if (deleteBtn) {
-                        deleteBtn.style.display = 'none';
-                    }
+                    if (deleteBtn) deleteBtn.style.display = 'none';
                 }
             })
-            .catch(error => {
-                console.error(`[checkLibraryStatus] Error for ${mediaType} ${mediaId}:`, error);
+            .catch(() => {
                 statusBadge.textContent = 'Error';
                 statusBadge.className = 'status-badge text-xs badge bg-danger';
-                if (deleteBtn) {
-                    deleteBtn.style.display = 'none';
-                }
+                if (deleteBtn) deleteBtn.style.display = 'none';
             });
     }
 
-    // Delete from library
     function deleteFromLibrary(e) {
         e.stopPropagation();
         const mediaType = this.dataset.mediaType;
-        const mediaId = this.dataset.mediaId;
-        
+        const mediaId   = this.dataset.mediaId;
         if (confirm('Are you sure you want to delete this from your library?')) {
-            fetch(`/api/${mediaType}/${mediaId}`, {
-                method: 'DELETE'
-            })
-            .then(response => {
-                if (response.ok) {
-                    showNotification('Item deleted successfully', 'success');
-                    // Refresh the library status
-                    const card = this.closest('.search-result-card');
-                    checkLibraryStatus(mediaType, mediaId, card);
-                } else {
-                    throw new Error('Failed to delete item');
-                }
-            })
-            .catch(error => {
-                console.error(error);
-                showNotification('Failed to delete item', 'error');
-            });
+            fetch(`/api/${mediaType}/${mediaId}`, { method: 'DELETE' })
+                .then(r => {
+                    if (r.ok) {
+                        showNotification('Item deleted successfully', 'success');
+                        checkLibraryStatus(mediaType, mediaId, this.closest('.search-result-card'));
+                    } else throw new Error();
+                })
+                .catch(() => showNotification('Failed to delete item', 'error'));
         }
     }
 
-    // Simple notification function
     function showNotification(message, type) {
-        // You can implement a toast notification system here
         alert(`${type === 'success' ? '✅' : '❌'} ${message}`);
     }
 
-    // Form validation function
     function validateForm() {
         const query = document.querySelector('input[name="query"]').value.trim();
-        if (!query) {
-            alert('Please enter a search term');
-            return false;
-        }
+        if (!query) { alert('Please enter a search term'); return false; }
         return true;
     }
-
-    // Back to top functionality
-    window.addEventListener('scroll', function() {
-        const backToTop = document.getElementById('backToTop');
-        if (window.pageYOffset > 300) {
-            backToTop.classList.add('show');
-        } else {
-            backToTop.classList.remove('show');
-        }
-    });
-
-    document.getElementById('backToTop').addEventListener('click', function() {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
     </script>
 </body>
 </html>

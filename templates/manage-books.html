@@ -23,14 +23,23 @@
         }
         .book-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
         .book-thumb { width: 70px; height: 100px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
-        .book-thumb-placeholder { width: 70px; height: 100px; background: #333; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .book-title { font-size: 0.95rem; font-weight: 600; color: #fff; }
+        .book-thumb-placeholder { width: 70px; height: 100px; background: #333; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .book-title  { font-size: 0.95rem; font-weight: 600; color: #fff; }
         .book-author { font-size: 0.78rem; color: #c0392b; }
-        .book-meta  { font-size: 0.72rem; color: #aaa; }
+        .book-meta   { font-size: 0.72rem; color: #aaa; }
         .book-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
 
+        /* source pill shown on unenriched cards */
+        .source-pill {
+            font-size: 0.65rem; padding: 2px 6px; border-radius: 20px;
+            background: #3a3a3a; color: #bbb; white-space: nowrap;
+        }
+        .source-pill.needs-manual { background: #5a2d0c; color: #f39c12; }
+        .source-pill.enriching    { background: #1a3a1a; color: #6ab759; }
+
         /* ── A-Z navigation ── */
-        #azLetters { display: none; flex-wrap: wrap; gap: 4px; padding: 6px 0; }
+        #azLetters { display: none; flex-wrap: wrap; gap: 4px; }
         #azLetters.open { display: flex; }
         .az-btn {
             background: #2a2a2a; border: 1px solid #3a3a3a; color: #bbb;
@@ -40,85 +49,124 @@
         .az-btn:hover:not([disabled]) { background: #3a3a3a; color: #fff; border-color: #555; }
         .az-btn[disabled] { opacity: 0.22; cursor: default; }
         #azToggle.az-active { border-color: #c0392b; color: #c0392b; }
+
+        /* ── Manual import modal ── */
+        #importModal .modal-content { background: #1e1e1e; color: #eee; }
+        #importModal .form-label    { font-size: 0.82rem; color: #bbb; }
+        #importModal .form-control,
+        #importModal .form-select   { background: #2a2a2a; color: #eee; border-color: #444; font-size: 0.85rem; }
+        #importModal .form-control:focus { border-color: #c0392b; box-shadow: 0 0 0 .15rem rgba(192,57,43,.25); }
+        #importCoverPreview { max-height: 120px; border-radius: 6px; display: none; }
     </style>
 </head>
 {% set current_page = 'manage-books' %}
 <body>
     {% include 'partials/navbar.html' %}
 
-    <div class="container mt-4">
-        <!-- Header -->
-        <div class="d-flex align-items-center justify-content-between mb-3">
+    <!-- ── Sticky controls header ── -->
+    <div class="page-sticky-controls" id="stickyControls">
+        <div class="container py-2">
+            <!-- Header row: title + search -->
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="fas fa-book" style="color:#c0392b;"></i>
+                <span class="fw-semibold" style="color:#c0392b; white-space:nowrap;">
+                    Manage Books
+                    <span class="badge bg-secondary ms-1" title="Books found on disk" style="font-size:0.7rem;">{{ total_downloaded }}</span>
+                </span>
+                {% if root_folder %}
+                <small class="text-muted d-none d-md-inline text-truncate">
+                    <i class="fas fa-folder-open me-1"></i>{{ root_folder }}
+                </small>
+                {% endif %}
+                <!-- Search -->
+                <div class="input-group input-group-sm ms-auto" style="max-width:280px;">
+                    <input type="text" id="bookSearch" class="form-control form-control-sm bg-dark text-light border-secondary"
+                           placeholder="Search books…" autocomplete="off">
+                    <button class="btn btn-outline-secondary btn-sm" id="clearBookSearch" disabled>
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- A-Z nav + back-to-top -->
             <div class="d-flex align-items-center gap-2">
-                <i class="fas fa-book fa-lg" style="color:#c0392b;"></i>
-                <h4 class="mb-0" style="color:#c0392b;">Manage Books</h4>
-                <span class="badge bg-secondary ms-1" title="Downloaded books">{{ total_downloaded }}</span>
+                <button class="btn btn-sm btn-outline-secondary flex-shrink-0" id="azToggle" onclick="toggleAzNav()">
+                    <i class="fas fa-sort-alpha-down me-1"></i>A–Z
+                </button>
+                <div id="azLetters" class="flex-grow-1"></div>
+                <button id="backToTop" class="btn btn-sm btn-outline-secondary btn-back-to-top"
+                        title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
             </div>
         </div>
+    </div>
 
-        <!-- Search -->
-        <div class="input-group mb-3">
-            <input type="text" id="bookSearch" class="form-control bg-dark text-light border-secondary"
-                   placeholder="Search books..." autocomplete="off">
-            <button class="btn btn-outline-secondary" id="clearBookSearch" disabled>
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-
-        <!-- A-Z quick navigation -->
-        <div class="d-flex align-items-start gap-2 mb-2 flex-wrap">
-            <button class="btn btn-sm btn-outline-secondary" id="azToggle" onclick="toggleAzNav()">
-                <i class="fas fa-sort-alpha-down me-1"></i>A–Z
-            </button>
-            <div id="azLetters"></div>
-        </div>
-
+    <div class="container mt-3">
         <!-- Book grid -->
         {% if books %}
         <div id="booksGrid">
             {% for book in books %}
-            {% set poster_url = '' %}
-            {% for img in book.images %}
-                {% if img.coverType in ['poster', 'cover'] and poster_url == '' %}
-                    {% set poster_url = img.remoteUrl or img.url %}
-                {% endif %}
-            {% endfor %}
-            {% set author_name = book.author.authorName if book.author else 'Unknown Author' %}
-            {% set file_count = book.statistics.bookFileCount if book.statistics else 0 %}
-            {% set size_mb = (book.statistics.sizeOnDisk / 1048576) | round(1) if book.statistics and book.statistics.sizeOnDisk else 0 %}
-
             <div class="book-card p-3 mb-2 d-flex gap-3 book-item"
-                 data-title="{{ book.title|lower }}"
-                 data-foreign-id="{{ book.foreignBookId }}"
-                 data-internal-id="{{ book.id }}"
-                 onclick="openBookDetails('{{ book.foreignBookId }}', {{ book.id }}, this)">
+                 data-title="{{ (book.title or book.filename)|lower }}"
+                 data-file-path="{{ book.file_path }}"
+                 data-db-id="{{ book.id or '' }}"
+                 data-source="{{ book.source or 'unknown' }}"
+                 data-internal-id="{{ book.internal_id or '' }}"
+                 data-foreign-id="{{ book.foreign_book_id or '' }}"
+                 onclick="openBookDetails(this)">
 
-                {% if poster_url %}
-                <img src="{{ poster_url }}" class="book-thumb" alt="{{ book.title }}"
+                <!-- Thumbnail -->
+                {% if book.cover_url %}
+                <img src="{{ book.cover_url }}" class="book-thumb" alt="{{ book.title or book.filename }}"
                      onerror="this.onerror=null;this.src='/static/images/apple-touch-icon.png'">
                 {% else %}
                 <div class="book-thumb-placeholder"><i class="fas fa-book text-muted fa-2x"></i></div>
                 {% endif %}
 
+                <!-- Info -->
                 <div class="flex-grow-1" style="min-width:0;">
-                    <div class="book-title text-truncate">{{ book.title }}</div>
-                    <div class="book-author">{{ author_name }}</div>
+                    <div class="book-title text-truncate">{{ book.title or book.filename }}</div>
+                    <div class="book-author">{{ book.author or '' }}</div>
                     <div class="book-meta mt-1">
-                        {{ book.releaseDate[:4] if book.releaseDate else 'N/A' }}
-                        {% if book.pageCount %} · {{ book.pageCount }} pages{% endif %}
-                        {% if size_mb %} · {{ size_mb }} MB{% endif %}
-                        {% if file_count %} · {{ file_count }} file{{ 's' if file_count != 1 else '' }}{% endif %}
+                        {% if book.year %}{{ book.year }}{% endif %}
+                        {% if book.pages %} · {{ book.pages }} pages{% endif %}
+                        {% if book.file_size %} · {{ (book.file_size / 1048576) | round(1) }} MB{% endif %}
+                        <span class="ms-1 text-uppercase" style="font-size:0.65rem;color:#555;">
+                            {{ book.extension or '' }}
+                        </span>
                     </div>
                     <div class="book-actions" onclick="event.stopPropagation()">
-                        {% if file_count %}
-                        <a href="/read/{{ book.id }}" target="_blank" class="btn btn-sm btn-outline-success">
+                        <!-- Read button: local DB id preferred, falls back to Readarr internal id -->
+                        {% if book.id %}
+                        <a href="/read/local/{{ book.id }}" target="_blank"
+                           class="btn btn-sm btn-outline-success">
+                            <i class="fas fa-book-open me-1"></i>Read
+                        </a>
+                        {% elif book.internal_id %}
+                        <a href="/read/{{ book.internal_id }}" target="_blank"
+                           class="btn btn-sm btn-outline-success">
                             <i class="fas fa-book-open me-1"></i>Read
                         </a>
                         {% endif %}
-                        <button class="btn btn-sm btn-outline-danger"
-                                onclick="deleteBook('{{ book.foreignBookId }}', {{ book.id }}, this)">
-                            <i class="fas fa-trash"></i>
+
+                        <!-- Source indicator / import button -->
+                        {% set src = book.source or 'unknown' %}
+                        {% if src in ['file', 'filename', 'unknown'] %}
+                        <button class="btn btn-sm btn-outline-warning import-btn"
+                                onclick="event.stopPropagation(); triggerImport(this)"
+                                data-file-path="{{ book.file_path }}"
+                                title="No full metadata found — click to import manually">
+                            <i class="fas fa-file-import me-1"></i>Import
                         </button>
+                        <span class="source-pill enriching" data-fp="{{ book.file_path }}"
+                              title="Looking up metadata…">
+                            <span class="spinner-border spinner-border-sm"
+                                  style="width:8px;height:8px;border-width:1px;"></span>
+                            enriching…
+                        </span>
+                        {% else %}
+                        <span class="source-pill" title="Metadata source: {{ src }}">{{ src }}</span>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -127,7 +175,7 @@
         {% else %}
         <div class="alert alert-secondary text-center">
             <i class="fas fa-book-open fa-2x mb-2 d-block"></i>
-            No downloaded books found. Books appear here once they have been downloaded.
+            No book files found in <strong>{{ root_folder or 'the configured books folder' }}</strong>.
         </div>
         {% endif %}
 
@@ -136,7 +184,7 @@
         </div>
     </div>
 
-    <!-- Details Modal (reuses shared renderBookDetails from main.js) -->
+    <!-- Details Modal -->
     <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-modal="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content bg-dark text-light">
@@ -144,13 +192,81 @@
                     <h5 class="modal-title" id="detailsModalLabel">Book Details</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body" id="detailsContent">Loading...</div>
+                <div class="modal-body" id="detailsContent">Loading…</div>
             </div>
         </div>
     </div>
 
-    <div id="backToTop" class="back-to-top">
-        <i class="fas fa-chevron-up"></i>
+    <!-- Manual Import Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-modal="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="border-color:#333;">
+                    <h5 class="modal-title" id="importModalLabel">
+                        <i class="fas fa-file-import me-2" style="color:#c0392b;"></i>Manual Import
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        No metadata could be found automatically. Fill in what you know — fields are
+                        pre-populated from the file itself where available.
+                    </p>
+                    <input type="hidden" id="importFilePath">
+
+                    <div class="row g-3">
+                        <div class="col-md-3 text-center">
+                            <img id="importCoverPreview" src="" alt="Cover">
+                            <div class="mt-2">
+                                <label class="form-label d-block">Cover URL</label>
+                                <input type="text" class="form-control form-control-sm"
+                                       id="importCoverUrl" placeholder="https://…"
+                                       oninput="previewCover(this.value)">
+                            </div>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="row g-2">
+                                <div class="col-12">
+                                    <label class="form-label" for="importTitle">Title *</label>
+                                    <input type="text" class="form-control" id="importTitle" required>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="importAuthor">Author</label>
+                                    <input type="text" class="form-control" id="importAuthor">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="importYear">Year</label>
+                                    <input type="number" class="form-control" id="importYear"
+                                           min="1000" max="2099">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="importPages">Pages</label>
+                                    <input type="number" class="form-control" id="importPages" min="1">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="importIsbn">ISBN</label>
+                                    <input type="text" class="form-control" id="importIsbn">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="importOverview">Synopsis / Overview</label>
+                                    <textarea class="form-control" id="importOverview" rows="4"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="importError" class="alert alert-danger mt-3" style="display:none;"></div>
+                </div>
+                <div class="modal-footer" style="border-color:#333;">
+                    <small class="text-muted me-auto" id="importFileLabel"></small>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="importSaveBtn"
+                            onclick="saveImport()">
+                        <i class="fas fa-save me-1"></i>Save to Library
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="overlay-backdrop" class="overlay-backdrop"></div>
@@ -183,48 +299,75 @@
         emptyMsg.style.display = 'none';
     });
 
-    // ── Client-side book data cache ──────────────────────────────────────────
-    const bookDataCache = new Map();
+    // ── Card patch helper ─────────────────────────────────────────────────────
+    function patchBookCard(card, book) {
+        if (!card || !book) return;
 
-    // ── Card patch helper ────────────────────────────────────────────────────
-    function patchBookCard(foreignBookId, bookData) {
-        const card = document.querySelector(`.book-item[data-foreign-id="${foreignBookId}"]`);
-        if (!card || !bookData) return;
-
-        const authorName = bookData.authorName || bookData.author?.authorName;
-        if (authorName) {
-            const authorEl = card.querySelector('.book-author');
-            if (authorEl && (!authorEl.textContent.trim() || authorEl.textContent.trim() === 'Unknown Author')) {
-                authorEl.textContent = authorName;
-            }
+        const title = book.title || card.dataset.title;
+        if (title) {
+            const el = card.querySelector('.book-title');
+            if (el) el.textContent = title;
+            card.dataset.title = title.toLowerCase();
         }
 
-        const posterUrl = bookData.posterUrl
-            || (bookData.images || []).find(i => i.coverType === 'poster' || i.coverType === 'cover')?.remoteUrl
-            || bookData.remotePoster;
-        if (posterUrl) {
+        const author = book.author;
+        if (author) {
+            const el = card.querySelector('.book-author');
+            if (el) el.textContent = author;
+        }
+
+        const coverUrl = book.cover_url;
+        if (coverUrl) {
             const placeholder = card.querySelector('.book-thumb-placeholder');
             if (placeholder) {
                 const img = document.createElement('img');
-                img.src = posterUrl;
+                img.src       = coverUrl;
                 img.className = 'book-thumb';
-                img.alt = bookData.title || '';
-                img.onerror = function() { this.onerror = null; this.src = '/static/images/apple-touch-icon.png'; };
+                img.alt       = title || '';
+                img.onerror   = () => { img.onerror = null; img.src = '/static/images/apple-touch-icon.png'; };
                 placeholder.replaceWith(img);
-            } else {
-                const existingImg = card.querySelector('.book-thumb');
-                if (existingImg && (!existingImg.complete || existingImg.naturalHeight === 0)) {
-                    existingImg.src = posterUrl;
-                }
             }
+        }
+
+        if (book.source) {
+            card.dataset.source = book.source;
+        }
+
+        if (book.id) {
+            card.dataset.dbId = book.id;
+            // Update Read button href to use local route
+            const readBtn = card.querySelector('a.btn-outline-success');
+            if (readBtn) readBtn.href = `/read/local/${book.id}`;
+        }
+
+        // Replace "enriching…" pill with final source pill
+        const pill = card.querySelector('.source-pill');
+        if (pill) {
+            pill.classList.remove('enriching', 'needs-manual');
+            pill.innerHTML = book.source || 'local';
+        }
+
+        // Hide the Import button once we have real metadata
+        const src = book.source || '';
+        if (!['file', 'filename', 'unknown'].includes(src)) {
+            const importBtn = card.querySelector('.import-btn');
+            if (importBtn) importBtn.style.display = 'none';
+        }
+
+        // Update meta line
+        const metaEl = card.querySelector('.book-meta');
+        if (metaEl) {
+            const parts = [];
+            if (book.year)  parts.push(book.year);
+            if (book.pages) parts.push(`${book.pages} pages`);
+            const ext = card.querySelector('.book-meta .text-uppercase');
+            const extText = ext ? ext.outerHTML : '';
+            metaEl.innerHTML = parts.join(' · ') + (parts.length ? ' ' : '') + extText;
         }
     }
 
-    // ── Bookmark badges ──────────────────────────────────────────────────────
-    // Reads localStorage for epub_bm_{internalId}. If set, prepends a gold
-    // 🔖 badge (with page number when available) to each bookmarked card.
+    // ── Bookmark badges ───────────────────────────────────────────────────────
     function applyBookmarkBadges() {
-        // ── Card list ────────────────────────────────────────────────────────
         document.querySelectorAll('.book-item[data-internal-id]').forEach(card => {
             const internalId    = card.dataset.internalId;
             const bmKey         = `epub_bm_${internalId}`;
@@ -242,9 +385,9 @@
             badge.className     = 'bm-badge badge';
             badge.style.cssText = 'background:#f39c12;color:#000;font-size:0.7rem;cursor:default;';
             if (pageInfo) {
-                const [pg, total] = pageInfo.split('/');
+                const [pg] = pageInfo.split('/');
                 badge.textContent = `🔖 p.${pg}`;
-                badge.title = `Bookmarked at page ${pg} of ${total}`;
+                badge.title = `Bookmarked at page ${pg}`;
             } else {
                 badge.textContent = '🔖';
                 badge.title = 'Bookmarked';
@@ -252,76 +395,84 @@
             if (!existingBadge) actionsDiv.prepend(badge);
         });
 
-        // ── Details modal (if open) ──────────────────────────────────────────
-        // If the modal is showing a book whose bookmark was just removed,
-        // pull the badge out of the modal too.
+        // Sweep open details modal
         const modalBtn = document.getElementById('bmRemoveBtn');
         if (modalBtn) {
             const bmId = modalBtn.dataset.bmId;
-            if (bmId && !localStorage.getItem(`epub_bm_${bmId}`)) {
-                modalBtn.remove();
-            }
+            if (bmId && !localStorage.getItem(`epub_bm_${bmId}`)) modalBtn.remove();
         }
     }
 
-    // ── First-load enrichment for cards still missing thumbnails ─────────────
-    // After the fast disk-cache pass, any card still showing a placeholder
-    // gets the full enrichment chain (cache → Apify → Readarr) via
-    // /get_media_details — the same call that fires when clicking a book.
-    // Processed in sequential batches of 20 to avoid hammering the server.
-    function enrichMissingBooks() {
-        const missing = [...document.querySelectorAll('.book-item[data-foreign-id]')]
-            .filter(card => {
-                if (bookDataCache.has(card.dataset.foreignId)) return false;
-                return card.querySelector('.book-thumb-placeholder') !== null;
-            });
-        if (!missing.length) return;
+    // ── Background enrichment ─────────────────────────────────────────────────
+    // For cards whose source is 'file', 'filename', or 'unknown', call the
+    // enrichment endpoint (Goodreads → Readarr) in background batches.
+    function enrichPendingBooks() {
+        const pending = [...document.querySelectorAll(
+            '.book-item[data-source="file"],' +
+            '.book-item[data-source="filename"],' +
+            '.book-item[data-source="unknown"]'
+        )];
+        if (!pending.length) return;
 
-        let batchStart = 0;
-        const BATCH = 20;
+        let i = 0;
+        const BATCH = 5;  // smaller batches — each call may hit Goodreads/Readarr
 
         function nextBatch() {
-            // Yield to detail view if one has been opened
             if (window._bg && window._bg.controller.signal.aborted) {
-                if (window._registerBgResume) window._registerBgResume(enrichMissingBooks);
+                if (window._registerBgResume) window._registerBgResume(enrichPendingBooks);
                 return;
             }
-
-            const slice = missing.slice(batchStart, batchStart + BATCH);
+            const slice = pending.slice(i, i + BATCH);
             if (!slice.length) return;
-            batchStart += BATCH;
+            i += BATCH;
 
-            const signal = window._bg ? window._bg.signal : undefined;
-            Promise.all(slice.map(card => {
-                const fid = card.dataset.foreignId;
-                return fetch(`/get_media_details?type=book&id=${fid}`, signal ? { signal } : {})
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data?.data) {
-                            bookDataCache.set(fid, data.data);
-                            patchBookCard(fid, data.data);
+            Promise.allSettled(slice.map(card => {
+                const fp     = card.dataset.filePath;
+                const title  = card.querySelector('.book-title')?.textContent?.trim() || '';
+                const author = card.querySelector('.book-author')?.textContent?.trim() || '';
+                return fetch('/api/books/enrich', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ file_path: fp, title, author }),
+                    signal:  window._bg ? window._bg.signal : undefined,
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'ok' && data.book) {
+                        patchBookCard(card, data.book);
+                    } else if (data.status === 'needs_manual') {
+                        // Keep the Import button; update pill
+                        const pill = card.querySelector('.source-pill');
+                        if (pill) {
+                            pill.classList.remove('enriching');
+                            pill.classList.add('needs-manual');
+                            pill.innerHTML = '<i class="fas fa-question-circle me-1"></i>no match';
                         }
-                    })
-                    .catch(err => { if (err.name === 'AbortError') throw err; });
+                    }
+                })
+                .catch(err => {
+                    if (err.name === 'AbortError') throw err;
+                    // Network/server error — leave the card as-is
+                });
             }))
-            .then(nextBatch)
-            .catch(err => {
-                if (err.name === 'AbortError') {
-                    // Re-queue from scratch — already-patched books are filtered
-                    // out by enrichMissingBooks() via bookDataCache.has() check
-                    if (window._registerBgResume) window._registerBgResume(enrichMissingBooks);
+            .then(results => {
+                // If any was aborted, re-queue
+                if (results.some(r => r.status === 'rejected' &&
+                        r.reason?.name === 'AbortError')) {
+                    if (window._registerBgResume) window._registerBgResume(enrichPendingBooks);
+                    return;
                 }
+                nextBatch();
             });
         }
 
         nextBatch();
     }
 
-    // ── A-Z quick navigation ─────────────────────────────────────────────────
+    // ── A-Z quick navigation ──────────────────────────────────────────────────
     function buildAzNav() {
         const letters = document.getElementById('azLetters');
         if (!letters) return;
-
         const used = new Set();
         document.querySelectorAll('.book-item[data-title]').forEach(item => {
             const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
@@ -329,7 +480,6 @@
             if (/[0-9]/.test(c)) used.add('0');
             else if (/[a-z]/i.test(c)) used.add(c.toLowerCase());
         });
-
         const chars = ['0', ...'abcdefghijklmnopqrstuvwxyz'];
         letters.innerHTML = chars.map(c => {
             const label  = c === '0' ? '0–9' : c.toUpperCase();
@@ -358,81 +508,161 @@
         }
     }
 
-    // ── Refresh bookmark badges when tab becomes active ──────────────────────
-    // DOMContentLoaded fires only once. If the user opens the reader in a new
-    // tab, sets a bookmark, then returns here, we need to re-read localStorage.
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) applyBookmarkBadges();
-    });
-    window.addEventListener('pageshow', applyBookmarkBadges); // bfcache restore
+    // ── Details modal ─────────────────────────────────────────────────────────
+    function openBookDetails(card) {
+        const foreignId  = card.dataset.foreignId;
+        const internalId = card.dataset.internalId || card.dataset.dbId;
+        if (foreignId) {
+            showManageDetails('book', foreignId, internalId);
+        } else {
+            // No Readarr foreign ID — show a simple detail panel from local data
+            const title    = card.querySelector('.book-title')?.textContent || '';
+            const author   = card.querySelector('.book-author')?.textContent || '';
+            const coverImg = card.querySelector('.book-thumb');
+            const coverUrl = coverImg ? coverImg.src : '';
+            const dbId     = card.dataset.dbId;
+            const readHref = dbId ? `/read/local/${dbId}` : null;
 
-    // ── Initialise ───────────────────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', function() {
-        applyBookmarkBadges();
-        buildAzNav();
+            document.getElementById('detailsModalLabel').textContent = title;
+            document.getElementById('detailsContent').innerHTML = `
+                <div class="d-flex gap-3">
+                    ${coverUrl ? `<img src="${coverUrl}" style="width:90px;border-radius:6px;" onerror="this.style.display='none'">` : ''}
+                    <div>
+                        <h5 class="text-white">${title}</h5>
+                        ${author ? `<p class="text-danger mb-1">${author}</p>` : ''}
+                        <p class="text-muted small">${card.dataset.filePath || ''}</p>
+                        ${readHref ? `<a href="${readHref}" target="_blank" class="btn btn-sm btn-outline-success me-2">
+                            <i class="fas fa-book-open me-1"></i>Read</a>` : ''}
+                        <button class="btn btn-sm btn-outline-warning"
+                                onclick="triggerImport(document.querySelector('.import-btn[data-file-path=\\'${(card.dataset.filePath||'').replace(/'/g, "\\'")}\\']') || { dataset:{ filePath:'${(card.dataset.filePath||'').replace(/'/g,"\\'")}' } }); bootstrap.Modal.getInstance(document.getElementById('detailsModal'))?.hide();">
+                            <i class="fas fa-file-import me-1"></i>Import metadata
+                        </button>
+                    </div>
+                </div>`;
+            new bootstrap.Modal(document.getElementById('detailsModal')).show();
+        }
+    }
 
-        const ids = [...document.querySelectorAll('.book-item[data-foreign-id]')]
-            .map(el => el.dataset.foreignId).filter(Boolean);
-        if (!ids.length) return;
+    // ── Manual import ─────────────────────────────────────────────────────────
+    let _importCard = null;  // reference to the card being imported
 
-        // Pass 1 — fast disk-cache reads (milliseconds, no HTTP calls)
-        fetch('/api/book/metadata-cache?ids=' + ids.join(','))
-            .then(r => r.json())
-            .then(data => {
-                Object.entries(data).forEach(([fid, bookData]) => {
-                    bookDataCache.set(fid, bookData);
-                    patchBookCard(fid, bookData);
-                });
-                // Pass 2 — full enrichment for anything still missing a thumbnail
-                enrichMissingBooks();
-            })
-            .catch(() => enrichMissingBooks());
-    });
+    async function triggerImport(btn) {
+        const fp = btn.dataset ? btn.dataset.filePath : btn;
+        _importCard = document.querySelector(`.book-item[data-file-path="${CSS.escape ? CSS.escape(fp) : fp}"]`);
 
-    // ── Click handler ────────────────────────────────────────────────────────
-    function openBookDetails(foreignBookId, internalId) {
-        showManageDetails('book', foreignBookId, internalId);
+        // Clear form
+        document.getElementById('importFilePath').value  = fp;
+        document.getElementById('importFileLabel').textContent = fp.split(/[\\/]/).pop();
+        document.getElementById('importTitle').value    = '';
+        document.getElementById('importAuthor').value   = '';
+        document.getElementById('importYear').value     = '';
+        document.getElementById('importPages').value    = '';
+        document.getElementById('importIsbn').value     = '';
+        document.getElementById('importOverview').value = '';
+        document.getElementById('importCoverUrl').value = '';
+        document.getElementById('importCoverPreview').style.display = 'none';
+        document.getElementById('importError').style.display = 'none';
 
-        const cached = bookDataCache.get(foreignBookId);
-        if (cached) {
-            patchBookCard(foreignBookId, cached);
+        // Pre-populate from file metadata
+        try {
+            const r    = await fetch(`/api/books/file-metadata?path=${encodeURIComponent(fp)}`);
+            const meta = await r.json();
+            if (!r.ok) throw new Error(meta.error || 'Server error');
+
+            if (meta.title)    document.getElementById('importTitle').value    = meta.title;
+            if (meta.author)   document.getElementById('importAuthor').value   = meta.author;
+            if (meta.year)     document.getElementById('importYear').value     = meta.year;
+            if (meta.pages)    document.getElementById('importPages').value    = meta.pages;
+            if (meta.isbn)     document.getElementById('importIsbn').value     = meta.isbn;
+            if (meta.overview) document.getElementById('importOverview').value = meta.overview;
+        } catch (e) {
+            // Non-fatal — user can fill in manually
+            console.warn('[import] file-metadata fetch failed:', e);
+        }
+
+        new bootstrap.Modal(document.getElementById('importModal')).show();
+    }
+
+    function previewCover(url) {
+        const img = document.getElementById('importCoverPreview');
+        if (url) {
+            img.src   = url;
+            img.style.display = 'block';
+        } else {
+            img.style.display = 'none';
+        }
+    }
+
+    async function saveImport() {
+        const fp = document.getElementById('importFilePath').value;
+        if (!fp) return;
+
+        const title = document.getElementById('importTitle').value.trim();
+        if (!title) {
+            const errEl = document.getElementById('importError');
+            errEl.textContent = 'Title is required.';
+            errEl.style.display = 'block';
             return;
         }
 
-        fetch(`/get_media_details?type=book&id=${foreignBookId}`)
-            .then(r => r.json())
-            .then(data => {
-                if (data?.data) {
-                    bookDataCache.set(foreignBookId, data.data);
-                    patchBookCard(foreignBookId, data.data);
-                }
-            })
-            .catch(() => {});
+        const btn = document.getElementById('importSaveBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+
+        const payload = {
+            file_path: fp,
+            title,
+            author:    document.getElementById('importAuthor').value.trim() || null,
+            year:      parseInt(document.getElementById('importYear').value)  || null,
+            pages:     parseInt(document.getElementById('importPages').value) || null,
+            isbn:      document.getElementById('importIsbn').value.trim()     || null,
+            overview:  document.getElementById('importOverview').value.trim() || null,
+            cover_url: document.getElementById('importCoverUrl').value.trim() || null,
+            source:    'manual',
+        };
+
+        try {
+            const r    = await fetch('/api/books/save-metadata', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(payload),
+            });
+            const data = await r.json();
+            if (!r.ok || !data.success) throw new Error(data.error || 'Save failed');
+
+            // Update the card
+            if (_importCard) patchBookCard(_importCard, data.book);
+
+            bootstrap.Modal.getInstance(document.getElementById('importModal'))?.hide();
+        } catch (e) {
+            const errEl = document.getElementById('importError');
+            errEl.textContent = e.message;
+            errEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save me-1"></i>Save to Library';
+        }
     }
 
-    function deleteBook(foreignBookId, internalId, btn) {
-        if (!confirm('Remove this book from your library? (files will NOT be deleted)')) return;
-        const orig = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        fetch(`/api/book/${internalId}`, { method: 'DELETE' })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    bookDataCache.delete(foreignBookId);
-                    btn.closest('.book-item').remove();
-                } else {
-                    alert('Failed: ' + (data.message || 'unknown error'));
-                    btn.disabled = false;
-                    btn.innerHTML = orig;
-                }
-            })
-            .catch(err => {
-                alert('Error: ' + err.message);
-                btn.disabled = false;
-                btn.innerHTML = orig;
-            });
-    }
+    // ── Bookmark sync across tabs ─────────────────────────────────────────────
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) applyBookmarkBadges();
+    });
+    window.addEventListener('pageshow', applyBookmarkBadges);
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+        applyBookmarkBadges();
+        buildAzNav();
+        // Kick off background enrichment for books without full metadata
+        setTimeout(enrichPendingBooks, 200);
+
+        // Back-to-top visibility
+        window.addEventListener('scroll', function() {
+            document.getElementById('backToTop')
+                    .classList.toggle('show', window.pageYOffset > 200);
+        });
+    });
     </script>
 </body>
 </html>

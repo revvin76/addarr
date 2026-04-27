@@ -4,104 +4,119 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Books - Addarr</title>
-    <!--
-        kindle.html — Kindle/Silk browser optimised book library view.
-        Redirected to from /kindle when a Kindle User-Agent is detected.
-        Designed for:
-          - Kindle Silk browser (Fire tablets)
-          - Kindle e-ink browsers (basic Kindle devices)
-          - Low-bandwidth connections
-          - Large tap targets (finger navigation, no hover)
-          - High contrast, no animations, no shadows
-    -->
     <style>
-        /* ── Reset & base ─────────────────────────────────────────────────── */
+        /* ── Reset ────────────────────────────────────────────────────────── */
         *, *::before, *::after {
             box-sizing: border-box;
             margin: 0; padding: 0;
-            /* Kill all animations/transitions — they stutter on Silk */
             animation: none !important;
             transition: none !important;
         }
 
+        html {
+            /* overflow-y on html not body — Paperwhite browser scrolls html,
+               not body. Setting it on body alone causes no-scroll bugs.       */
+            overflow-y: auto;
+        }
+
         body {
-            font-family: Georgia, 'Times New Roman', serif;
-            font-size: 17px;
-            line-height: 1.6;
-            background: #f5f0e8;   /* warm off-white, easier on e-ink */
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.5;
+            background: #fff;
             color: #111;
-            padding: 0;
             -webkit-text-size-adjust: 100%;
+            /* NO overflow:hidden — that breaks native scroll on Silk         */
         }
 
         /* ── Header ───────────────────────────────────────────────────────── */
         header {
             background: #1a1a1a;
             color: #fff;
-            padding: 14px 16px;
+            padding: 12px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 3px solid #c0392b;
+            /* NOT position:fixed — fixed elements cause full-page repaints
+               on every scroll step on e-ink. Use static layout instead.      */
         }
         header h1 {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: bold;
-            letter-spacing: 0.02em;
             color: #fff;
-            font-family: Arial, sans-serif;
         }
         .header-count {
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             background: #c0392b;
             color: #fff;
-            padding: 2px 9px;
-            border-radius: 12px;
-            font-family: Arial, sans-serif;
+            padding: 2px 8px;
+            border-radius: 10px;
             white-space: nowrap;
         }
 
-        /* ── Search bar ───────────────────────────────────────────────────── */
+        /* ── Search ───────────────────────────────────────────────────────── */
         .search-bar {
-            padding: 10px 12px;
-            background: #e8e0d0;
+            padding: 8px 12px;
+            background: #f0f0f0;
             border-bottom: 1px solid #ccc;
             display: flex;
-            gap: 8px;
-            align-items: center;
+            gap: 6px;
         }
         .search-bar input {
             flex: 1;
-            font-size: 16px;
-            padding: 10px 12px;
+            font-size: 16px;   /* 16px prevents iOS/Silk auto-zoom on focus  */
+            padding: 9px 10px;
             border: 2px solid #888;
-            border-radius: 6px;
+            border-radius: 4px;
             background: #fff;
             color: #111;
-            /* Silk-safe: avoid outline flicker */
             outline: none;
             -webkit-appearance: none;
+            /* No :focus border-color change — causes repaint on e-ink        */
         }
-        .search-bar input:focus { border-color: #c0392b; }
-        .search-bar button {
-            font-size: 15px;
-            padding: 10px 16px;
-            border: 2px solid #888;
-            border-radius: 6px;
+        /* Search is triggered by button tap, not keystroke input event.
+           'input' event fires unreliably on Silk — button is reliable.       */
+        .search-btn {
+            font-size: 14px;
+            padding: 9px 14px;
+            border: 2px solid #555;
+            border-radius: 4px;
             background: #fff;
-            color: #555;
+            color: #111;
             cursor: pointer;
             min-height: 44px;
-            min-width: 44px;   /* minimum tap target */
+            min-width: 54px;
+            font-weight: bold;
         }
-        .search-bar button:active { background: #e0e0e0; }
+        .search-btn:active { background: #ddd; }
+        .search-btn.clear-btn {
+            min-width: 44px;
+            color: #c0392b;
+            border-color: #c0392b;
+        }
 
-        /* ── A-Z navigation ───────────────────────────────────────────────── */
-        .az-bar {
-            padding: 8px 12px;
-            background: #e8e0d0;
+        /* ── A-Z ──────────────────────────────────────────────────────────── */
+        .az-toggle-row {
+            padding: 6px 12px;
+            background: #f0f0f0;
             border-bottom: 1px solid #ccc;
-            display: none;   /* shown via JS */
+        }
+        .az-toggle {
+            font-size: 13px;
+            padding: 7px 14px;
+            border: 2px solid #555;
+            border-radius: 4px;
+            background: #fff;
+            color: #111;
+            cursor: pointer;
+            min-height: 40px;
+        }
+        .az-toggle:active { background: #ddd; }
+        .az-bar {
+            display: none;
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ccc;
         }
         .az-bar.open { display: block; }
         .az-grid {
@@ -110,140 +125,99 @@
             gap: 5px;
         }
         .az-btn {
-            padding: 7px 10px;
+            padding: 7px 9px;
             border: 1px solid #aaa;
-            border-radius: 4px;
+            border-radius: 3px;
             background: #fff;
             color: #333;
-            font-size: 0.8rem;
-            font-family: Arial, sans-serif;
+            font-size: 0.82rem;
             cursor: pointer;
-            min-height: 36px;
-            min-width: 36px;
+            min-height: 38px;
+            min-width: 38px;
             text-align: center;
+            /* These are real <button> elements, not onclick-in-innerHTML,
+               so addEventListener works reliably on Silk.                     */
         }
         .az-btn:active { background: #ddd; }
-        .az-btn[disabled] { opacity: 0.3; cursor: default; }
-        .az-toggle {
-            font-size: 14px;
-            padding: 8px 14px;
-            border: 2px solid #888;
-            border-radius: 6px;
-            background: #fff;
-            color: #333;
-            cursor: pointer;
-            margin: 8px 12px 0;
-            display: inline-block;
-            font-family: Arial, sans-serif;
-            min-height: 44px;
-        }
-        .az-toggle.az-active { border-color: #c0392b; color: #c0392b; }
+        .az-btn:disabled { opacity: 0.3; cursor: default; }
 
         /* ── Book list ────────────────────────────────────────────────────── */
-        #booksGrid {
-            padding: 0;
-        }
+        #booksGrid { padding: 0; }
 
         .book-item {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             align-items: flex-start;
-            padding: 14px 14px;
-            border-bottom: 1px solid #ccc;
+            padding: 12px 12px;
+            border-bottom: 1px solid #ddd;
             background: #fff;
             cursor: pointer;
-            /* No box-shadow — renders poorly on e-ink */
+            /* will-change:transform would force GPU layer — bad on e-ink.
+               Leave unpromoted so Silk uses its normal 2D painter.           */
         }
-        .book-item:nth-child(even) { background: #f9f5ee; }
-        .book-item:active { background: #e8e0d0; }
+        .book-item:nth-child(even) { background: #f8f8f8; }
+        .book-item:active { background: #e0e0e0; }
 
-        /* Cover image: small, left-aligned */
+        /* Thumbnails: proxied through Flask at 60×90 so Kindle doesn't
+           have to decode a full-resolution remote image over slow Wi-Fi.
+           The proxy route is /api/book/cover/<book_id>?w=60&h=90           */
         .book-thumb {
-            width: 56px;
-            height: 80px;
+            width: 60px;
+            height: 90px;
             object-fit: cover;
-            border-radius: 3px;
             flex-shrink: 0;
             border: 1px solid #ccc;
-            /* Degrade gracefully if image fails */
-            background: #ddd;
+            background: #eee;
+            /* No border-radius — rounded corners need anti-aliasing
+               which causes extra repaints on e-ink at scroll time.          */
         }
         .book-thumb-placeholder {
-            width: 56px;
-            height: 80px;
-            background: #ddd;
-            border-radius: 3px;
+            width: 60px;
+            height: 90px;
             flex-shrink: 0;
+            background: #e8e8e8;
             border: 1px solid #ccc;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
-            color: #999;
+            font-size: 1.4rem;
+            color: #aaa;
         }
 
         .book-info { flex: 1; min-width: 0; }
         .book-title {
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: bold;
             color: #111;
-            font-family: Arial, sans-serif;
-            /* Wrap on Kindle — no truncation */
             white-space: normal;
             word-break: break-word;
+            line-height: 1.35;
         }
         .book-author {
-            font-size: 0.82rem;
+            font-size: 0.8rem;
             color: #c0392b;
-            font-family: Arial, sans-serif;
-            margin-top: 2px;
+            margin-top: 3px;
         }
         .book-meta {
-            font-size: 0.75rem;
-            color: #666;
-            font-family: Arial, sans-serif;
+            font-size: 0.72rem;
+            color: #777;
+            margin-top: 3px;
+        }
+        .bm-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            background: #e8a000;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 3px;
             margin-top: 4px;
         }
 
-        /* ── Action buttons ───────────────────────────────────────────────── */
-        .book-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-            align-items: center;
-        }
-        .btn-read {
-            font-size: 14px;
-            padding: 9px 16px;
-            border: 2px solid #2a7a2a;
-            border-radius: 6px;
-            background: #fff;
-            color: #2a7a2a;
-            text-decoration: none;
-            font-family: Arial, sans-serif;
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-read:active { background: #e8f5e8; }
-
-        .bm-badge {
-            font-size: 0.72rem;
-            background: #f39c12;
-            color: #000;
-            padding: 3px 7px;
-            border-radius: 4px;
-            font-family: Arial, sans-serif;
-        }
-
-        /* ── Empty / no-results states ────────────────────────────────────── */
+        /* ── Empty states ─────────────────────────────────────────────────── */
         .empty-msg {
             padding: 40px 20px;
             text-align: center;
             color: #666;
-            font-family: Arial, sans-serif;
             font-size: 0.9rem;
         }
         #emptySearch {
@@ -251,434 +225,295 @@
             padding: 20px;
             text-align: center;
             color: #666;
-            font-family: Arial, sans-serif;
-            border-top: 1px solid #ccc;
+            border-top: 1px solid #ddd;
+            font-size: 0.85rem;
         }
 
         /* ── Back to top ──────────────────────────────────────────────────── */
-        #backToTop {
-            display: none;   /* hidden until JS shows it */
-            position: fixed;
-            bottom: 20px;
-            right: 16px;
-            background: #1a1a1a;
-            color: #fff;
-            border: none;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            font-size: 20px;
-            cursor: pointer;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            font-family: Arial, sans-serif;
+        /* Static block element at the bottom — NOT position:fixed.
+           Fixed elements trigger a full composited layer repaint on every
+           scroll event on e-ink, which is the primary cause of screen
+           tearing. A static link at the bottom of the list is simpler
+           and causes zero scroll-time repaints.                              */
+        #backToTopRow {
+            padding: 16px;
+            text-align: center;
+            border-top: 1px solid #ddd;
         }
-        #backToTop.visible { display: flex; }
-
-        /* ── Details panel (inline, no modal — modals are unreliable on Silk) */
-        #bookDetails {
-            display: none;
-            background: #fff;
-            border-top: 3px solid #c0392b;
-            border-bottom: 3px solid #c0392b;
-            padding: 16px 14px;
-        }
-        #bookDetails.open { display: block; }
-        #bookDetails h2 {
-            font-size: 1rem;
-            font-family: Arial, sans-serif;
-            margin-bottom: 6px;
-        }
-        #bookDetails p {
-            font-size: 0.85rem;
-            color: #444;
-            margin-bottom: 8px;
-        }
-        .details-close {
+        #backToTopBtn {
             font-size: 14px;
-            padding: 9px 16px;
-            border: 2px solid #888;
-            border-radius: 6px;
-            background: #f5f0e8;
-            color: #333;
+            padding: 10px 20px;
+            border: 2px solid #555;
+            border-radius: 4px;
+            background: #fff;
+            color: #111;
             cursor: pointer;
-            font-family: Arial, sans-serif;
             min-height: 44px;
-            margin-top: 10px;
         }
+        #backToTopBtn:active { background: #ddd; }
     </style>
 </head>
-
 <body>
 
     <!-- Header -->
     <header>
         <h1>&#128218; My Books</h1>
-        <span class="header-count">{{ total_downloaded }} downloaded</span>
+        <span class="header-count">{{ total_downloaded }} books</span>
     </header>
 
-    <!-- Search -->
+    <!-- Search — uses button tap, not input event, for Silk reliability -->
     <div class="search-bar">
-        <input type="text" id="bookSearch" placeholder="Search books or authors..."
-               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-        <button id="clearBookSearch" disabled aria-label="Clear search">&#10005;</button>
+        <input type="text" id="bookSearch"
+               placeholder="Title or author..."
+               autocomplete="off" autocorrect="off"
+               autocapitalize="off" spellcheck="false">
+        <button class="search-btn" id="doSearch">Search</button>
+        <button class="search-btn clear-btn" id="clearSearch" style="display:none">&#10005;</button>
     </div>
 
-    <!-- A-Z toggle + panel -->
-    <button class="az-toggle" id="azToggle" onclick="toggleAzNav()">A&#8211;Z</button>
-    <div class="az-bar" id="azLetters">
+    <!-- A-Z — buttons built as real DOM elements, not innerHTML strings -->
+    <div class="az-toggle-row">
+        <button class="az-toggle" id="azToggle">A&#8211;Z jump</button>
+    </div>
+    <div class="az-bar" id="azBar">
         <div class="az-grid" id="azGrid"></div>
-    </div>
-
-    <!-- Inline detail panel (replaces modal — Silk modal support is unreliable) -->
-    <div id="bookDetails">
-        <div id="bookDetailsBody"></div>
-        <button class="details-close" onclick="closeDetails()">&#8592; Back to list</button>
     </div>
 
     <!-- Book list -->
     {% if books %}
     <div id="booksGrid">
         {% for book in books %}
-        {% set poster_url = '' %}
-        {% for img in book.images %}
-            {% if img.coverType in ['poster', 'cover'] and poster_url == '' %}
-                {% set poster_url = img.remoteUrl or img.url %}
-            {% endif %}
-        {% endfor %}
-        {% set author_name = book.author.authorName if book.author else 'Unknown Author' %}
-        {% set size_mb = (book.statistics.sizeOnDisk / 1048576) | round(1) if book.statistics and book.statistics.sizeOnDisk else 0 %}
+        {#
+            New DB schema field names:
+              book.author     — plain string (was book.author.authorName)
+              book.year       — 4-digit string (was book.releaseDate[:4])
+              book.pages      — integer (was book.pageCount)
+              book.file_size  — bytes (was book.statistics.sizeOnDisk)
+              book.id         — local DB integer id
+        #}
+        {% set author_name = book.author if book.author else '' %}
+        {% set size_mb = (book.file_size / 1048576) | round(1) if book.file_size else 0 %}
 
         <div class="book-item"
-             data-title="{{ book.title|lower }}"
-             data-foreign-id="{{ book.foreignBookId }}"
-             data-internal-id="{{ book.id }}"
-             onclick="window.location.href='/read/{{ book.id }}'">
+             data-title="{{ book.title | lower }}"
+             data-author="{{ author_name | lower }}"
+             data-id="{{ book.id }}">
 
+            <img src="/api/book/cover/{{ book.id }}?w=60&h=90"
+                 class="book-thumb"
+                 alt="{{ book.title }}"
+                 onerror="this.onerror=null;this.outerHTML='<div class=\'book-thumb-placeholder\'>&#128218;</div>'">
 
-            <!-- Cover -->
-            {% if poster_url %}
-            <img src="{{ poster_url }}" class="book-thumb" alt="{{ book.title }}"
-                 onerror="this.onerror=null;this.src='/static/images/apple-touch-icon.png'">
-            {% else %}
-            <div class="book-thumb-placeholder">&#128218;</div>
-            {% endif %}
-
-            <!-- Info -->
             <div class="book-info">
-                <div class="book-title">{{ book.title }}</div>
+                <div class="book-title">{{ book.title or book.filename }}</div>
+                {% if author_name %}
                 <div class="book-author">{{ author_name }}</div>
+                {% endif %}
                 <div class="book-meta">
-                    {{ book.releaseDate[:4] if book.releaseDate else '' }}
-                    {% if book.pageCount %} &middot; {{ book.pageCount }}pp{% endif %}
-                    {% if size_mb %} &middot; {{ size_mb }}MB{% endif %}
+                    {% if book.year %}{{ book.year }}{% endif %}
+                    {% if book.pages %}&middot; {{ book.pages }}pp{% endif %}
+                    {% if size_mb %}&middot; {{ size_mb }}MB{% endif %}
                 </div>
+                <!-- Bookmark badge injected here by JS if a bookmark exists -->
             </div>
-
         </div>
         {% endfor %}
     </div>
     {% else %}
     <div class="empty-msg">
         <p>&#128218;</p>
-        <p>No downloaded books found.<br>Books appear here once they have been downloaded.</p>
+        <p style="margin-top:10px;">No downloaded books found.</p>
     </div>
     {% endif %}
 
     <div id="emptySearch">No books match your search.</div>
 
-    <!-- Back to top -->
-    <button id="backToTop" onclick="window.scrollTo(0,0)" aria-label="Back to top">&#8679;</button>
+    <!-- Static back-to-top — no position:fixed, no scroll listener needed -->
+    {% if books %}
+    <div id="backToTopRow">
+        <button id="backToTopBtn">&#8679; Back to top</button>
+    </div>
+    {% endif %}
 
     <script>
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function allItems() {
+        return Array.from(document.querySelectorAll('.book-item'));
+    }
+
     // ── Search ───────────────────────────────────────────────────────────────
-    const searchInput = document.getElementById('bookSearch');
-    const clearBtn    = document.getElementById('clearBookSearch');
-    const emptyMsg    = document.getElementById('emptySearch');
+    // Triggered by button tap only — not the 'input' event.
+    // Silk fires 'input' unreliably mid-keystroke and on soft keyboard
+    // show/hide. A dedicated Search button is the only reliable trigger.
 
-    searchInput.addEventListener('input', function() {
-        const term = this.value.trim().toLowerCase();
-        clearBtn.disabled = !term;
-        let anyVisible = false;
-        document.querySelectorAll('.book-item').forEach(item => {
-            const titleMatch  = item.dataset.title.includes(term);
-            const authorEl    = item.querySelector('.book-author');
-            const authorMatch = authorEl ? authorEl.textContent.toLowerCase().includes(term) : false;
-            const match = !term || titleMatch || authorMatch;
-            item.style.display = match ? '' : 'none';
-            if (match) anyVisible = true;
+    var searchActive = false;
+
+    function doSearch() {
+        var term = document.getElementById('bookSearch').value.trim().toLowerCase();
+        var clearBtn = document.getElementById('clearSearch');
+
+        if (!term) {
+            clearSearch();
+            return;
+        }
+
+        searchActive = true;
+        clearBtn.style.display = '';
+        var any = false;
+
+        allItems().forEach(function(item) {
+            var titleMatch  = (item.dataset.title  || '').indexOf(term) !== -1;
+            var authorMatch = (item.dataset.author || '').indexOf(term) !== -1;
+            var show = titleMatch || authorMatch;
+            item.style.display = show ? '' : 'none';
+            if (show) any = true;
         });
-        emptyMsg.style.display = anyVisible || !term ? 'none' : 'block';
+
+        document.getElementById('emptySearch').style.display = any ? 'none' : 'block';
+    }
+
+    function clearSearch() {
+        searchActive = false;
+        document.getElementById('bookSearch').value = '';
+        document.getElementById('clearSearch').style.display = 'none';
+        document.getElementById('emptySearch').style.display = 'none';
+        allItems().forEach(function(item) {
+            item.style.display = '';
+        });
+    }
+
+    document.getElementById('doSearch').addEventListener('click', doSearch);
+    document.getElementById('clearSearch').addEventListener('click', clearSearch);
+
+    // Allow Enter key on Silk keyboard to trigger search
+    document.getElementById('bookSearch').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) doSearch();
     });
 
-    clearBtn.addEventListener('click', function() {
-        searchInput.value = '';
-        this.disabled = true;
-        document.querySelectorAll('.book-item').forEach(i => i.style.display = '');
-        emptyMsg.style.display = 'none';
-    });
+    // ── A-Z ──────────────────────────────────────────────────────────────────
+    // All buttons are created as real DOM <button> elements with
+    // addEventListener — not as onclick= strings inside innerHTML,
+    // which Silk may block due to its CSP-style inline handler restrictions.
 
-    // ── Back to top ──────────────────────────────────────────────────────────
-    const backToTop = document.getElementById('backToTop');
-    window.addEventListener('scroll', function() {
-        backToTop.classList.toggle('visible', window.scrollY > 300);
-    });
-
-    // ── A-Z navigation ───────────────────────────────────────────────────────
     function buildAzNav() {
-        const grid = document.getElementById('azGrid');
+        var grid = document.getElementById('azGrid');
         if (!grid) return;
-        const used = new Set();
-        document.querySelectorAll('.book-item[data-title]').forEach(item => {
-            const t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
-            const c = t.charAt(0);
-            if (/[0-9]/.test(c)) used.add('0');
-            else if (/[a-z]/i.test(c)) used.add(c.toLowerCase());
+
+        // Collect which first-letters actually exist in the list
+        var used = {};
+        allItems().forEach(function(item) {
+            var t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
+            var c = t.charAt(0);
+            if (/[0-9]/.test(c))      used['0'] = true;
+            else if (/[a-z]/i.test(c)) used[c.toLowerCase()] = true;
         });
-        const chars = ['0', ...'abcdefghijklmnopqrstuvwxyz'];
-        grid.innerHTML = chars.map(c => {
-            const label  = c === '0' ? '0-9' : c.toUpperCase();
-            const active = used.has(c);
-            return `<button class="az-btn" ${active ? `onclick="scrollToLetter('${c}')"` : 'disabled'}>${label}</button>`;
-        }).join('');
+
+        var chars = ['0','a','b','c','d','e','f','g','h','i','j','k','l','m',
+                     'n','o','p','q','r','s','t','u','v','w','x','y','z'];
+
+        chars.forEach(function(c) {
+            var btn = document.createElement('button');
+            btn.className = 'az-btn';
+            btn.textContent = c === '0' ? '0-9' : c.toUpperCase();
+            if (used[c]) {
+                // Real addEventListener — works reliably on Silk
+                btn.addEventListener('click', function() { scrollToLetter(c); });
+            } else {
+                btn.disabled = true;
+            }
+            grid.appendChild(btn);
+        });
     }
 
-    function toggleAzNav() {
-        const bar = document.getElementById('azLetters');
-        const tog = document.getElementById('azToggle');
-        const isOpen = bar.classList.toggle('open');
-        tog.classList.toggle('az-active', isOpen);
-    }
+    document.getElementById('azToggle').addEventListener('click', function() {
+        var bar = document.getElementById('azBar');
+        var isOpen = bar.classList.toggle('open');
+        this.textContent = isOpen ? 'A\u2013Z \u25b2 close' : 'A\u2013Z jump';
+    });
 
     function scrollToLetter(letter) {
-        document.getElementById('azLetters').classList.remove('open');
-        document.getElementById('azToggle').classList.remove('az-active');
-        for (const item of document.querySelectorAll('.book-item[data-title]')) {
+        // Close the A-Z panel first
+        document.getElementById('azBar').classList.remove('open');
+        document.getElementById('azToggle').textContent = 'A\u2013Z jump';
+
+        var items = allItems();
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
             if (item.style.display === 'none') continue;
-            const t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
-            const c = t.charAt(0).toLowerCase();
-            const match = letter === '0' ? /[0-9]/.test(c) : c === letter;
+            var t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
+            var c = t.charAt(0).toLowerCase();
+            var match = (letter === '0') ? /[0-9]/.test(c) : (c === letter);
             if (match) {
-                item.scrollIntoView({ behavior: 'auto', block: 'start' }); // 'auto' not 'smooth' — Silk scrolls jank
+                // scrollIntoView with behavior:'auto' — 'smooth' stutters on e-ink
+                item.scrollIntoView({ behavior: 'auto', block: 'start' });
                 return;
             }
         }
-    }
-
-    // ── Client-side cache ────────────────────────────────────────────────────
-    const bookDataCache = new Map();
-
-    // ── Inline details panel (no modal — Silk Bootstrap modal is unreliable) ─
-    let currentOpenItem = null;
-
-    function openBookDetails(foreignBookId, internalId, itemEl) {
-        const panel = document.getElementById('bookDetails');
-        const body  = document.getElementById('bookDetailsBody');
-
-        // Close if tapping same item again
-        if (currentOpenItem === itemEl && panel.classList.contains('open')) {
-            closeDetails();
-            return;
-        }
-        currentOpenItem = itemEl;
-
-        // Insert panel after the tapped item
-        itemEl.parentNode.insertBefore(panel, itemEl.nextSibling);
-        body.innerHTML = '<p>Loading...</p>';
-        panel.classList.add('open');
-
-        // Scroll panel into view (Silk-safe: behavior: auto)
-        panel.scrollIntoView({ behavior: 'auto', block: 'start' });
-
-        // Use cache if available
-        const cached = bookDataCache.get(foreignBookId);
-        if (cached) {
-            renderDetails(body, cached, internalId);
-            return;
-        }
-
-        fetch('/get_media_details?type=book&id=' + foreignBookId)
-            .then(r => r.json())
-            .then(data => {
-                if (data && data.data) {
-                    bookDataCache.set(foreignBookId, data.data);
-                    renderDetails(body, data.data, internalId);
-                } else {
-                    body.innerHTML = '<p>Details not available.</p>';
-                }
-            })
-            .catch(() => { body.innerHTML = '<p>Could not load details.</p>'; });
-    }
-
-    function renderDetails(container, book, internalId) {
-        const title    = book.title || 'Unknown Title';
-        const author   = book.authorName || book.author?.authorName || '';
-        const overview = book.overview || book.synopsis || '';
-        const year     = (book.releaseDate || '').slice(0, 4);
-        const pages    = book.pageCount ? book.pageCount + ' pages' : '';
-        const rating   = book.ratings?.value ? '&#9733; ' + book.ratings.value.toFixed(1) : '';
-        const fileCount = book.statistics?.bookFileCount || 0;
-
-        container.innerHTML = `
-            <h2>${title}</h2>
-            ${author ? `<p style="color:#c0392b;font-family:Arial,sans-serif;margin-bottom:6px;">${author}</p>` : ''}
-            ${[year, pages, rating].filter(Boolean).join(' &middot; ')
-                ? `<p style="font-size:0.8rem;color:#666;font-family:Arial,sans-serif;margin-bottom:10px;">${[year, pages, rating].filter(Boolean).join(' &middot; ')}</p>`
-                : ''}
-            ${overview ? `<p style="font-size:0.85rem;color:#333;font-family:Arial,sans-serif;">${overview}</p>` : ''}
-            ${fileCount ? `<a href="/read/${internalId}" class="btn-read" style="margin-top:12px;display:inline-flex;">&#128214; Open in reader</a>` : ''}
-        `;
-    }
-
-    function closeDetails() {
-        const panel = document.getElementById('bookDetails');
-        panel.classList.remove('open');
-        currentOpenItem = null;
-        // Move panel back to end of grid so it doesn't affect layout
-        const grid = document.getElementById('booksGrid');
-        if (grid) grid.appendChild(panel);
     }
 
     // ── Bookmark badges ──────────────────────────────────────────────────────
+    // Appended into .book-info, not .book-actions (which no longer exists)
+
     function applyBookmarkBadges() {
-        document.querySelectorAll('.book-item[data-internal-id]').forEach(card => {
-            const internalId    = card.dataset.internalId;
-            const bmKey         = 'epub_bm_' + internalId;
-            const actionsDiv    = card.querySelector('.book-actions');
-            const existingBadge = actionsDiv ? actionsDiv.querySelector('.bm-badge') : null;
+        allItems().forEach(function(card) {
+            var id    = card.dataset.id;
+            // reader_kindle.html stores bookmarks as epub_bm_local_<id>
+            // to match the book_id format used in the reader: 'local_123'
+            var bmKey = 'epub_bm_local_' + id;
+            var info  = card.querySelector('.book-info');
+            if (!info) return;
+
+            var existing = info.querySelector('.bm-badge');
+
             if (!localStorage.getItem(bmKey)) {
-                if (existingBadge) existingBadge.remove();
+                if (existing) existing.remove();
                 return;
             }
-            if (!actionsDiv) return;
-            const pageInfo = localStorage.getItem(bmKey + '_page') || '';
-            const badge = existingBadge || document.createElement('span');
+
+            var badge = existing || document.createElement('span');
             badge.className = 'bm-badge';
+            var pageInfo = localStorage.getItem(bmKey + '_page') || '';
             if (pageInfo) {
-                const parts = pageInfo.split('/');
+                var parts = pageInfo.split('/');
                 badge.textContent = '\uD83D\uDD16 p.' + parts[0];
-                badge.title = 'Bookmarked at page ' + parts[0] + ' of ' + (parts[1] || '?');
             } else {
-                badge.textContent = '\uD83D\uDD16';
-                badge.title = 'Bookmarked';
+                badge.textContent = '\uD83D\uDD16 Bookmarked';
             }
-            if (!existingBadge) actionsDiv.prepend(badge);
+            if (!existing) info.appendChild(badge);
         });
     }
 
-    // ── Card cover enrichment ────────────────────────────────────────────────
-    // Kindle connections can be slow — we load the disk cache first (fast),
-    // then only fire enrichment for books still missing a cover image.
-    function patchBookCard(foreignBookId, bookData) {
-        const card = document.querySelector('.book-item[data-foreign-id="' + foreignBookId + '"]');
-        if (!card || !bookData) return;
+    // ── Card tap → reader ────────────────────────────────────────────────────
+    // Attached via addEventListener rather than onclick="" attribute so it
+    // works cleanly alongside the search/clear buttons without conflict.
 
-        const authorName = bookData.authorName || bookData.author?.authorName;
-        if (authorName) {
-            const authorEl = card.querySelector('.book-author');
-            if (authorEl && (!authorEl.textContent.trim() || authorEl.textContent.trim() === 'Unknown Author')) {
-                authorEl.textContent = authorName;
-            }
-        }
+    document.getElementById('booksGrid') && document.getElementById('booksGrid')
+        .addEventListener('click', function(e) {
+            var item = e.target.closest('.book-item');
+            if (!item) return;
+            var id = item.dataset.id;
+            // Local DB books always use /read/local/<id>
+            // data-id is always a plain integer from the DB
+            if (id) window.location.href = '/read/local/' + id;
+        });
 
-        const posterUrl = bookData.posterUrl
-            || (bookData.images || []).find(i => i.coverType === 'poster' || i.coverType === 'cover')?.remoteUrl
-            || bookData.remotePoster;
-        if (posterUrl) {
-            const placeholder = card.querySelector('.book-thumb-placeholder');
-            if (placeholder) {
-                const img = document.createElement('img');
-                img.src = posterUrl;
-                img.className = 'book-thumb';
-                img.alt = bookData.title || '';
-                img.onerror = function() { this.onerror = null; this.src = '/static/images/apple-touch-icon.png'; };
-                placeholder.replaceWith(img);
-            }
-        }
-    }
-
-    function enrichMissingBooks() {
-        const missing = [...document.querySelectorAll('.book-item[data-foreign-id]')]
-            .filter(card => !bookDataCache.has(card.dataset.foreignId) && card.querySelector('.book-thumb-placeholder'));
-        if (!missing.length) return;
-
-        // Smaller batches than desktop — Kindle connections are slower
-        const BATCH = 5;
-        let start = 0;
-
-        function nextBatch() {
-            const slice = missing.slice(start, start + BATCH);
-            if (!slice.length) return;
-            start += BATCH;
-            Promise.all(slice.map(card => {
-                const fid = card.dataset.foreignId;
-                return fetch('/get_media_details?type=book&id=' + fid)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data && data.data) {
-                            bookDataCache.set(fid, data.data);
-                            patchBookCard(fid, data.data);
-                        }
-                    })
-                    .catch(() => {});
-            })).then(() => {
-                // Small delay between batches — be polite on slow connections
-                setTimeout(nextBatch, 500);
-            });
-        }
-        nextBatch();
-    }
-
-    // ── Delete ───────────────────────────────────────────────────────────────
-    function deleteBook(foreignBookId, internalId, btn) {
-        if (!confirm('Remove this book from your library?\n(Files will NOT be deleted)')) return;
-        const orig = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '...';
-        fetch('/api/book/' + internalId, { method: 'DELETE' })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    bookDataCache.delete(foreignBookId);
-                    closeDetails();
-                    btn.closest('.book-item').remove();
-                } else {
-                    alert('Failed: ' + (data.message || 'unknown error'));
-                    btn.disabled = false;
-                    btn.innerHTML = orig;
-                }
-            })
-            .catch(err => {
-                alert('Error: ' + err.message);
-                btn.disabled = false;
-                btn.innerHTML = orig;
-            });
+    // ── Back to top ──────────────────────────────────────────────────────────
+    var bttBtn = document.getElementById('backToTopBtn');
+    if (bttBtn) {
+        bttBtn.addEventListener('click', function() {
+            // No smooth scroll — just jump
+            window.scrollTo(0, 0);
+        });
     }
 
     // ── Init ─────────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function() {
-        applyBookmarkBadges();
         buildAzNav();
-
-        const ids = [...document.querySelectorAll('.book-item[data-foreign-id]')]
-            .map(el => el.dataset.foreignId).filter(Boolean);
-        if (!ids.length) return;
-
-        // Pass 1: fast disk cache (no HTTP calls)
-        fetch('/api/book/metadata-cache?ids=' + ids.join(','))
-            .then(r => r.json())
-            .then(data => {
-                Object.entries(data).forEach(([fid, bookData]) => {
-                    bookDataCache.set(fid, bookData);
-                    patchBookCard(fid, bookData);
-                });
-                enrichMissingBooks();
-            })
-            .catch(() => enrichMissingBooks());
+        applyBookmarkBadges();
     });
 
-    document.addEventListener('visibilitychange', () => {
+    document.addEventListener('visibilitychange', function() {
         if (!document.hidden) applyBookmarkBadges();
     });
     window.addEventListener('pageshow', applyBookmarkBadges);
