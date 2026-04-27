@@ -32,7 +32,7 @@ def _connect():
 
 
 def init_db():
-    """Create the books table if it doesn't exist yet."""
+    """Create the books table if it doesn't exist yet, then migrate."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with _connect() as conn:
         conn.execute("""
@@ -50,10 +50,23 @@ def init_db():
                 foreign_book_id TEXT,
                 internal_id     INTEGER,
                 source          TEXT DEFAULT 'unknown',
+                genre           TEXT,
+                reading_status  TEXT DEFAULT 'not_started',
+                is_wishlist     INTEGER DEFAULT 0,
                 created_at      TEXT DEFAULT (datetime('now')),
                 updated_at      TEXT DEFAULT (datetime('now'))
             )
         """)
+        # ── Migrate existing databases — ADD COLUMN is idempotent via try/except ──
+        for col, defn in [
+            ('genre',          'TEXT'),
+            ('reading_status', "TEXT DEFAULT 'not_started'"),
+            ('is_wishlist',    'INTEGER DEFAULT 0'),
+        ]:
+            try:
+                conn.execute(f'ALTER TABLE books ADD COLUMN {col} {defn}')
+            except Exception:
+                pass  # column already exists — normal on re-run
         conn.commit()
     logging.debug("[books_db] DB initialised at %s", DB_PATH)
 

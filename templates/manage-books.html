@@ -29,6 +29,13 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        .book-genre {
+            font-size: 0.65rem;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .book-actions {
             display: flex;
             gap: 4px;
@@ -37,6 +44,18 @@
             margin-top: 6px;
         }
         .book-actions .btn { padding: 0.15rem 0.4rem; font-size: 0.7rem; }
+
+        /* Reading status badge on cards */
+        .reading-status-badge {
+            font-size: 0.6rem;
+            padding: 2px 5px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+        .rs-not_started { background: #2a2a2a; color: #888; }
+        .rs-reading     { background: #1a3a5a; color: #6ab4d9; }
+        .rs-complete    { background: #1a3a1a; color: #6ab759; }
+        .rs-dnf         { background: #3a1a1a; color: #c0392b; }
 
         /* Source pill shown on unenriched cards */
         .source-pill {
@@ -65,6 +84,13 @@
         #importModal .form-select   { background: #2a2a2a; color: #eee; border-color: #444; font-size: 0.85rem; }
         #importModal .form-control:focus { border-color: #c0392b; box-shadow: 0 0 0 .15rem rgba(192,57,43,.25); }
         #importCoverPreview { max-height: 120px; border-radius: 6px; display: none; }
+
+        /* ── Detail modal book-specific ── */
+        .book-detail-status-btn {
+            font-size: 0.78rem;
+            padding: 0.25rem 0.6rem;
+        }
+        .book-detail-status-btn.active-status { font-weight: 600; }
     </style>
     <script>
     // Sequential batch image loader — 20 at a time. Mirrors manage.html.
@@ -102,41 +128,51 @@
     <!-- ── Sticky controls header (matches manage.html layout) ── -->
     <div class="page-sticky-controls" id="stickyControls">
         <div class="container py-2">
-            <!-- Title + count + search row -->
+            <!-- Title + count + filter row -->
             <div class="row g-2 mb-2 align-items-center">
-                <div class="col-12 col-md-5">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="fas fa-book" style="color:#c0392b;"></i>
-                        <span class="fw-semibold" style="color:#c0392b; white-space:nowrap;">Manage Books</span>
-                        <span class="badge bg-secondary" title="Books found on disk" style="font-size:0.7rem;">
-                            {{ total_downloaded }}
-                        </span>
-                        {% if root_folder %}
-                        <small class="text-muted d-none d-md-inline text-truncate" title="{{ root_folder }}">
-                            <i class="fas fa-folder-open me-1"></i>{{ root_folder }}
-                        </small>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-12 col-md-7">
+                <div class="col-6">
                     <div class="input-group input-group-sm">
-                        <span class="btn btn-primary input-group-text">
+                        <button class="btn btn-primary btn-sm" type="button">
                             <i class="fas fa-search"></i>
-                        </span>
+                        </button>
                         <input type="text" id="bookSearch" class="form-control form-control-sm"
-                               placeholder="Search books…" autocomplete="off">
+                               placeholder="Search title, author, genre…" autocomplete="off">
                         <button type="button" class="btn btn-outline-danger btn-sm" id="clearBookSearch" disabled>
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                 </div>
+                <div class="col-6">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-primary btn-sm" type="button">
+                            <i class="fas fa-filter me-1"></i>
+                        </button>
+                        <select id="statusFilter" class="form-select form-select-sm">
+                            <option value="all">All Books</option>
+                            <option value="not_started">Not Started</option>
+                            <option value="reading">Reading</option>
+                            <option value="complete">Complete</option>
+                            <option value="dnf">Did Not Finish</option>
+                            <option value="wishlist">Wishlist ♥</option>
+                        </select>
+                    </div>
+                </div>
             </div>
-            <!-- A-Z + back-to-top row -->
+            <!-- A-Z + count + back-to-top row -->
             <div class="d-flex align-items-center gap-2">
                 <button class="btn btn-sm btn-outline-secondary flex-shrink-0" id="azToggle" onclick="toggleAzNav()">
                     <i class="fas fa-sort-alpha-down me-1"></i>A–Z
                 </button>
                 <div id="azLetters" class="flex-grow-1"></div>
+                <span class="badge bg-secondary flex-shrink-0" style="font-size:0.7rem;" title="Books on disk">
+                    {{ total_downloaded }}
+                    <i class="fas fa-book ms-1"></i>
+                </span>
+                {% if root_folder %}
+                <small class="text-muted d-none d-lg-inline text-truncate" title="{{ root_folder }}" style="max-width:200px;">
+                    <i class="fas fa-folder-open me-1"></i>{{ root_folder }}
+                </small>
+                {% endif %}
                 <button id="backToTop" class="btn btn-sm btn-outline-secondary btn-back-to-top"
                         title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
                     <i class="fas fa-chevron-up"></i>
@@ -150,8 +186,13 @@
         {% if books %}
         <div class="row" id="booksGrid">
             {% for book in books %}
+            {% set rs = book.reading_status or 'not_started' %}
             <div class="col-6 col-md-4 col-lg-12 mb-3 media-item book-item"
                  data-title="{{ (book.title or book.filename)|lower }}"
+                 data-author="{{ (book.author or '')|lower }}"
+                 data-genre="{{ (book.genre or '')|lower }}"
+                 data-reading-status="{{ rs }}"
+                 data-wishlist="{{ 1 if book.is_wishlist else 0 }}"
                  data-file-path="{{ book.file_path }}"
                  data-db-id="{{ book.id or '' }}"
                  data-source="{{ book.source or 'unknown' }}"
@@ -162,7 +203,11 @@
                 <div class="search-result-card manage-result-card h-100 book-card">
                     <!-- Poster -->
                     <div class="search-result-thumbnail-container">
+                        {% if book.id %}
+                        <img data-src="/api/book/cover/{{ book.id }}?w=174&h=261"
+                        {% else %}
                         <img data-src="{{ book.cover_url or '/static/images/apple-touch-icon.png' }}"
+                        {% endif %}
                              src="/static/images/placeholder.png"
                              class="search-result-thumbnail book-thumb"
                              alt="{{ book.title or book.filename }}"
@@ -171,9 +216,12 @@
                         <div class="watermark-icon position-absolute">
                             <i class="fas fa-book"></i>
                         </div>
+                        {% if book.is_wishlist %}
+                        <div class="position-absolute" style="top:4px;right:4px;font-size:0.9rem;">♥</div>
+                        {% endif %}
                     </div>
 
-                    <!-- Card content: title, author, meta, actions -->
+                    <!-- Card content: title, author, meta, genre -->
                     <div class="search-result-content">
                         <h6 class="text-white truncate book-title">{{ book.title or book.filename }}</h6>
                         <div class="book-author text-truncate">{{ book.author or '' }}</div>
@@ -181,12 +229,14 @@
                             <span>
                                 {% if book.year %}{{ book.year }}{% endif %}
                                 {% if book.pages %}{% if book.year %} · {% endif %}{{ book.pages }}p{% endif %}
-                                {% if book.file_size %}{% if book.year or book.pages %} · {% endif %}{{ (book.file_size / 1048576) | round(1) }} MB{% endif %}
                             </span>
                             <span class="ext-badge">{{ book.extension or '' }}</span>
                         </div>
+                        {% if book.genre %}
+                        <div class="book-genre mt-1">{{ book.genre | truncate(30, true, '…') }}</div>
+                        {% endif %}
                         <div class="book-actions" onclick="event.stopPropagation()">
-                            <!-- Read button: local DB id preferred, falls back to Readarr internal id -->
+                            <!-- Read button -->
                             {% if book.id %}
                             <a href="/read/local/{{ book.id }}" target="_blank"
                                class="btn btn-sm btn-outline-success">
@@ -198,6 +248,15 @@
                                 <i class="fas fa-book-open me-1"></i>Read
                             </a>
                             {% endif %}
+
+                            <!-- Reading status badge -->
+                            <span class="reading-status-badge rs-{{ rs }} book-rs-badge">
+                                {% if rs == 'not_started' %}Not Started
+                                {% elif rs == 'reading' %}Reading…
+                                {% elif rs == 'complete' %}✓ Complete
+                                {% elif rs == 'dnf' %}DNF
+                                {% endif %}
+                            </span>
 
                             <!-- Source indicator / import button -->
                             {% set src = book.source or 'unknown' %}
@@ -235,7 +294,7 @@
         </div>
     </div>
 
-    <!-- Details Modal -->
+    <!-- ── Details Modal ── -->
     <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-modal="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content bg-dark text-light">
@@ -248,7 +307,7 @@
         </div>
     </div>
 
-    <!-- Manual Import Modal -->
+    <!-- ── Manual Import Modal ── -->
     <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-modal="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
@@ -299,6 +358,11 @@
                                     <input type="text" class="form-control" id="importIsbn">
                                 </div>
                                 <div class="col-12">
+                                    <label class="form-label" for="importGenre">Genre</label>
+                                    <input type="text" class="form-control" id="importGenre"
+                                           placeholder="e.g. Fiction, Fantasy">
+                                </div>
+                                <div class="col-12">
                                     <label class="form-label" for="importOverview">Synopsis / Overview</label>
                                     <textarea class="form-control" id="importOverview" rows="4"></textarea>
                                 </div>
@@ -327,27 +391,43 @@
 
     <script>
     // ── Search / filter ──────────────────────────────────────────────────────
-    const searchInput = document.getElementById('bookSearch');
-    const clearBtn    = document.getElementById('clearBookSearch');
-    const emptyMsg    = document.getElementById('emptySearch');
+    const searchInput  = document.getElementById('bookSearch');
+    const clearBtn     = document.getElementById('clearBookSearch');
+    const statusFilter = document.getElementById('statusFilter');
+    const emptyMsg     = document.getElementById('emptySearch');
 
-    searchInput.addEventListener('input', function() {
-        const term = this.value.trim().toLowerCase();
+    function applyFilters() {
+        const term   = searchInput.value.trim().toLowerCase();
+        const status = statusFilter.value;
         clearBtn.disabled = !term;
         let anyVisible = false;
         document.querySelectorAll('.book-item').forEach(item => {
-            const match = !term || item.dataset.title.includes(term);
-            item.style.display = match ? '' : 'none';
-            if (match) anyVisible = true;
+            const titleMatch  = !term || (item.dataset.title  || '').includes(term);
+            const authorMatch = !term || (item.dataset.author || '').includes(term);
+            const genreMatch  = !term || (item.dataset.genre  || '').includes(term);
+            const textOk = titleMatch || authorMatch || genreMatch;
+
+            let statusOk = true;
+            if (status === 'wishlist') {
+                statusOk = item.dataset.wishlist === '1';
+            } else if (status !== 'all') {
+                statusOk = item.dataset.readingStatus === status;
+            }
+
+            const show = textOk && statusOk;
+            item.style.display = show ? '' : 'none';
+            if (show) anyVisible = true;
         });
         emptyMsg.style.display = anyVisible ? 'none' : 'block';
-    });
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+    statusFilter.addEventListener('change', applyFilters);
 
     clearBtn.addEventListener('click', function() {
         searchInput.value = '';
         this.disabled = true;
-        document.querySelectorAll('.book-item').forEach(i => i.style.display = '');
-        emptyMsg.style.display = 'none';
+        applyFilters();
     });
 
     // ── Card patch helper ─────────────────────────────────────────────────────
@@ -362,9 +442,29 @@
         }
 
         const author = book.author;
-        if (author) {
+        if (author !== undefined) {
             const el = card.querySelector('.book-author');
-            if (el) el.textContent = author;
+            if (el) el.textContent = author || '';
+            card.dataset.author = (author || '').toLowerCase();
+        }
+
+        if (book.genre !== undefined) {
+            card.dataset.genre = (book.genre || '').toLowerCase();
+            let genreEl = card.querySelector('.book-genre');
+            if (book.genre) {
+                if (!genreEl) {
+                    genreEl = document.createElement('div');
+                    genreEl.className = 'book-genre mt-1';
+                    const metaEl = card.querySelector('.book-meta');
+                    if (metaEl) metaEl.after(genreEl);
+                }
+                const truncated = book.genre.length > 30
+                    ? book.genre.substring(0, 30) + '…'
+                    : book.genre;
+                genreEl.textContent = truncated;
+            } else if (genreEl) {
+                genreEl.remove();
+            }
         }
 
         const coverUrl = book.cover_url;
@@ -376,13 +476,10 @@
             }
         }
 
-        if (book.source) {
-            card.dataset.source = book.source;
-        }
+        if (book.source) card.dataset.source = book.source;
 
         if (book.id) {
             card.dataset.dbId = book.id;
-            // Update Read button href to use local route
             const readBtn = card.querySelector('a.btn-outline-success');
             if (readBtn) readBtn.href = `/read/local/${book.id}`;
         }
@@ -394,7 +491,7 @@
             pill.innerHTML = book.source || 'local';
         }
 
-        // Hide the Import button once we have real metadata
+        // Hide Import button once we have real metadata
         const src = book.source || '';
         if (!['file', 'filename', 'unknown'].includes(src)) {
             const importBtn = card.querySelector('.import-btn');
@@ -409,6 +506,240 @@
             if (book.pages) parts.push(`${book.pages}p`);
             metaEl.textContent = parts.join(' · ');
         }
+
+        // Update reading status badge
+        if (book.reading_status) {
+            card.dataset.readingStatus = book.reading_status;
+            const badge = card.querySelector('.book-rs-badge');
+            if (badge) {
+                badge.className = `reading-status-badge rs-${book.reading_status} book-rs-badge`;
+                const labels = { not_started:'Not Started', reading:'Reading…', complete:'✓ Complete', dnf:'DNF' };
+                badge.textContent = labels[book.reading_status] || book.reading_status;
+            }
+        }
+    }
+
+    // ── Book detail modal ─────────────────────────────────────────────────────
+    function openBookDetails(card) {
+        const dbId = card.dataset.dbId;
+        if (!dbId) {
+            _openSimpleBookModal(card);
+            return;
+        }
+        document.getElementById('detailsModalLabel').textContent = 'Book Details';
+        document.getElementById('detailsContent').innerHTML = `
+            <div class="text-center my-4">
+                <div class="spinner-border" role="status"><span class="visually-hidden">Loading…</span></div>
+            </div>`;
+        new bootstrap.Modal(document.getElementById('detailsModal')).show();
+
+        fetch(`/api/books/local/${dbId}`)
+            .then(r => r.json())
+            .then(book => _renderBookDetailModal(book, card))
+            .catch(() => {
+                document.getElementById('detailsContent').innerHTML =
+                    '<div class="alert alert-danger">Failed to load book details.</div>';
+            });
+    }
+
+    function _renderBookDetailModal(book, card) {
+        document.getElementById('detailsModalLabel').textContent = book.title || 'Book Details';
+
+        const bmId   = book.id;
+        const bmCfi  = bmId ? localStorage.getItem(`epub_bm_local_${bmId}`) : null;
+        const bmPage = bmId ? localStorage.getItem(`epub_bm_local_${bmId}_page`) : null;
+        let bmBadge  = '';
+        if (bmCfi) {
+            const label = bmPage
+                ? (() => { const [pg, tot] = bmPage.split('/'); return `🔖 p.${pg} / ${tot}`; })()
+                : '🔖 Bookmarked';
+            bmBadge = `<button id="bmRemoveBtn" class="badge border-0 me-1"
+                data-bm-id="local_${bmId}"
+                style="background:#f39c12;color:#000;cursor:pointer;"
+                title="Bookmarked — click to remove"
+                onclick="(function(){
+                    localStorage.removeItem('epub_bm_local_${bmId}');
+                    localStorage.removeItem('epub_bm_local_${bmId}_page');
+                    document.getElementById('bmRemoveBtn').remove();
+                    if(typeof applyBookmarkBadges==='function') applyBookmarkBadges();
+                })()">
+                ${label}
+            </button>`;
+        }
+
+        const rs = book.reading_status || 'not_started';
+        const rsLabels = { not_started:'Not Started', reading:'Reading', complete:'Complete', dnf:'Did Not Finish' };
+        const statusBtns = ['not_started','reading','complete','dnf'].map(s => `
+            <button class="btn btn-sm book-detail-status-btn ${s === rs ? 'btn-primary active-status' : 'btn-outline-secondary'}"
+                    onclick="setBookStatus(${book.id}, '${s}', this)">
+                ${rsLabels[s]}
+            </button>`).join('');
+
+        const wishIcon = book.is_wishlist ? '♥' : '♡';
+        const wishLabel = book.is_wishlist ? 'In Wishlist' : 'Add to Wishlist';
+        const wishClass = book.is_wishlist ? 'btn-danger' : 'btn-outline-danger';
+
+        const coverSrc = book.id
+            ? `/api/book/cover/${book.id}?w=200&h=300`
+            : (book.cover_url || '/static/images/apple-touch-icon.png');
+
+        document.getElementById('detailsContent').innerHTML = `
+            <div class="row mb-3">
+                <div class="col-4 pe-0">
+                    <img src="${coverSrc}"
+                         class="img-fluid rounded w-100" style="max-width:160px;"
+                         alt="${book.title || ''}"
+                         onerror="this.src='/static/images/apple-touch-icon.png'">
+                </div>
+                <div class="col-8 ps-3">
+                    <h5 class="text-white mb-1">${book.title || 'Unknown Title'}</h5>
+                    ${book.author ? `<div class="text-danger mb-2" style="font-size:0.9rem;">${book.author}</div>` : ''}
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                        ${book.year ? `<span class="badge bg-secondary">${book.year}</span>` : ''}
+                        ${book.pages ? `<span class="badge bg-secondary">${book.pages} pages</span>` : ''}
+                        ${book.genre ? `<span class="badge bg-dark border border-secondary">${book.genre.split(',')[0].trim()}</span>` : ''}
+                        ${bmBadge}
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 mb-3">
+                        ${statusBtns}
+                    </div>
+                    <button class="btn btn-sm ${wishClass}" id="wishlistBtn"
+                            onclick="toggleWishlist(${book.id}, this)">
+                        ${wishIcon} ${wishLabel}
+                    </button>
+                </div>
+            </div>
+
+            ${book.genre ? `
+            <div class="card bg-dark border-secondary mb-3">
+                <div class="card-body py-2">
+                    <small class="text-muted me-2">GENRE</small>
+                    ${book.genre.split(',').map(g => `<span class="badge bg-dark border border-secondary me-1">${g.trim()}</span>`).join('')}
+                </div>
+            </div>` : ''}
+
+            ${book.overview ? `
+            <div class="card bg-dark border-secondary mb-3">
+                <div class="card-header py-1"><small class="text-muted">SYNOPSIS</small></div>
+                <div class="card-body py-2" style="font-size:0.88rem;">${book.overview}</div>
+            </div>` : ''}
+
+            <div class="card bg-dark border-secondary mb-3">
+                <div class="card-body py-2">
+                    <div class="row g-1" style="font-size:0.82rem;">
+                        ${book.isbn ? `<div class="col-4 text-muted">ISBN</div><div class="col-8">${book.isbn}</div>` : ''}
+                        ${book.file_size ? `<div class="col-4 text-muted">File size</div><div class="col-8">${(book.file_size/1048576).toFixed(1)} MB</div>` : ''}
+                        <div class="col-4 text-muted">Source</div>
+                        <div class="col-8"><code style="font-size:0.75rem;">${book.source || 'unknown'}</code></div>
+                        <div class="col-4 text-muted">Path</div>
+                        <div class="col-8 text-truncate" style="font-size:0.72rem;color:#888;" title="${book.file_path || ''}">${book.file_path || ''}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                ${book.id ? `<a href="/read/local/${book.id}" target="_blank" class="btn btn-success flex-fill">
+                    <i class="fas fa-book-open me-1"></i>Read
+                </a>` : ''}
+                <button class="btn btn-outline-warning flex-fill"
+                        onclick="triggerImport({dataset:{filePath:'${(book.file_path||'').replace(/'/g, "\\'")}'}});bootstrap.Modal.getInstance(document.getElementById('detailsModal'))?.hide();">
+                    <i class="fas fa-edit me-1"></i>Edit metadata
+                </button>
+            </div>
+        `;
+
+        // Keep a reference so status/wishlist updates can patch the card
+        document.getElementById('detailsModal')._bookCard = card;
+        document.getElementById('detailsModal')._bookId   = book.id;
+    }
+
+    function _openSimpleBookModal(card) {
+        const title    = card.querySelector('.book-title')?.textContent || '';
+        const author   = card.querySelector('.book-author')?.textContent || '';
+        const coverImg = card.querySelector('.book-thumb');
+        const coverUrl = coverImg ? coverImg.src : '';
+        const dbId     = card.dataset.dbId;
+        const readHref = dbId ? `/read/local/${dbId}` : null;
+
+        document.getElementById('detailsModalLabel').textContent = title;
+        document.getElementById('detailsContent').innerHTML = `
+            <div class="d-flex gap-3">
+                ${coverUrl ? `<img src="${coverUrl}" style="width:90px;border-radius:6px;" onerror="this.style.display='none'">` : ''}
+                <div>
+                    <h5 class="text-white">${title}</h5>
+                    ${author ? `<p class="text-danger mb-1">${author}</p>` : ''}
+                    <p class="text-muted small">${card.dataset.filePath || ''}</p>
+                    ${readHref ? `<a href="${readHref}" target="_blank" class="btn btn-sm btn-outline-success me-2">
+                        <i class="fas fa-book-open me-1"></i>Read</a>` : ''}
+                    <button class="btn btn-sm btn-outline-warning"
+                            onclick="triggerImport({dataset:{filePath:'${(card.dataset.filePath||'').replace(/'/g, "\\'")}'}});bootstrap.Modal.getInstance(document.getElementById('detailsModal'))?.hide();">
+                        <i class="fas fa-file-import me-1"></i>Import metadata
+                    </button>
+                </div>
+            </div>`;
+        new bootstrap.Modal(document.getElementById('detailsModal')).show();
+    }
+
+    // ── Reading status update ─────────────────────────────────────────────────
+    function setBookStatus(dbId, status, btn) {
+        fetch('/api/books/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ db_id: dbId, reading_status: status })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            // Update button group in modal
+            btn.closest('div').querySelectorAll('.book-detail-status-btn').forEach(b => {
+                b.classList.remove('btn-primary', 'btn-outline-secondary', 'active-status');
+                b.classList.add('btn-outline-secondary');
+            });
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-primary', 'active-status');
+            // Patch the card if still visible
+            const card = document.getElementById('detailsModal')._bookCard;
+            if (card) patchBookCard(card, data.book);
+        })
+        .catch(console.error);
+    }
+
+    // ── Wishlist toggle ───────────────────────────────────────────────────────
+    function toggleWishlist(dbId, btn) {
+        const current  = btn.dataset.wishlisted === '1';
+        const newState = current ? 0 : 1;
+        fetch('/api/books/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ db_id: dbId, is_wishlist: newState })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            const inList = !!data.book.is_wishlist;
+            btn.dataset.wishlisted = inList ? '1' : '0';
+            btn.className = `btn btn-sm ${inList ? 'btn-danger' : 'btn-outline-danger'}`;
+            btn.textContent = `${inList ? '♥' : '♡'} ${inList ? 'In Wishlist' : 'Add to Wishlist'}`;
+            // Patch card
+            const card = document.getElementById('detailsModal')._bookCard;
+            if (card) {
+                card.dataset.wishlist = inList ? '1' : '0';
+                let heart = card.querySelector('.position-absolute[style*="top:4px"]');
+                if (inList && !heart) {
+                    const thumb = card.querySelector('.search-result-thumbnail-container');
+                    if (thumb) {
+                        heart = document.createElement('div');
+                        heart.className = 'position-absolute';
+                        heart.style.cssText = 'top:4px;right:4px;font-size:0.9rem;';
+                        heart.textContent = '♥';
+                        thumb.appendChild(heart);
+                    }
+                } else if (!inList && heart) {
+                    heart.remove();
+                }
+            }
+        })
+        .catch(console.error);
     }
 
     // ── Bookmark badges ───────────────────────────────────────────────────────
@@ -439,18 +770,9 @@
             }
             if (!existingBadge) actionsDiv.prepend(badge);
         });
-
-        // Sweep open details modal
-        const modalBtn = document.getElementById('bmRemoveBtn');
-        if (modalBtn) {
-            const bmId = modalBtn.dataset.bmId;
-            if (bmId && !localStorage.getItem(`epub_bm_${bmId}`)) modalBtn.remove();
-        }
     }
 
     // ── Background enrichment ─────────────────────────────────────────────────
-    // For cards whose source is 'file', 'filename', or 'unknown', call the
-    // enrichment endpoint (Goodreads → Readarr) in background batches.
     function enrichPendingBooks() {
         const pending = [...document.querySelectorAll(
             '.book-item[data-source="file"],' +
@@ -460,7 +782,7 @@
         if (!pending.length) return;
 
         let i = 0;
-        const BATCH = 5;  // smaller batches — each call may hit Goodreads/Readarr
+        const BATCH = 5;
 
         function nextBatch() {
             if (window._bg && window._bg.controller.signal.aborted) {
@@ -486,7 +808,6 @@
                     if (data.status === 'ok' && data.book) {
                         patchBookCard(card, data.book);
                     } else if (data.status === 'needs_manual') {
-                        // Keep the Import button; update pill
                         const pill = card.querySelector('.source-pill');
                         if (pill) {
                             pill.classList.remove('enriching');
@@ -497,11 +818,9 @@
                 })
                 .catch(err => {
                     if (err.name === 'AbortError') throw err;
-                    // Network/server error — leave the card as-is
                 });
             }))
             .then(results => {
-                // If any was aborted, re-queue
                 if (results.some(r => r.status === 'rejected' &&
                         r.reason?.name === 'AbortError')) {
                     if (window._registerBgResume) window._registerBgResume(enrichPendingBooks);
@@ -520,7 +839,7 @@
         if (!letters) return;
         const used = new Set();
         document.querySelectorAll('.book-item[data-title]').forEach(item => {
-            const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
             const c = t.charAt(0);
             if (/[0-9]/.test(c)) used.add('0');
             else if (/[a-z]/i.test(c)) used.add(c.toLowerCase());
@@ -541,7 +860,7 @@
     function scrollToLetter(letter) {
         for (const item of document.querySelectorAll('.book-item[data-title]')) {
             if (item.style.display === 'none') continue;
-            const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
             const c = t.charAt(0).toLowerCase();
             const match = letter === '0' ? /[0-9]/.test(c) : c === letter;
             if (match) {
@@ -553,49 +872,13 @@
         }
     }
 
-    // ── Details modal ─────────────────────────────────────────────────────────
-    function openBookDetails(card) {
-        const foreignId  = card.dataset.foreignId;
-        const internalId = card.dataset.internalId || card.dataset.dbId;
-        if (foreignId) {
-            showManageDetails('book', foreignId, internalId);
-        } else {
-            // No Readarr foreign ID — show a simple detail panel from local data
-            const title    = card.querySelector('.book-title')?.textContent || '';
-            const author   = card.querySelector('.book-author')?.textContent || '';
-            const coverImg = card.querySelector('.book-thumb');
-            const coverUrl = coverImg ? coverImg.src : '';
-            const dbId     = card.dataset.dbId;
-            const readHref = dbId ? `/read/local/${dbId}` : null;
-
-            document.getElementById('detailsModalLabel').textContent = title;
-            document.getElementById('detailsContent').innerHTML = `
-                <div class="d-flex gap-3">
-                    ${coverUrl ? `<img src="${coverUrl}" style="width:90px;border-radius:6px;" onerror="this.style.display='none'">` : ''}
-                    <div>
-                        <h5 class="text-white">${title}</h5>
-                        ${author ? `<p class="text-danger mb-1">${author}</p>` : ''}
-                        <p class="text-muted small">${card.dataset.filePath || ''}</p>
-                        ${readHref ? `<a href="${readHref}" target="_blank" class="btn btn-sm btn-outline-success me-2">
-                            <i class="fas fa-book-open me-1"></i>Read</a>` : ''}
-                        <button class="btn btn-sm btn-outline-warning"
-                                onclick="triggerImport(document.querySelector('.import-btn[data-file-path=\\'${(card.dataset.filePath||'').replace(/'/g, "\\'")}\\']') || { dataset:{ filePath:'${(card.dataset.filePath||'').replace(/'/g,"\\'")}' } }); bootstrap.Modal.getInstance(document.getElementById('detailsModal'))?.hide();">
-                            <i class="fas fa-file-import me-1"></i>Import metadata
-                        </button>
-                    </div>
-                </div>`;
-            new bootstrap.Modal(document.getElementById('detailsModal')).show();
-        }
-    }
-
     // ── Manual import ─────────────────────────────────────────────────────────
-    let _importCard = null;  // reference to the card being imported
+    let _importCard = null;
 
     async function triggerImport(btn) {
         const fp = btn.dataset ? btn.dataset.filePath : btn;
         _importCard = document.querySelector(`.book-item[data-file-path="${CSS.escape ? CSS.escape(fp) : fp}"]`);
 
-        // Clear form
         document.getElementById('importFilePath').value  = fp;
         document.getElementById('importFileLabel').textContent = fp.split(/[\\/]/).pop();
         document.getElementById('importTitle').value    = '';
@@ -603,12 +886,12 @@
         document.getElementById('importYear').value     = '';
         document.getElementById('importPages').value    = '';
         document.getElementById('importIsbn').value     = '';
+        document.getElementById('importGenre').value    = '';
         document.getElementById('importOverview').value = '';
         document.getElementById('importCoverUrl').value = '';
         document.getElementById('importCoverPreview').style.display = 'none';
         document.getElementById('importError').style.display = 'none';
 
-        // Pre-populate from file metadata
         try {
             const r    = await fetch(`/api/books/file-metadata?path=${encodeURIComponent(fp)}`);
             const meta = await r.json();
@@ -619,9 +902,9 @@
             if (meta.year)     document.getElementById('importYear').value     = meta.year;
             if (meta.pages)    document.getElementById('importPages').value    = meta.pages;
             if (meta.isbn)     document.getElementById('importIsbn').value     = meta.isbn;
+            if (meta.genre)    document.getElementById('importGenre').value    = meta.genre;
             if (meta.overview) document.getElementById('importOverview').value = meta.overview;
         } catch (e) {
-            // Non-fatal — user can fill in manually
             console.warn('[import] file-metadata fetch failed:', e);
         }
 
@@ -630,12 +913,8 @@
 
     function previewCover(url) {
         const img = document.getElementById('importCoverPreview');
-        if (url) {
-            img.src   = url;
-            img.style.display = 'block';
-        } else {
-            img.style.display = 'none';
-        }
+        if (url) { img.src = url; img.style.display = 'block'; }
+        else       img.style.display = 'none';
     }
 
     async function saveImport() {
@@ -661,6 +940,7 @@
             year:      parseInt(document.getElementById('importYear').value)  || null,
             pages:     parseInt(document.getElementById('importPages').value) || null,
             isbn:      document.getElementById('importIsbn').value.trim()     || null,
+            genre:     document.getElementById('importGenre').value.trim()    || null,
             overview:  document.getElementById('importOverview').value.trim() || null,
             cover_url: document.getElementById('importCoverUrl').value.trim() || null,
             source:    'manual',
@@ -675,9 +955,7 @@
             const data = await r.json();
             if (!r.ok || !data.success) throw new Error(data.error || 'Save failed');
 
-            // Update the card
             if (_importCard) patchBookCard(_importCard, data.book);
-
             bootstrap.Modal.getInstance(document.getElementById('importModal'))?.hide();
         } catch (e) {
             const errEl = document.getElementById('importError');
@@ -695,7 +973,7 @@
     });
     window.addEventListener('pageshow', applyBookmarkBadges);
 
-    // ── Service worker (matches manage.html) ──────────────────────────────────
+    // ── Service worker ────────────────────────────────────────────────────────
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/static/sw.js')
@@ -709,10 +987,9 @@
         applyBookmarkBadges();
         buildAzNav();
         startProgressiveLoading();
-        // Kick off background enrichment for books without full metadata
+        applyFilters();
         setTimeout(enrichPendingBooks, 200);
 
-        // Back-to-top visibility
         window.addEventListener('scroll', function() {
             document.getElementById('backToTop')
                     .classList.toggle('show', window.pageYOffset > 200);

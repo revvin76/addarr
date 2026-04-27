@@ -1482,12 +1482,16 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                                 </div>
 
                                 <div class="mt-3">
-                                    <button class="btn ${alreadyAdded ? 'btn-success' : 'btn-primary'} w-100" 
-                                            id="modalAddButton"
-                                            onclick="${alreadyAdded ? '' : `addItemFromModal('${mediaType}', ${mediaId})`}"
-                                            ${alreadyAdded ? 'disabled' : ''}>
-                                        ${alreadyAdded ? '✓ Already in Library' : `Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}`}
-                                    </button>
+                                    ${alreadyAdded
+                                        ? `<a class="btn btn-success w-100" id="modalAddButton"
+                                                href="/manage?open=${encodeURIComponent(internalData.internal_id || internalData.id || mediaId)}&type=${mediaType}">
+                                               <i class="fas fa-external-link-alt me-1"></i>View in Library
+                                           </a>`
+                                        : `<button class="btn btn-primary w-100" id="modalAddButton"
+                                                onclick="addItemFromModal('${mediaType}', ${mediaId})">
+                                               Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}
+                                           </button>`
+                                    }
                                 </div>
                             </div>
                         </div>

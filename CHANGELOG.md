@@ -2,8 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.30] - 2026-04-27
+## [1.1.31] - 2026-04-27
 
+### Updated
+
+- MANAGE BOOKS Filter by keywords fixed
+- MANAGE BOOKS Results list needs to use the same template as the other pages (/manage, /search /trending) with the larger thumbnail
+- MANAGE BOOKS ShowDetails card for books now modelled on the /manage version, but tailored for books
+- TRENDING When opening details for something thats already in the library, add to sonarr/radarr button should be replaced with "View in library" 
+
+## [1.1.30] - 2026-04-27
 ### Fixed
 - **`ERR_CONTENT_LENGTH_MISMATCH` via Pinggy tunnel** — Pinggy's free/pro tunnel injects its own interstitial HTML into responses when the `X-Pinggy-No-Screen` header is absent from the *response*. The injected bytes cause the actual response body to exceed the `Content-Length` Flask declared, so Chrome reports the mismatch and the page is treated as truncated. The truncated page means `startProgressiveLoading()` never executes, which is why thumbnails also failed to load through the tunnel. Fixed by adding an `@app.after_request` handler in `app.py` that stamps `X-Pinggy-No-Screen: bypass` on every Flask response. The header is harmless on direct/LAN requests.
 

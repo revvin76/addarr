@@ -13,11 +13,7 @@
             transition: none !important;
         }
 
-        html {
-            /* overflow-y on html not body — Paperwhite browser scrolls html,
-               not body. Setting it on body alone causes no-scroll bugs.       */
-            overflow-y: auto;
-        }
+        html { overflow-y: auto; }
 
         body {
             font-family: Arial, sans-serif;
@@ -26,25 +22,18 @@
             background: #fff;
             color: #111;
             -webkit-text-size-adjust: 100%;
-            /* NO overflow:hidden — that breaks native scroll on Silk         */
         }
 
         /* ── Header ───────────────────────────────────────────────────────── */
         header {
             background: #1a1a1a;
             color: #fff;
-            padding: 12px 14px;
+            padding: 10px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            /* NOT position:fixed — fixed elements cause full-page repaints
-               on every scroll step on e-ink. Use static layout instead.      */
         }
-        header h1 {
-            font-size: 1rem;
-            font-weight: bold;
-            color: #fff;
-        }
+        header h1 { font-size: 1rem; font-weight: bold; color: #fff; }
         .header-count {
             font-size: 0.78rem;
             background: #c0392b;
@@ -64,7 +53,7 @@
         }
         .search-bar input {
             flex: 1;
-            font-size: 16px;   /* 16px prevents iOS/Silk auto-zoom on focus  */
+            font-size: 16px;
             padding: 9px 10px;
             border: 2px solid #888;
             border-radius: 4px;
@@ -72,10 +61,7 @@
             color: #111;
             outline: none;
             -webkit-appearance: none;
-            /* No :focus border-color change — causes repaint on e-ink        */
         }
-        /* Search is triggered by button tap, not keystroke input event.
-           'input' event fires unreliably on Silk — button is reliable.       */
         .search-btn {
             font-size: 14px;
             padding: 9px 14px;
@@ -92,6 +78,43 @@
         .search-btn.clear-btn {
             min-width: 44px;
             color: #c0392b;
+            border-color: #c0392b;
+        }
+
+        /* ── Filter strip ─────────────────────────────────────────────────── */
+        .filter-strip {
+            padding: 6px 12px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-label {
+            font-size: 0.75rem;
+            color: #555;
+            white-space: nowrap;
+        }
+        .filter-btn {
+            font-size: 0.72rem;
+            padding: 5px 10px;
+            border: 1px solid #aaa;
+            border-radius: 3px;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+            min-height: 34px;
+        }
+        .filter-btn:active { background: #ddd; }
+        .filter-btn.active {
+            background: #1a1a1a;
+            color: #fff;
+            border-color: #1a1a1a;
+        }
+        .filter-btn.active-wishlist {
+            background: #c0392b;
+            color: #fff;
             border-color: #c0392b;
         }
 
@@ -119,11 +142,7 @@
             border-bottom: 1px solid #ccc;
         }
         .az-bar.open { display: block; }
-        .az-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-        }
+        .az-grid { display: flex; flex-wrap: wrap; gap: 5px; }
         .az-btn {
             padding: 7px 9px;
             border: 1px solid #aaa;
@@ -135,8 +154,6 @@
             min-height: 38px;
             min-width: 38px;
             text-align: center;
-            /* These are real <button> elements, not onclick-in-innerHTML,
-               so addEventListener works reliably on Silk.                     */
         }
         .az-btn:active { background: #ddd; }
         .az-btn:disabled { opacity: 0.3; cursor: default; }
@@ -152,15 +169,10 @@
             border-bottom: 1px solid #ddd;
             background: #fff;
             cursor: pointer;
-            /* will-change:transform would force GPU layer — bad on e-ink.
-               Leave unpromoted so Silk uses its normal 2D painter.           */
         }
         .book-item:nth-child(even) { background: #f8f8f8; }
         .book-item:active { background: #e0e0e0; }
 
-        /* Thumbnails: proxied through Flask at 60×90 so Kindle doesn't
-           have to decode a full-resolution remote image over slow Wi-Fi.
-           The proxy route is /api/book/cover/<book_id>?w=60&h=90           */
         .book-thumb {
             width: 60px;
             height: 90px;
@@ -168,8 +180,6 @@
             flex-shrink: 0;
             border: 1px solid #ccc;
             background: #eee;
-            /* No border-radius — rounded corners need anti-aliasing
-               which causes extra repaints on e-ink at scroll time.          */
         }
         .book-thumb-placeholder {
             width: 60px;
@@ -203,6 +213,11 @@
             color: #777;
             margin-top: 3px;
         }
+        .book-genre {
+            font-size: 0.68rem;
+            color: #999;
+            margin-top: 2px;
+        }
         .bm-badge {
             display: inline-block;
             font-size: 0.7rem;
@@ -211,6 +226,28 @@
             padding: 2px 6px;
             border-radius: 3px;
             margin-top: 4px;
+        }
+
+        /* Reading status badge */
+        .rs-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-top: 4px;
+        }
+        .rs-not_started { background: #e8e8e8; color: #666; }
+        .rs-reading     { background: #d0e8f8; color: #1a5a8a; }
+        .rs-complete    { background: #d0f0d8; color: #1a6a30; }
+        .rs-dnf         { background: #f8d0d0; color: #8a1a1a; }
+
+        /* Heart / wishlist badge */
+        .heart-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            color: #c0392b;
+            margin-top: 4px;
+            margin-left: 4px;
         }
 
         /* ── Empty states ─────────────────────────────────────────────────── */
@@ -230,16 +267,7 @@
         }
 
         /* ── Back to top ──────────────────────────────────────────────────── */
-        /* Static block element at the bottom — NOT position:fixed.
-           Fixed elements trigger a full composited layer repaint on every
-           scroll event on e-ink, which is the primary cause of screen
-           tearing. A static link at the bottom of the list is simpler
-           and causes zero scroll-time repaints.                              */
-        #backToTopRow {
-            padding: 16px;
-            text-align: center;
-            border-top: 1px solid #ddd;
-        }
+        #backToTopRow { padding: 16px; text-align: center; border-top: 1px solid #ddd; }
         #backToTopBtn {
             font-size: 14px;
             padding: 10px 20px;
@@ -261,17 +289,28 @@
         <span class="header-count">{{ total_downloaded }} books</span>
     </header>
 
-    <!-- Search — uses button tap, not input event, for Silk reliability -->
+    <!-- Search -->
     <div class="search-bar">
         <input type="text" id="bookSearch"
-               placeholder="Title or author..."
+               placeholder="Title, author or genre…"
                autocomplete="off" autocorrect="off"
                autocapitalize="off" spellcheck="false">
         <button class="search-btn" id="doSearch">Search</button>
         <button class="search-btn clear-btn" id="clearSearch" style="display:none">&#10005;</button>
     </div>
 
-    <!-- A-Z — buttons built as real DOM elements, not innerHTML strings -->
+    <!-- Status filter strip -->
+    <div class="filter-strip">
+        <span class="filter-label">Filter:</span>
+        <button class="filter-btn active" data-filter="all"          id="fAll">All</button>
+        <button class="filter-btn"        data-filter="not_started"  id="fNotStarted">Not Started</button>
+        <button class="filter-btn"        data-filter="reading"      id="fReading">Reading</button>
+        <button class="filter-btn"        data-filter="complete"     id="fComplete">Complete</button>
+        <button class="filter-btn"        data-filter="dnf"          id="fDnf">DNF</button>
+        <button class="filter-btn"        data-filter="wishlist"     id="fWishlist">&#9825; Wishlist</button>
+    </div>
+
+    <!-- A-Z -->
     <div class="az-toggle-row">
         <button class="az-toggle" id="azToggle">A&#8211;Z jump</button>
     </div>
@@ -283,20 +322,14 @@
     {% if books %}
     <div id="booksGrid">
         {% for book in books %}
-        {#
-            New DB schema field names:
-              book.author     — plain string (was book.author.authorName)
-              book.year       — 4-digit string (was book.releaseDate[:4])
-              book.pages      — integer (was book.pageCount)
-              book.file_size  — bytes (was book.statistics.sizeOnDisk)
-              book.id         — local DB integer id
-        #}
-        {% set author_name = book.author if book.author else '' %}
-        {% set size_mb = (book.file_size / 1048576) | round(1) if book.file_size else 0 %}
-
+        {% set rs = book.reading_status or 'not_started' %}
+        {% set rs_label = {'not_started': '', 'reading': 'Reading…', 'complete': '✓ Done', 'dnf': 'DNF'} %}
         <div class="book-item"
              data-title="{{ book.title | lower }}"
-             data-author="{{ author_name | lower }}"
+             data-author="{{ (book.author or '') | lower }}"
+             data-genre="{{ (book.genre or '') | lower }}"
+             data-reading-status="{{ rs }}"
+             data-wishlist="{{ 1 if book.is_wishlist else 0 }}"
              data-id="{{ book.id }}">
 
             <img src="/api/book/cover/{{ book.id }}?w=60&h=90"
@@ -306,15 +339,25 @@
 
             <div class="book-info">
                 <div class="book-title">{{ book.title or book.filename }}</div>
-                {% if author_name %}
-                <div class="book-author">{{ author_name }}</div>
+                {% if book.author %}
+                <div class="book-author">{{ book.author }}</div>
                 {% endif %}
                 <div class="book-meta">
                     {% if book.year %}{{ book.year }}{% endif %}
                     {% if book.pages %}&middot; {{ book.pages }}pp{% endif %}
-                    {% if size_mb %}&middot; {{ size_mb }}MB{% endif %}
                 </div>
-                <!-- Bookmark badge injected here by JS if a bookmark exists -->
+                {% if book.genre %}
+                <div class="book-genre">{{ book.genre | truncate(40, true, '…') }}</div>
+                {% endif %}
+                <div>
+                    {% if rs != 'not_started' %}
+                    <span class="rs-badge rs-{{ rs }}">{{ rs_label.get(rs, rs) }}</span>
+                    {% endif %}
+                    {% if book.is_wishlist %}
+                    <span class="heart-badge">&#9829;</span>
+                    {% endif %}
+                    <!-- Bookmark badge injected here by JS if a bookmark exists -->
+                </div>
             </div>
         </div>
         {% endfor %}
@@ -328,7 +371,6 @@
 
     <div id="emptySearch">No books match your search.</div>
 
-    <!-- Static back-to-top — no position:fixed, no scroll listener needed -->
     {% if books %}
     <div id="backToTopRow">
         <button id="backToTopBtn">&#8679; Back to top</button>
@@ -337,35 +379,33 @@
 
     <script>
     // ── Helpers ──────────────────────────────────────────────────────────────
-
     function allItems() {
         return Array.from(document.querySelectorAll('.book-item'));
     }
 
-    // ── Search ───────────────────────────────────────────────────────────────
-    // Triggered by button tap only — not the 'input' event.
-    // Silk fires 'input' unreliably mid-keystroke and on soft keyboard
-    // show/hide. A dedicated Search button is the only reliable trigger.
-
+    // ── Active filter state ──────────────────────────────────────────────────
+    var activeFilter = 'all';
     var searchActive = false;
 
-    function doSearch() {
+    // ── Filter logic ─────────────────────────────────────────────────────────
+    function applyFilters() {
         var term = document.getElementById('bookSearch').value.trim().toLowerCase();
-        var clearBtn = document.getElementById('clearSearch');
-
-        if (!term) {
-            clearSearch();
-            return;
-        }
-
-        searchActive = true;
-        clearBtn.style.display = '';
-        var any = false;
+        var any  = false;
 
         allItems().forEach(function(item) {
-            var titleMatch  = (item.dataset.title  || '').indexOf(term) !== -1;
-            var authorMatch = (item.dataset.author || '').indexOf(term) !== -1;
-            var show = titleMatch || authorMatch;
+            var titleMatch  = !term || (item.dataset.title  || '').indexOf(term) !== -1;
+            var authorMatch = !term || (item.dataset.author || '').indexOf(term) !== -1;
+            var genreMatch  = !term || (item.dataset.genre  || '').indexOf(term) !== -1;
+            var textOk = titleMatch || authorMatch || genreMatch;
+
+            var statusOk = true;
+            if (activeFilter === 'wishlist') {
+                statusOk = item.dataset.wishlist === '1';
+            } else if (activeFilter !== 'all') {
+                statusOk = item.dataset.readingStatus === activeFilter;
+            }
+
+            var show = textOk && statusOk;
             item.style.display = show ? '' : 'none';
             if (show) any = true;
         });
@@ -373,34 +413,45 @@
         document.getElementById('emptySearch').style.display = any ? 'none' : 'block';
     }
 
+    // ── Search ───────────────────────────────────────────────────────────────
+    function doSearch() {
+        var term = document.getElementById('bookSearch').value.trim();
+        document.getElementById('clearSearch').style.display = term ? '' : 'none';
+        searchActive = !!term;
+        applyFilters();
+    }
+
     function clearSearch() {
         searchActive = false;
         document.getElementById('bookSearch').value = '';
         document.getElementById('clearSearch').style.display = 'none';
-        document.getElementById('emptySearch').style.display = 'none';
-        allItems().forEach(function(item) {
-            item.style.display = '';
-        });
+        applyFilters();
     }
 
     document.getElementById('doSearch').addEventListener('click', doSearch);
     document.getElementById('clearSearch').addEventListener('click', clearSearch);
-
-    // Allow Enter key on Silk keyboard to trigger search
     document.getElementById('bookSearch').addEventListener('keydown', function(e) {
         if (e.key === 'Enter' || e.keyCode === 13) doSearch();
     });
 
-    // ── A-Z ──────────────────────────────────────────────────────────────────
-    // All buttons are created as real DOM <button> elements with
-    // addEventListener — not as onclick= strings inside innerHTML,
-    // which Silk may block due to its CSP-style inline handler restrictions.
+    // ── Status filter buttons ─────────────────────────────────────────────────
+    document.querySelector('.filter-strip').addEventListener('click', function(e) {
+        var btn = e.target.closest('.filter-btn');
+        if (!btn) return;
+        activeFilter = btn.dataset.filter;
+        // Update button styles
+        document.querySelectorAll('.filter-btn').forEach(function(b) {
+            b.classList.remove('active', 'active-wishlist');
+        });
+        if (activeFilter === 'wishlist') btn.classList.add('active-wishlist');
+        else btn.classList.add('active');
+        applyFilters();
+    });
 
+    // ── A-Z ──────────────────────────────────────────────────────────────────
     function buildAzNav() {
         var grid = document.getElementById('azGrid');
         if (!grid) return;
-
-        // Collect which first-letters actually exist in the list
         var used = {};
         allItems().forEach(function(item) {
             var t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
@@ -408,35 +459,27 @@
             if (/[0-9]/.test(c))      used['0'] = true;
             else if (/[a-z]/i.test(c)) used[c.toLowerCase()] = true;
         });
-
         var chars = ['0','a','b','c','d','e','f','g','h','i','j','k','l','m',
                      'n','o','p','q','r','s','t','u','v','w','x','y','z'];
-
         chars.forEach(function(c) {
             var btn = document.createElement('button');
             btn.className = 'az-btn';
             btn.textContent = c === '0' ? '0-9' : c.toUpperCase();
-            if (used[c]) {
-                // Real addEventListener — works reliably on Silk
-                btn.addEventListener('click', function() { scrollToLetter(c); });
-            } else {
-                btn.disabled = true;
-            }
+            if (used[c]) btn.addEventListener('click', function() { scrollToLetter(c); });
+            else btn.disabled = true;
             grid.appendChild(btn);
         });
     }
 
     document.getElementById('azToggle').addEventListener('click', function() {
-        var bar = document.getElementById('azBar');
+        var bar    = document.getElementById('azBar');
         var isOpen = bar.classList.toggle('open');
-        this.textContent = isOpen ? 'A\u2013Z \u25b2 close' : 'A\u2013Z jump';
+        this.textContent = isOpen ? 'A–Z ▲ close' : 'A–Z jump';
     });
 
     function scrollToLetter(letter) {
-        // Close the A-Z panel first
         document.getElementById('azBar').classList.remove('open');
-        document.getElementById('azToggle').textContent = 'A\u2013Z jump';
-
+        document.getElementById('azToggle').textContent = 'A–Z jump';
         var items = allItems();
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
@@ -444,26 +487,18 @@
             var t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
             var c = t.charAt(0).toLowerCase();
             var match = (letter === '0') ? /[0-9]/.test(c) : (c === letter);
-            if (match) {
-                // scrollIntoView with behavior:'auto' — 'smooth' stutters on e-ink
-                item.scrollIntoView({ behavior: 'auto', block: 'start' });
-                return;
-            }
+            if (match) { item.scrollIntoView({ behavior: 'auto', block: 'start' }); return; }
         }
     }
 
     // ── Bookmark badges ──────────────────────────────────────────────────────
-    // Appended into .book-info, not .book-actions (which no longer exists)
-
     function applyBookmarkBadges() {
         allItems().forEach(function(card) {
             var id    = card.dataset.id;
-            // reader_kindle.html stores bookmarks as epub_bm_local_<id>
-            // to match the book_id format used in the reader: 'local_123'
             var bmKey = 'epub_bm_local_' + id;
             var info  = card.querySelector('.book-info');
             if (!info) return;
-
+            var badgeContainer = info.querySelector('.badge-row') || info.lastElementChild;
             var existing = info.querySelector('.bm-badge');
 
             if (!localStorage.getItem(bmKey)) {
@@ -476,41 +511,36 @@
             var pageInfo = localStorage.getItem(bmKey + '_page') || '';
             if (pageInfo) {
                 var parts = pageInfo.split('/');
-                badge.textContent = '\uD83D\uDD16 p.' + parts[0];
+                badge.textContent = '🔖 p.' + parts[0];
             } else {
-                badge.textContent = '\uD83D\uDD16 Bookmarked';
+                badge.textContent = '🔖 Bookmarked';
             }
-            if (!existing) info.appendChild(badge);
+            if (!existing) {
+                // Append after the status/heart badges row
+                var lastDiv = info.querySelector('.book-info > div:last-child') || info;
+                lastDiv.appendChild(badge);
+            }
         });
     }
 
     // ── Card tap → reader ────────────────────────────────────────────────────
-    // Attached via addEventListener rather than onclick="" attribute so it
-    // works cleanly alongside the search/clear buttons without conflict.
-
     document.getElementById('booksGrid') && document.getElementById('booksGrid')
         .addEventListener('click', function(e) {
             var item = e.target.closest('.book-item');
             if (!item) return;
             var id = item.dataset.id;
-            // Local DB books always use /read/local/<id>
-            // data-id is always a plain integer from the DB
             if (id) window.location.href = '/read/local/' + id;
         });
 
     // ── Back to top ──────────────────────────────────────────────────────────
     var bttBtn = document.getElementById('backToTopBtn');
-    if (bttBtn) {
-        bttBtn.addEventListener('click', function() {
-            // No smooth scroll — just jump
-            window.scrollTo(0, 0);
-        });
-    }
+    if (bttBtn) bttBtn.addEventListener('click', function() { window.scrollTo(0, 0); });
 
     // ── Init ─────────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function() {
         buildAzNav();
         applyBookmarkBadges();
+        applyFilters();
     });
 
     document.addEventListener('visibilitychange', function() {

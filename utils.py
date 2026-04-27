@@ -133,12 +133,20 @@ def extract_epub_metadata(file_path):
                             pass
                         break
 
+            # Genre from dc:subject (may have multiple elements)
+            genre_parts = []
+            for subj in opf.findall(f'.//{{{DC}}}subject'):
+                if subj.text and subj.text.strip():
+                    genre_parts.append(subj.text.strip())
+            genre = ', '.join(genre_parts) if genre_parts else None
+
             return {
                 'title':      title,
                 'author':     author,
                 'overview':   desc,
                 'year':       year,
                 'isbn':       isbn,
+                'genre':      genre,
                 'cover_data': cover_data,
                 'source':     'file',
             }

@@ -268,6 +268,25 @@
             document.getElementById('backToTop')
                     .classList.toggle('show', window.pageYOffset > 200);
         });
+
+        // ── Deep-link: /manage?open=<id>&type=<movie|tv> ─────────────────────
+        // Used by the "View in Library" button on trending/search detail modals.
+        const params   = new URLSearchParams(window.location.search);
+        const openId   = params.get('open');
+        const openType = params.get('type') || 'movie';
+        if (openId) {
+            const card = document.querySelector(`.media-item[data-id="${openId}"]`);
+            setTimeout(() => {
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const mtype = card.dataset.mediaType || openType;
+                    const iid   = card.dataset.internalId || card.dataset.dbId || '';
+                    showManageDetails(mtype, openId, parseInt(iid) || iid);
+                } else {
+                    showManageDetails(openType, openId, openId);
+                }
+            }, 400);
+        }
     });
     </script>
 

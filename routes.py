@@ -149,11 +149,11 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 fp = fs['file_path']
                 if fp in db_books:
                     rec = db_books[fp]
-                    # Backfill year/pages if the record was saved without them
-                    # (e.g. by the /kindle route which previously omitted them)
-                    if not rec.get('year') and not rec.get('pages'):
+                    # Backfill year/pages/genre if the record was saved without them
+                    missing = [k for k in ('year', 'pages', 'genre') if not rec.get(k)]
+                    if missing:
                         meta = extract_file_metadata(fp)
-                        upd = {k: meta.get(k) for k in ('year', 'pages') if meta.get(k)}
+                        upd = {k: meta.get(k) for k in missing if meta.get(k)}
                         if upd:
                             rec = books_db.save_book({'file_path': fp, **upd}) or rec
                 else:
@@ -169,6 +169,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                         'year':      meta.get('year'),
                         'pages':     meta.get('pages'),
                         'isbn':      meta.get('isbn'),
+                        'genre':     meta.get('genre'),
                         'source':    meta.get('source', 'filename'),
                     })
 
@@ -215,6 +216,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                         'author': meta.get('author'),
                         'year':   meta.get('year'),
                         'pages':  meta.get('pages'),
+                        'genre':  meta.get('genre'),
                         'source': meta.get('source', 'filename'),
                     })
                 merged.append({**fs, **(rec or {})})
@@ -940,6 +942,47 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             return jsonify({'success': True, 'book': book})
         except Exception as e:
             logging.error("[books/save-metadata] error: %s", e)
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/books/local/<int:db_id>')
+    @requires_auth
+    def books_get_local(db_id):
+        """Return a single book record from the local DB by integer id."""
+        book = books_db.get_book_by_id(db_id)
+        if not book:
+            return jsonify({'error': 'not found'}), 404
+        return jsonify(book)
+
+    @app.route('/api/books/update', methods=['POST'])
+    @requires_auth
+    def books_update():
+        """Patch reading_status or is_wishlist (or both) for a book.
+
+        Request JSON: { db_id: int, reading_status?: str, is_wishlist?: 0|1 }
+        reading_status values: 'not_started' | 'reading' | 'complete' | 'dnf'
+        """
+        data = request.get_json(force=True, silent=True) or {}
+        db_id = data.get('db_id')
+        if not db_id:
+            return jsonify({'error': 'db_id required'}), 400
+
+        book = books_db.get_book_by_id(int(db_id))
+        if not book:
+            return jsonify({'error': 'book not found'}), 404
+
+        update = {'file_path': book['file_path']}
+        VALID_STATUSES = {'not_started', 'reading', 'complete', 'dnf'}
+        if 'reading_status' in data:
+            if data['reading_status'] not in VALID_STATUSES:
+                return jsonify({'error': 'invalid reading_status'}), 400
+            update['reading_status'] = data['reading_status']
+        if 'is_wishlist' in data:
+            update['is_wishlist'] = 1 if data['is_wishlist'] else 0
+
+        try:
+            updated = books_db.save_book(update)
+            return jsonify({'success': True, 'book': updated})
+        except Exception as e:
             return jsonify({'error': str(e)}), 500
 
     # ── Reader route for local (non-Readarr) books ─────────────────────────────
