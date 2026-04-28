@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.33] - 2026-04-28
+
+### Added
+- **Kindle AZW3 library** — complete replacement of the epub.js Kindle reader with a native AZW3 download flow. At startup a daemon thread scans all books and calls Calibre's `ebook-convert` to produce a sibling `.azw3` file. Kindle's browser downloads the AZW3 (`application/vnd.amazon.ebook`) and auto-imports it — no in-browser rendering required.
+- **`ensure_azw3()` + `_find_ebook_convert()`** in `utils.py` — `_find_ebook_convert()` checks `shutil.which` first then a list of common Calibre Windows install paths (`C:\Program Files\Calibre2\`, etc.) so the tool is found even when Calibre is not in PATH. `ensure_azw3()` converts epub / mobi / pdf to AZW3 and returns a `(path, status)` tuple (`exists` / `converted` / `failed` / `skipped`).
+- **Background AZW3 scan** — `_background_azw3_scan()` daemon thread in `app.py` starts 8 s after startup, iterates every book in the root folder, and pre-converts files to AZW3 so the Kindle page is ready without waiting.
+- **`/kindle` library redesign** — 3-column cover-only poster grid (20 vh header with search input + Filters button + ☀/☾ dark-mode toggle; black bottom bar with white top edge; prev/next paging). Filter overlay exposes Genre, Year, Author, Title, and Size chips. Dark mode stored in `localStorage`; written in ES5 for Kindle WebKit 531.2 compatibility.
+- **`/kindle/book/<id>` detail page** (`kindle_book.html`) — cover, title, author, meta row (year, file size, pages), genre chips, synopsis. Shows **Send to Kindle** (`href` to AZW3 download) when an AZW3 exists, or a **Prepare for Kindle** button that triggers on-demand conversion via `POST /api/book/convert/<id>` XHR and swaps to the Send button on success.
+- **`GET /api/book/azw3/<id>`** — streams the `.azw3` file as `application/vnd.amazon.ebook` for Kindle auto-import.
+- **`POST /api/book/convert/<id>`** — on-demand synchronous AZW3 conversion; returns `{"success": true/false}`.
+- **"Refresh online" multi-result picker** — `POST /api/books/search-online/<id>` queries both Google Books (up to 8 results) and Readarr (up to 8 results) and returns the full list without saving anything. In the Edit Metadata modal, clicking **Refresh online** now shows a scrollable grid of cover cards (thumbnail, title, author, year, source badge). Clicking a card fills all form fields — title, author, year, pages, ISBN, genre, overview, cover URL — without saving; the user reviews and clicks Save to apply.
+- **"Clear Thumbnail Cache" button** — in the Settings → Readarr section of the navbar; calls `POST /api/books/covers/clear-cache` which deletes all `.jpg` files from the thumbnail cache directory and returns a count.
+
+### Fixed
+- **Calibre not in Windows PATH** — Kindle detail page showed "Preparing for Kindle… check back shortly" after Calibre was installed because `ebook-convert.exe` isn't added to PATH by the Calibre installer. Resolved via `_find_ebook_convert()` hardcoded path fallback.
+- **AZW3 files appearing as separate books in manage-books** — background conversion created `.azw3` siblings that `scan_books_folder` picked up as independent book entries with no useful metadata. Fixed by filtering manage-books to only list `.epub` / `.pdf` files; AZW3 companions are shown as a status line ("AZW3 ready" / "AZW3 not yet generated") on the card.
+- **Desktop reader 415 / error page for AZW3 entries** — clicking "Read" on an AZW3 book that had been inserted into the DB before the filter fix routed to `/read/local/<id>` which returned a 415-equivalent error. Fixed by redirecting non-epub/pdf extensions in `read_local_book()` to `kindle_book_detail` instead.
+- **manage-books Edit Metadata broken — `Unexpected end of input`** — two separate JS syntax errors: (1) `book.overview` inserted raw into a template literal; backtick characters in Google Books synopses closed the literal prematurely. Fixed by adding `escHtml()` which escapes `&`, `<`, `>`, `"`, and `` ` `` (→ `&#96;`) and applying it to all user-sourced strings in template literals. (2) `JSON.stringify(book.file_path)` in an `onclick="..."` attribute produced embedded double-quotes that broke the HTML attribute boundary. Fixed by moving data into `data-edit-fp` / `data-edit-id` attributes and using a named `openEditFromModal(btn)` function.
+- **Stale thumbnail showing wrong cover after cover_url update** — manage-books cards used `w=174&h=261` while the detail modal used `w=180&h=270`, resulting in different cache files; changing the URL via "Refresh online" busted the new-size cache but left the old-size file serving the stale image. Fixed by standardising cards on `w=180&h=270` and calling `_bust_thumb_cache()` whenever `cover_url` is saved to the DB.
+- **Random / wrong cover shown when no cover_url exists** — `book_cover()` had a Priority 3 Google Books fallback that fetched the top result for `intitle:<title>+inauthor:<author>` and persisted it, causing incorrect covers to appear on books with no cover URL in the DB. Removed; the route now returns 404 immediately when no cover is found, and the `onerror` handler on every `<img>` shows `/static/images/apple-touch-icon.png` instead.
+
+### Changed
+- **`refreshMetadata()` no longer auto-applies** — previously called `POST /api/books/refresh/<id>` which immediately picked the best match, saved it to the DB, and updated the card. Now calls the new `search-online` route and renders a picker grid; nothing is saved until the user explicitly clicks Save.
+- **Thumbnail cache size standardised** — all book cover `<img>` requests in manage-books now use `w=180&h=270` (was `w=174&h=261` on cards, `w=180&h=270` in modal) to share a single cache file per book.
+
 ## [1.1.32] - 2026-04-28
 
 ### Added

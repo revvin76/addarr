@@ -472,9 +472,9 @@ window.onerror = function(msg, src, line) {
     return true;
 };
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+<script src="/static/js/jszip.min.js"
         onerror="window._showReaderError('Failed to load JSZip library. Check your internet connection.')"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"
+<script src="/static/js/epub.min.js"
         onerror="window._showReaderError('Failed to load epub.js library. Check your internet connection.')"></script>
 <script>
 const bookId  = "{{ book_id }}";
@@ -558,7 +558,7 @@ function buildToc(items, depth = 0) {
             closeToc();
         };
         list.appendChild(el);
-        if (item.subitems?.length) buildToc(item.subitems, depth + 1);
+        if (item.subitems && item.subitems.length) buildToc(item.subitems, depth + 1);
     }
 }
 
@@ -580,8 +580,8 @@ function removeHighlight(cfi) {
 
 function isBookmarkOnPage(loc) {
     if (!bookmarkCfi || !loc) return false;
-    const start = loc.start?.cfi;
-    const end   = loc.end?.cfi || start;
+    const start = loc && loc.start ? loc.start.cfi : null;
+    const end   = (loc && loc.end ? loc.end.cfi : null) || start;
     if (!start) return false;
     const spineOf = c => { const m = c.match(/epubcfi\(([^!]+)!/); return m ? m[1] : ''; };
     if (spineOf(bookmarkCfi) !== spineOf(start)) return false;
@@ -601,8 +601,8 @@ function updateBookmarkBtn(loc) {
 }
 
 function toggleBookmark() {
-    const loc = rendition?.currentLocation?.();
-    const cfi = loc?.start?.cfi;
+    const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
+    const cfi = loc && loc.start ? loc.start.cfi : null;
     if (!cfi) return;
 
     if (bookmarkCfi && isBookmarkOnPage(loc)) {
@@ -653,7 +653,7 @@ function initEpub() {
 
     // Verify libraries loaded
     if (typeof ePub === 'undefined') {
-        window._showReaderError('epub.js did not load. Check your internet connection.');
+        window._showReaderError('epub.js did not load. The server may still be starting — try refreshing.');
         return;
     }
 

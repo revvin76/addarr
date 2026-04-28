@@ -30,6 +30,38 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     update_manager = update_manager
     is_kindle_request = kindle_detector or (lambda: False)
 
+    # ── Kindle / reader request+response logging ──────────────────────────────
+    _KINDLE_LOG_PREFIXES = ('/kindle', '/api/book/azw3/', '/api/book/cover/')
+
+    @app.before_request
+    def _log_kindle_request():
+        if not any(request.path.startswith(p) for p in _KINDLE_LOG_PREFIXES):
+            return
+        ua  = request.headers.get('User-Agent', '—')
+        logging.info(
+            '[KindleLog] ▶ %s %s | is_kindle=%s | IP=%s\n'
+            '            UA: %s\n'
+            '            Headers: %s',
+            request.method, request.path,
+            is_kindle_request(), request.remote_addr,
+            ua,
+            dict(request.headers),
+        )
+
+    @app.after_request
+    def _log_kindle_response(response):
+        if not any(request.path.startswith(p) for p in _KINDLE_LOG_PREFIXES):
+            return response
+        logging.info(
+            '[KindleLog] ◀ %s %s → %s | content-type=%s | content-length=%s',
+            request.method, request.path,
+            response.status_code,
+            response.content_type,
+            response.headers.get('Content-Length', '—'),
+        )
+        return response
+
+
     # Library status cache — two-tier: in-memory (60s) + disk (5 min)
     # Only status fields (hasFile, monitored, statistics) go stale.
     # Static metadata (posters, titles, etc.) is cached permanently elsewhere.
@@ -139,13 +171,26 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             # ── Scan filesystem ────────────────────────────────────────────────
             scanned = scan_books_folder(root_folder) if root_folder else []
 
+            # Separate AZW3 companion files from readable source files.
+            # AZW3s are created by our conversion pipeline and must not appear
+            # as independent entries in the browser-readable book list.
+            azw3_stems = set()
+            source_files = []
+            for b in scanned:
+                stem = os.path.splitext(b['file_path'])[0]
+                if b['extension'] == '.azw3':
+                    azw3_stems.add(stem)
+                elif b['extension'] in ('.epub', '.pdf'):
+                    source_files.append(b)
+                # mobi / cbz / cbr — not browser-readable, skip
+
             # ── Batch DB lookup ────────────────────────────────────────────────
-            paths    = [b['file_path'] for b in scanned]
+            paths    = [b['file_path'] for b in source_files]
             db_books = books_db.get_books_by_paths(paths)
 
             # ── Merge: for new files, create a minimal DB record immediately ──
             merged = []
-            for fs in scanned:
+            for fs in source_files:
                 fp = fs['file_path']
                 if fp in db_books:
                     rec = db_books[fp]
@@ -173,9 +218,12 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                         'source':    meta.get('source', 'filename'),
                     })
 
+                stem     = os.path.splitext(fp)[0]
+                has_azw3 = stem in azw3_stems
                 merged.append({
-                    **fs,            # file_path, filename, extension, file_size, rel_path
-                    **(rec or {}),   # DB fields override / supplement
+                    **fs,               # file_path, filename, extension, file_size, rel_path
+                    **(rec or {}),      # DB fields override / supplement
+                    'has_azw3': has_azw3,
                 })
 
             merged.sort(key=lambda b: (b.get('title') or b['filename']).lower())
@@ -196,15 +244,27 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @conditional_debug_log
     @requires_auth
     def kindle_books():
+        logging.info('[KindleLog] /kindle hit | UA=%s', request.headers.get('User-Agent', '—'))
         try:
             from utils import scan_books_folder, extract_file_metadata, _title_from_filename
             books_db.init_db()
             root_folder = CONFIG.readarr.root_folder if CONFIG.readarr.enabled else None
             scanned  = scan_books_folder(root_folder) if root_folder else []
-            paths    = [b['file_path'] for b in scanned]
+
+            # Separate AZW3 files from source files; note which stems have AZW3s
+            azw3_stems = set()
+            source_files = []
+            for b in scanned:
+                stem = os.path.splitext(b['file_path'])[0]
+                if b['extension'] == '.azw3':
+                    azw3_stems.add(stem)
+                else:
+                    source_files.append(b)
+
+            paths    = [b['file_path'] for b in source_files]
             db_books = books_db.get_books_by_paths(paths)
-            merged = []
-            for fs in scanned:
+            merged   = []
+            for fs in source_files:
                 fp = fs['file_path']
                 if fp in db_books:
                     rec = db_books[fp]
@@ -219,14 +279,99 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                         'genre':  meta.get('genre'),
                         'source': meta.get('source', 'filename'),
                     })
-                merged.append({**fs, **(rec or {})})
+                stem     = os.path.splitext(fp)[0]
+                has_azw3 = stem in azw3_stems
+                merged.append({**fs, **(rec or {}), 'has_azw3': has_azw3})
+
             merged.sort(key=lambda b: (b.get('title') or b['filename']).lower())
-            return render_template('kindle.html', books=merged,
-                                total_downloaded=len(merged), config=CONFIG._config)
+
+            # Collect filter option lists for the template
+            genres  = sorted(set(
+                g.strip()
+                for b in merged
+                for g in (b.get('genre') or '').split(',')
+                if g.strip()
+            ))
+            years   = sorted(set(
+                b.get('year') for b in merged if b.get('year')
+            ), reverse=True)
+
+            logging.info('[KindleLog] /kindle → kindle.html, %d books (%d with AZW3)',
+                         len(merged), sum(1 for b in merged if b['has_azw3']))
+            return render_template('kindle.html',
+                                   books=merged,
+                                   genres=genres,
+                                   years=years,
+                                   config=CONFIG._config)
         except Exception as e:
             logging.error(f"Kindle route error: {e}", exc_info=True)
             return render_template('error.html', error="Failed to load book library")
-            
+
+    @app.route('/kindle/book/<int:db_id>')
+    @requires_auth
+    def kindle_book_detail(db_id):
+        """Book detail page for the Kindle — cover, metadata, AZW3 download link."""
+        book = books_db.get_book_by_id(db_id)
+        if not book:
+            return render_template('error.html', error="Book not found"), 404
+        file_path = book.get('file_path', '')
+        azw3_path = os.path.splitext(file_path)[0] + '.azw3' if file_path else ''
+        has_azw3  = bool(azw3_path and os.path.isfile(azw3_path))
+        # If the source file itself is AZW3
+        if not has_azw3 and file_path and os.path.splitext(file_path)[1].lower() == '.azw3':
+            has_azw3 = os.path.isfile(file_path)
+        file_size = None
+        if file_path and os.path.isfile(file_path):
+            sz = os.path.getsize(file_path)
+            file_size = f"{sz / 1_048_576:.1f} MB"
+        return render_template('kindle_book.html',
+                               book=book,
+                               has_azw3=has_azw3,
+                               file_size=file_size,
+                               config=CONFIG._config)
+
+    @app.route('/api/book/azw3/<int:db_id>')
+    @requires_auth
+    def book_azw3(db_id):
+        """Serve the AZW3 file for a book so the Kindle can import it."""
+        book = books_db.get_book_by_id(db_id)
+        if not book or not book.get('file_path'):
+            return jsonify({'error': 'Not found'}), 404
+        file_path = book['file_path']
+        ext       = os.path.splitext(file_path)[1].lower()
+        # Prefer derived AZW3 alongside the source file
+        if ext != '.azw3':
+            azw3_path = os.path.splitext(file_path)[0] + '.azw3'
+        else:
+            azw3_path = file_path
+        if not os.path.isfile(azw3_path):
+            return jsonify({'error': 'AZW3 not ready yet — conversion in progress'}), 404
+        filename = os.path.basename(azw3_path)
+        logging.info('[KindleLog] /api/book/azw3/%d — serving %s (%d bytes)',
+                     db_id, azw3_path, os.path.getsize(azw3_path))
+        return send_file(
+            azw3_path,
+            mimetype='application/vnd.amazon.ebook',
+            as_attachment=True,
+            download_name=filename,
+        )
+
+    @app.route('/api/book/convert/<int:db_id>', methods=['POST'])
+    @requires_auth
+    def book_convert(db_id):
+        """Synchronously convert a single book to AZW3 and report the result."""
+        from utils import ensure_azw3
+        book = books_db.get_book_by_id(db_id)
+        if not book or not book.get('file_path'):
+            return jsonify({'success': False, 'error': 'Book not found'}), 404
+        file_path = book['file_path']
+        azw3_path, status = ensure_azw3(file_path)
+        if status in ('exists', 'converted'):
+            return jsonify({'success': True, 'status': status,
+                            'azw3_path': azw3_path})
+        return jsonify({'success': False, 'status': status,
+                        'error': 'Conversion failed — check server logs for details'})
+
     @app.route('/trending')
     @conditional_debug_log
     @requires_auth  
@@ -1064,6 +1209,21 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     _COVERS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                'metadata', 'covers')
 
+    @app.route('/api/books/covers/clear-cache', methods=['POST'])
+    @requires_auth
+    def clear_thumb_cache():
+        """Delete all cached thumbnail files so they regenerate on next request."""
+        import glob as _glob
+        deleted = 0
+        for f in _glob.glob(os.path.join(_THUMB_DIR, '*.jpg')):
+            try:
+                os.remove(f)
+                deleted += 1
+            except OSError:
+                pass
+        logging.info('[thumb_cache] Cleared %d cached thumbnail files', deleted)
+        return jsonify({'success': True, 'deleted': deleted})
+
     @app.route('/api/books/cover/<int:db_id>', methods=['DELETE'])
     @requires_auth
     def delete_book_cover(db_id):
@@ -1235,37 +1395,127 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
 
         return jsonify({'status': 'no_match', 'message': 'No matching book found online'})
 
+    @app.route('/api/books/search-online/<int:db_id>', methods=['POST'])
+    @requires_auth
+    def search_online_all(db_id):
+        """Return ALL search results from Google Books + Readarr for the user to pick from.
+
+        Response: { results: [ { source, title, author, year, pages, cover_url,
+                                  overview, genres, isbn, foreign_book_id } ] }
+        """
+        book = books_db.get_book_by_id(db_id)
+        if not book:
+            return jsonify({'error': 'not found'}), 404
+
+        req_data = request.get_json(force=True, silent=True) or {}
+        override_query = (req_data.get('query') or '').strip()
+
+        title  = book.get('title', '')
+        author = book.get('author', '')
+        query  = override_query or f"{title} {author}".strip()
+
+        all_results = []
+
+        # ── Google Books ───────────────────────────────────────────────────────
+        if CONFIG.google_books.enabled and query:
+            try:
+                gb_results = utils.search_google_books(query, max_items=8)
+                for r in gb_results:
+                    _genres = r.get('genres') or []
+                    all_results.append({
+                        'source':          'Google Books',
+                        'title':           r.get('title') or '',
+                        'author':          (r.get('author') or {}).get('authorName') or '',
+                        'year':            r.get('year') or '',
+                        'pages':           r.get('pageCount') or 0,
+                        'cover_url':       r.get('cover_url') or r.get('remotePoster') or '',
+                        'overview':        r.get('overview') or '',
+                        'genres':          _genres,
+                        'genre_str':       ', '.join(_genres[:3]) if _genres else '',
+                        'isbn':            r.get('isbn') or '',
+                        'foreign_book_id': r.get('foreignBookId') or '',
+                    })
+            except Exception as e:
+                logging.warning("[search_online_all] Google Books error: %s", e)
+
+        # ── Readarr ────────────────────────────────────────────────────────────
+        if CONFIG.readarr.enabled and query:
+            try:
+                ra_results = utils.search_readarr(query)
+                for r in (ra_results or [])[:8]:
+                    author_obj  = r.get('author') or {}
+                    author_name = (author_obj.get('authorName') if isinstance(author_obj, dict)
+                                   else str(author_obj)) or ''
+                    images    = r.get('images') or []
+                    cover_url = next(
+                        (img.get('remoteUrl') or img.get('url')
+                         for img in images
+                         if img.get('coverType') in ('poster', 'cover')),
+                        r.get('remotePoster') or ''
+                    )
+                    _genres = r.get('genres') or []
+                    all_results.append({
+                        'source':          'Readarr',
+                        'title':           r.get('title') or '',
+                        'author':          author_name,
+                        'year':            (r.get('releaseDate') or '')[:4] or '',
+                        'pages':           r.get('pageCount') or 0,
+                        'cover_url':       cover_url,
+                        'overview':        r.get('overview') or '',
+                        'genres':          _genres,
+                        'genre_str':       ', '.join(_genres[:3]) if _genres else '',
+                        'isbn':            r.get('isbn') or '',
+                        'foreign_book_id': str(r.get('foreignBookId') or ''),
+                    })
+            except Exception as e:
+                logging.warning("[search_online_all] Readarr error: %s", e)
+
+        return jsonify({'results': all_results})
+
     # ── Reader route for local (non-Readarr) books ─────────────────────────────
 
     @app.route('/read/local/<int:db_id>')
     @requires_auth
     def read_local_book(db_id):
         """Open the reader for a book identified by its local DB id."""
+        if is_kindle_request():
+            return redirect(url_for('kindle_book_detail', db_id=db_id))
+
         book = books_db.get_book_by_id(db_id)
         if not book or not book.get('file_path'):
-            return render_template('error.html'), 404
+            return render_template('error.html', error='Book not found in library.'), 404
         file_path = book['file_path']
         if not os.path.isfile(file_path):
-            return render_template('error.html'), 404
+            return render_template('error.html',
+                                   error=f'File not found on disk: {os.path.basename(file_path)}'), 404
         ext = os.path.splitext(file_path)[1].lower()
         file_type = 'epub' if ext == '.epub' else 'pdf' if ext == '.pdf' else None
         if not file_type:
-            return render_template('error.html'), 415
-        template = 'reader_kindle.html' if is_kindle_request() else 'reader.html'
-        return render_template(template, book_id=f'local_{db_id}', file_type=file_type, config=CONFIG._config)            
+            # AZW3 / MOBI / etc. — not browser-readable; send to Kindle page instead
+            return redirect(url_for('kindle_book_detail', db_id=db_id))
+        return render_template('reader.html', book_id=f'local_{db_id}', file_type=file_type, config=CONFIG._config)
 
     @app.route('/api/book/file/local/<int:db_id>')
     @requires_auth
     def book_file_local(db_id):
         """Stream a book file by local DB id (for the reader)."""
+        logging.info('[KindleLog] /api/book/file/local/%s | UA=%s | Range=%s',
+                     db_id,
+                     request.headers.get('User-Agent', '—'),
+                     request.headers.get('Range', '—'))
         book = books_db.get_book_by_id(db_id)
         if not book or not book.get('file_path'):
+            logging.warning('[KindleLog] book_file_local/%s — DB record not found', db_id)
             return jsonify({'error': 'Not found'}), 404
         file_path = book['file_path']
         if not os.path.isfile(file_path):
+            logging.warning('[KindleLog] book_file_local/%s — file missing: %s', db_id, file_path)
             return jsonify({'error': 'File not found on disk'}), 404
         ext  = os.path.splitext(file_path)[1].lower()
         mime = 'application/epub+zip' if ext == '.epub' else 'application/pdf'
+        file_size = os.path.getsize(file_path)
+        logging.info('[KindleLog] book_file_local/%s — streaming %s (%s bytes, mime=%s)',
+                     db_id, file_path, file_size, mime)
         try:
             resp = send_file(file_path, mimetype=mime,
                              as_attachment=False, conditional=False)
@@ -1273,6 +1523,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             resp.headers['Cache-Control'] = 'no-store'
             return resp
         except Exception as e:
+            logging.error('[KindleLog] book_file_local/%s — send_file error: %s', db_id, e)
             return jsonify({'error': str(e)}), 500
 
     # ── General image proxy with disk cache ───────────────────────────────────
@@ -1978,6 +2229,9 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @requires_auth
     def read_book(book_id):
         """Serve the ebook reader page for a Readarr internal book ID."""
+        if is_kindle_request():
+            return redirect(url_for('kindle_books'))
+
         if not CONFIG.readarr.url:
             return redirect('/')
 
@@ -1990,13 +2244,10 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         if not file_type:
             return render_template('error.html'), 415
 
-        # Pick the right template based on User-Agent
-        template = 'reader_kindle.html' if is_kindle_request() else 'reader.html'
-
-        return render_template(template,
-                            book_id=book_id,
-                            file_type=file_type,
-                            config=CONFIG._config)
+        return render_template('reader.html',
+                               book_id=book_id,
+                               file_type=file_type,
+                               config=CONFIG._config)
 
     @app.route('/api/book/file/<int:book_id>')
     @requires_auth
@@ -2005,26 +2256,34 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         epub.js fetches this as an ArrayBuffer (see reader.html) so we must
         send the raw binary with correct MIME and permissive headers.
         """
+        logging.info('[KindleLog] /api/book/file/%s | UA=%s | Range=%s',
+                     book_id,
+                     request.headers.get('User-Agent', '—'),
+                     request.headers.get('Range', '—'))
         if not CONFIG.readarr.url:
+            logging.warning('[KindleLog] book_file/%s — Readarr not configured', book_id)
             return jsonify({'error': 'Readarr not configured'}), 503
         file_path = utils.get_readarr_book_file_path(book_id)
         if not file_path or not os.path.isfile(file_path):
-            logging.warning(f"[reader] book file not found: {file_path!r}")
+            logging.warning('[KindleLog] book_file/%s — file not found: %s', book_id, file_path)
             return jsonify({'error': 'File not found'}), 404
         ext = os.path.splitext(file_path)[1].lower()
         mime = 'application/epub+zip' if ext == '.epub' else 'application/pdf'
+        file_size = os.path.getsize(file_path)
+        logging.info('[KindleLog] book_file/%s — streaming %s (%s bytes, mime=%s)',
+                     book_id, file_path, file_size, mime)
         try:
             response = send_file(
                 file_path,
                 mimetype=mime,
                 as_attachment=False,
-                conditional=False,   # always send full file — no 304
+                conditional=False,
             )
             response.headers['Access-Control-Allow-Origin'] = '*'
             response.headers['Cache-Control'] = 'no-store'
             return response
         except Exception as e:
-            logging.error(f"[reader] send_file error: {str(e)}", exc_info=True)
+            logging.error('[KindleLog] book_file/%s — send_file error: %s', book_id, e, exc_info=True)
             return jsonify({'error': str(e)}), 500
 
     @app.route('/api/torrents/action', methods=['POST'])

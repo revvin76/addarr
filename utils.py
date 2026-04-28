@@ -268,6 +268,88 @@ def load_media_cache(cache_type):
         logging.warning(f"[cache] load_media_cache({cache_type}) error: {e}")
         return None, 0
 
+def _find_ebook_convert():
+    """Return the path to Calibre's ebook-convert executable.
+
+    Tries PATH first, then common Windows install locations.
+    Returns None if not found.
+    """
+    import shutil
+    import subprocess
+
+    # 1. Already in PATH?
+    cmd = shutil.which('ebook-convert')
+    if cmd:
+        return cmd
+
+    # 2. Common Windows Calibre install directories
+    candidates = [
+        r'C:\Program Files\Calibre2\ebook-convert.exe',
+        r'C:\Program Files (x86)\Calibre2\ebook-convert.exe',
+        r'C:\Program Files\Calibre\ebook-convert.exe',
+        r'C:\Program Files (x86)\Calibre\ebook-convert.exe',
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            logging.info('[AZW3] Found ebook-convert at %s', path)
+            return path
+
+    return None
+
+
+def ensure_azw3(file_path):
+    """Ensure an AZW3 version of *file_path* exists in the same directory.
+
+    Uses Calibre's ``ebook-convert`` CLI.  Returns ``(azw3_path, status)``
+    where *status* is one of:
+      ``'exists'``    — AZW3 already present (or source is already AZW3)
+      ``'converted'`` — just created successfully
+      ``'failed'``    — ebook-convert ran but failed / timed out / not found
+      ``'skipped'``   — source file missing or extension not supported
+    """
+    import subprocess
+
+    if not file_path or not os.path.isfile(file_path):
+        return None, 'skipped'
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    if ext == '.azw3':
+        return file_path, 'exists'
+
+    if ext not in ('.epub', '.mobi', '.pdf'):
+        return None, 'skipped'
+
+    azw3_path = os.path.splitext(file_path)[0] + '.azw3'
+    if os.path.isfile(azw3_path):
+        return azw3_path, 'exists'
+
+    cmd = _find_ebook_convert()
+    if not cmd:
+        logging.error('[AZW3] ebook-convert not found. '
+                      'Install Calibre and ensure it is on PATH '
+                      'or in C:\\Program Files\\Calibre2\\')
+        return None, 'failed'
+
+    logging.info('[AZW3] Converting %s → %s (using %s)', file_path, azw3_path, cmd)
+    try:
+        result = subprocess.run(
+            [cmd, file_path, azw3_path],
+            capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode == 0 and os.path.isfile(azw3_path):
+            logging.info('[AZW3] Converted OK: %s (%d bytes)',
+                         azw3_path, os.path.getsize(azw3_path))
+            return azw3_path, 'converted'
+        logging.warning('[AZW3] Conversion failed for %s (rc=%d): %s',
+                        file_path, result.returncode, (result.stderr or '')[:500])
+    except subprocess.TimeoutExpired:
+        logging.error('[AZW3] Conversion timed out for %s', file_path)
+    except Exception as e:
+        logging.error('[AZW3] Conversion error for %s: %s', file_path, e)
+    return None, 'failed'
+
+
 class SharedUtils:
     def __init__(self, config_manager):
         self.config = config_manager

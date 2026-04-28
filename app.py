@@ -463,6 +463,47 @@ routes.init_routes(
 
 # ============ STARTUP AND SHUTDOWN ============
 
+def _background_azw3_scan():
+    """Scan the book library and ensure every book has an AZW3 file.
+
+    Runs in a daemon thread so it does not block server startup.
+    """
+    try:
+        import time as _time
+        _time.sleep(8)  # let Flask fully finish starting up first
+        from utils import scan_books_folder, ensure_azw3
+        root_folder = (
+            CONFIG.readarr.root_folder
+            if hasattr(CONFIG, 'readarr') and getattr(CONFIG.readarr, 'enabled', False)
+            else None
+        )
+        if not root_folder:
+            logging.info('[AZW3] No Readarr root folder configured — skipping scan.')
+            return
+        logging.info('[AZW3] Starting background AZW3 scan of %s', root_folder)
+        books = scan_books_folder(root_folder)
+        to_convert = [
+            b['file_path'] for b in books
+            if b['extension'] in ('.epub', '.mobi', '.pdf')
+        ]
+        logging.info('[AZW3] %d books to check for AZW3 conversion', len(to_convert))
+        converted = failed = already = 0
+        for fp in to_convert:
+            _, status = ensure_azw3(fp)
+            if status == 'converted':
+                converted += 1
+            elif status == 'failed':
+                failed += 1
+            else:
+                already += 1
+        logging.info(
+            '[AZW3] Scan complete — %d converted, %d already exist, %d failed',
+            converted, already, failed,
+        )
+    except Exception as e:
+        logging.error('[AZW3] Background scan error: %s', e, exc_info=True)
+
+
 def startup_sequence():
     global tunnel_url  # Add this line to access the global variable
     
@@ -500,13 +541,19 @@ def startup_sequence():
     # Initialise local books database
     books_db.init_db()
 
+    # Start background AZW3 conversion scan
+    azw3_thread = threading.Thread(
+        target=_background_azw3_scan, daemon=True, name='AZW3Converter'
+    )
+    azw3_thread.start()
+
     # Start update manager if enabled (background checks)
     if CONFIG.update.enabled:
         update_manager.start()
-    
+
     # Start memory manager
     memory_manager.start()
-    
+
     # Print welcome message
     print_welcome()
 

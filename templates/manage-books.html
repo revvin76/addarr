@@ -148,6 +148,39 @@
             padding: 0.25rem 0.6rem;
         }
         .book-detail-status-btn.active-status { font-weight: 600; }
+
+        /* ── Online picker card ── */
+        .op-card {
+            display: flex; flex-direction: column;
+            border: 2px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            overflow: hidden;
+            background: #1a1a1a;
+            transition: border-color 0.15s;
+        }
+        .op-card:hover  { border-color: #c0392b; }
+        .op-card.op-sel { border-color: #c0392b; box-shadow: 0 0 0 1px #c0392b; }
+        .op-cover {
+            width: 100%; aspect-ratio: 2/3;
+            object-fit: cover; background: #222;
+            display: block;
+        }
+        .op-meta {
+            padding: 5px 6px;
+            font-size: 0.68rem; color: #ccc;
+            line-height: 1.3;
+        }
+        .op-meta strong { display: block; color: #eee; font-size: 0.7rem;
+                          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .op-badge {
+            display: inline-block; font-size: 0.6rem; font-weight: 600;
+            padding: 1px 5px; border-radius: 3px;
+            background: #333; color: #aaa; margin-top: 3px;
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .op-badge.google  { background: #1a3a5c; color: #7ab3e0; }
+        .op-badge.readarr { background: #2d1a1a; color: #e07a7a; }
     </style>
     <script>
     // Sequential batch image loader — 20 at a time. Mirrors manage.html.
@@ -259,13 +292,14 @@
                  data-source="{{ book.source or 'unknown' }}"
                  data-internal-id="{{ book.internal_id or '' }}"
                  data-foreign-id="{{ book.foreign_book_id or '' }}"
+                 data-has-azw3="{{ 'true' if book.has_azw3 else 'false' }}"
                  onclick="openBookDetails(this)">
 
                 <div class="search-result-card manage-result-card h-100 book-card">
                     <!-- Poster -->
                     <div class="search-result-thumbnail-container">
                         {% if book.id %}
-                        <img data-src="/api/book/cover/{{ book.id }}?w=174&h=261"
+                        <img data-src="/api/book/cover/{{ book.id }}?w=180&h=270"
                         {% else %}
                         <img data-src="{{ book.cover_url or '/static/images/apple-touch-icon.png' }}"
                         {% endif %}
@@ -507,6 +541,18 @@
                         </div>
                     </div>
 
+                    <!-- Online search results picker (shown after "Refresh online") -->
+                    <div id="onlinePickerWrap" style="display:none; margin-top:18px;">
+                        <div style="font-size:0.78rem; font-weight:600; text-transform:uppercase;
+                                    letter-spacing:0.06em; color:#aaa; margin-bottom:10px;">
+                            Pick a result to fill the form
+                        </div>
+                        <div id="onlinePickerGrid"
+                             style="display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+                                    gap:10px; max-height:340px; overflow-y:auto; padding-right:4px;">
+                        </div>
+                    </div>
+
                     <div id="importError"   class="alert alert-danger mt-3"  style="display:none;"></div>
                     <div id="importSuccess" class="alert alert-success mt-3" style="display:none;"></div>
                 </div>
@@ -528,6 +574,19 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
     <script>
+    // ── Safe HTML helper ─────────────────────────────────────────────────────
+    // Use for ANY user-sourced string placed inside a JS template literal.
+    // Handles backticks (which would prematurely close the literal) and the
+    // usual HTML-injection characters.
+    function escHtml(s) {
+        return (s == null ? '' : String(s))
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/`/g, '&#96;');
+    }
+
     // ── Search / filter ──────────────────────────────────────────────────────
     const searchInput  = document.getElementById('bookSearch');
     const clearBtn     = document.getElementById('clearBookSearch');
@@ -725,17 +784,19 @@
         const genreTags = book.genre
             ? book.genre.split(',').map(g =>
                 `<span class="badge bg-dark border border-secondary me-1 mb-1"
-                       style="font-weight:400;font-size:0.72rem;">${g.trim()}</span>`
+                       style="font-weight:400;font-size:0.72rem;">${escHtml(g.trim())}</span>`
               ).join('')
             : '';
 
         // Synopsis — capped at 5 lines, expandable
+        // IMPORTANT: escHtml() prevents backticks / special chars from breaking
+        // the surrounding template literal.
         const synopsisHtml = book.overview ? `
             <div style="margin:12px 0 0;">
                 <div id="synopsisText"
                      style="font-size:0.85rem;color:#ccc;line-height:1.55;
                             max-height:6.5em;overflow:hidden;position:relative;">
-                    ${book.overview}
+                    ${escHtml(book.overview)}
                     <div id="synopsisFade"
                          style="position:absolute;bottom:0;left:0;right:0;height:2em;
                                 background:linear-gradient(transparent,#212529);"></div>
@@ -752,17 +813,30 @@
                 </a>
             </div>` : '';
 
-        // File path — just a subtle line, not a full card
+        // File path + optional AZW3 companion line
+        const azw3Ready = card && card.dataset.hasAzw3 === 'true';
         const fileLine = book.file_path ? `
             <div style="margin-top:10px;font-size:0.7rem;color:#555;
                         overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                 title="${book.file_path}">
-                <i class="fas fa-file me-1"></i>${book.file_path.split(/[\\/]/).pop()}
+                 title="${escHtml(book.file_path)}">
+                <i class="fas fa-file me-1"></i>${escHtml(book.file_path.split(/[\\/]/).pop())}
                 ${book.source && book.source !== 'unknown'
                     ? `<span class="ms-2 badge bg-dark border border-secondary"
-                             style="font-size:0.65rem;font-weight:400;">${book.source}</span>`
+                             style="font-size:0.65rem;font-weight:400;">${escHtml(book.source)}</span>`
                     : ''}
-            </div>` : '';
+            </div>
+            ${azw3Ready ? `
+            <div style="margin-top:4px;font-size:0.7rem;color:#555;">
+                <i class="fas fa-tablet-alt me-1"></i>${escHtml(book.file_path.replace(/\.[^.]+$/, '.azw3').split(/[\\/]/).pop())}
+                <span class="ms-1 badge" style="background:#1a6b1a;color:#fff;font-size:0.6rem;font-weight:400;">AZW3 ready</span>
+            </div>` : `
+            <div style="margin-top:4px;font-size:0.7rem;color:#444;">
+                <i class="fas fa-tablet-alt me-1"></i>AZW3 not yet generated
+            </div>`}` : '';
+
+        const thmbSrc = book.id
+            ? `/api/book/cover/${book.id}?w=180&h=270`
+            : (book.cover_url || '/static/images/apple-touch-icon.png');
 
         document.getElementById('detailsContent').innerHTML = `
             <style>
@@ -772,17 +846,17 @@
 
             <!-- Top row: cover + core info -->
             <div class="d-flex gap-3 mb-3">
-                <img src="${coverSrc}" class="dm-cover"
+                <img src="${thmbSrc}" class="dm-cover"
                      style="align-self:flex-start;max-height:200px;object-fit:cover;"
-                     alt="${book.title || ''}"
+                     alt="${escHtml(book.title || '')}"
                      onerror="this.src='/static/images/apple-touch-icon.png'">
                 <div style="min-width:0;flex:1;">
                     <div style="font-size:1rem;font-weight:600;color:#fff;
                                 line-height:1.3;margin-bottom:4px;">
-                        ${book.title || 'Unknown Title'}
+                        ${escHtml(book.title) || 'Unknown Title'}
                     </div>
                     ${book.author
-                        ? `<div style="color:#c0392b;font-size:0.85rem;margin-bottom:6px;">${book.author}</div>`
+                        ? `<div style="color:#c0392b;font-size:0.85rem;margin-bottom:6px;">${escHtml(book.author)}</div>`
                         : ''}
                     <div class="d-flex flex-wrap align-items-center gap-1 mb-2" style="font-size:0.78rem;">
                         ${book.year  ? `<span class="badge bg-secondary">${book.year}</span>` : ''}
@@ -823,7 +897,9 @@
             <!-- Edit metadata -->
             <div style="margin-top:14px;">
                 <button class="btn btn-outline-warning btn-sm w-100"
-                        onclick="bootstrap.Modal.getInstance(document.getElementById('detailsModal'))?.hide();setTimeout(()=>triggerImport({dataset:{filePath:${JSON.stringify(book.file_path||'')}}},${book.id||'null'}),300);">
+                        data-edit-fp="${escHtml(book.file_path || '')}"
+                        data-edit-id="${book.id || ''}"
+                        onclick="openEditFromModal(this)">
                     <i class="fas fa-edit me-1"></i>Edit Metadata
                 </button>
             </div>
@@ -832,6 +908,17 @@
         // Keep references so status/wishlist updates can patch the card
         document.getElementById('detailsModal')._bookCard = card;
         document.getElementById('detailsModal')._bookId   = book.id;
+    }
+
+    // Called by the "Edit Metadata" button inside the details modal.
+    // Reads file path + db-id from data attributes (avoids embedding paths
+    // in onclick strings, which breaks when paths contain quotes or special chars).
+    function openEditFromModal(btn) {
+        const fp     = btn.dataset.editFp  || '';
+        const bookId = btn.dataset.editId  || null;
+        const modal  = bootstrap.Modal.getInstance(document.getElementById('detailsModal'));
+        if (modal) modal.hide();
+        setTimeout(() => triggerImport({ dataset: { filePath: fp } }, bookId || null), 300);
     }
 
     function _openSimpleBookModal(card) {
@@ -847,13 +934,15 @@
             <div class="d-flex gap-3">
                 ${coverUrl ? `<img src="${coverUrl}" style="width:90px;border-radius:6px;" onerror="this.style.display='none'">` : ''}
                 <div>
-                    <h5 class="text-white">${title}</h5>
-                    ${author ? `<p class="text-danger mb-1">${author}</p>` : ''}
-                    <p class="text-muted small">${card.dataset.filePath || ''}</p>
+                    <h5 class="text-white">${escHtml(title)}</h5>
+                    ${author ? `<p class="text-danger mb-1">${escHtml(author)}</p>` : ''}
+                    <p class="text-muted small">${escHtml(card.dataset.filePath || '')}</p>
                     ${readHref ? `<a href="${readHref}" target="_blank" class="btn btn-sm btn-outline-success me-2">
                         <i class="fas fa-book-open me-1"></i>Read</a>` : ''}
                     <button class="btn btn-sm btn-outline-warning"
-                            onclick="bootstrap.Modal.getInstance(document.getElementById('detailsModal'))?.hide();setTimeout(()=>triggerImport({dataset:{filePath:${JSON.stringify(card.dataset.filePath||'')}}},${dbId||'null'}),300);">
+                            data-edit-fp="${escHtml(card.dataset.filePath || '')}"
+                            data-edit-id="${dbId || ''}"
+                            onclick="openEditFromModal(this)">
                         <i class="fas fa-file-import me-1"></i>Edit metadata
                     </button>
                 </div>
@@ -1195,51 +1284,96 @@
         if (!dbId) return;
         const btn = document.getElementById('importRefreshBtn');
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Refreshing…';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Searching…';
         document.getElementById('importError').style.display   = 'none';
         document.getElementById('importSuccess').style.display = 'none';
+        document.getElementById('onlinePickerWrap').style.display = 'none';
+
         try {
-            const goodreadsUrl = (document.getElementById('importGoodreadsUrl').value || '').trim();
-            const r    = await fetch(`/api/books/refresh/${dbId}`, {
+            const r    = await fetch(`/api/books/search-online/${dbId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ goodreads_url: goodreadsUrl }),
+                body:    '{}',
             });
             const data = await r.json();
-            if (data.status === 'ok' && data.book) {
-                const b = data.book;
-                const set = (id, v) => { if (v !== undefined) document.getElementById(id).value = v || ''; };
-                set('importTitle',    b.title);
-                set('importAuthor',   b.author);
-                set('importYear',     b.year);
-                set('importPages',    b.pages);
-                set('importIsbn',     b.isbn);
-                set('importGenre',    b.genre);
-                set('importOverview', b.overview);
-                if (b.id) {
-                    const prev = document.getElementById('importCoverPreview');
-                    prev.src = `/api/book/cover/${b.id}?w=200&h=300&t=${Date.now()}`;
-                    prev.style.display = 'block';
-                    prev.onerror = () => { prev.style.display = 'none'; };
-                    document.getElementById('importCoverUrl').value = '';
-                }
-                document.getElementById('importGoodreadsUrl').value = '';
-                if (_importCard) patchBookCard(_importCard, b);
-                const sEl = document.getElementById('importSuccess');
-                sEl.textContent = `✓ Refreshed from ${b.source || 'online'}`;
-                sEl.style.display = 'block';
-            } else {
-                document.getElementById('importError').textContent =
-                    data.message || 'No match found online.';
+            const results = data.results || [];
+
+            if (!results.length) {
+                document.getElementById('importError').textContent = 'No results found online.';
                 document.getElementById('importError').style.display = 'block';
+                return;
             }
+
+            // Build picker cards
+            const grid = document.getElementById('onlinePickerGrid');
+            grid.innerHTML = '';
+            results.forEach(function(res, idx) {
+                const card = document.createElement('div');
+                card.className = 'op-card';
+                card.dataset.idx = idx;
+
+                const srcClass = res.source === 'Google Books' ? 'google' : 'readarr';
+                const coverSrc = res.cover_url || '/static/images/apple-touch-icon.png';
+                const authorShort = (res.author || '').split(',')[0];
+                const year = res.year ? ' · ' + res.year : '';
+
+                card.innerHTML =
+                    '<img class="op-cover" src="' + escHtml(coverSrc) + '" ' +
+                         'onerror="this.src=\'/static/images/apple-touch-icon.png\'">' +
+                    '<div class="op-meta">' +
+                        '<strong title="' + escHtml(res.title) + '">' + escHtml(res.title) + '</strong>' +
+                        escHtml(authorShort) + escHtml(year) +
+                        '<br><span class="op-badge ' + srcClass + '">' + escHtml(res.source) + '</span>' +
+                    '</div>';
+
+                card.addEventListener('click', function() {
+                    // Deselect all, select this
+                    grid.querySelectorAll('.op-card').forEach(function(c) { c.classList.remove('op-sel'); });
+                    card.classList.add('op-sel');
+                    applyPickerResult(res);
+                });
+                grid.appendChild(card);
+            });
+
+            document.getElementById('onlinePickerWrap').style.display = 'block';
+
         } catch (e) {
-            document.getElementById('importError').textContent = 'Refresh failed: ' + e.message;
+            document.getElementById('importError').textContent = 'Search failed: ' + e.message;
             document.getElementById('importError').style.display = 'block';
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Refresh online';
         }
+    }
+
+    function applyPickerResult(res) {
+        /* Fill the form fields from a picked search result (does NOT save yet). */
+        const set = function(id, v) {
+            const el = document.getElementById(id);
+            if (el && v !== undefined && v !== null) el.value = v;
+        };
+        set('importTitle',    res.title);
+        set('importAuthor',   res.author);
+        set('importYear',     res.year);
+        set('importPages',    res.pages || '');
+        set('importIsbn',     res.isbn);
+        set('importGenre',    res.genre_str || (res.genres || []).slice(0,3).join(', '));
+        set('importOverview', res.overview);
+        set('importCoverUrl', res.cover_url || '');
+
+        const prev = document.getElementById('importCoverPreview');
+        if (res.cover_url) {
+            prev.src = res.cover_url;
+            prev.style.display = 'block';
+            prev.onerror = function() { prev.style.display = 'none'; };
+        } else {
+            prev.style.display = 'none';
+        }
+
+        document.getElementById('importSuccess').textContent =
+            '✓ Filled from ' + (res.source || 'online') + ' — click Save to apply.';
+        document.getElementById('importSuccess').style.display = 'block';
+        document.getElementById('importError').style.display = 'none';
     }
 
     async function deleteCover() {

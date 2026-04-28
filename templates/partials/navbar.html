@@ -86,9 +86,12 @@
                 <div class="modal-body">
 
                     <!-- Radarr Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-radarr mb-3"><i class="fas fa-film me-2"></i>Radarr Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-radarr mb-0"><i class="fas fa-film me-2"></i>Radarr Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-md-6">
@@ -124,9 +127,12 @@
                     </div>
 
                     <!-- Sonarr Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-sonarr mb-3"><i class="fas fa-tv me-2"></i>Sonarr Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-sonarr mb-0"><i class="fas fa-tv me-2"></i>Sonarr Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-md-6">
@@ -168,9 +174,12 @@
                     </div>
 
                     <!-- Readarr Settings -->
-                    <div class="mb-4">
-                        <h5 class="mb-3" style="color: #c0392b;"><i class="fas fa-book me-2"></i>Readarr Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="mb-0" style="color: #c0392b;"><i class="fas fa-book me-2"></i>Readarr Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-md-6">
@@ -207,15 +216,28 @@
                                             <i class="fas fa-plug me-2"></i>Test Connection
                                         </button>
                                     </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-warning w-100"
+                                                onclick="clearThumbCache(this)">
+                                            <i class="fas fa-trash-alt me-2"></i>Clear Thumbnail Cache
+                                        </button>
+                                        <small class="text-muted d-block mt-1">
+                                            Forces all book covers to re-download on next page load.
+                                            Useful if covers are showing placeholder images.
+                                        </small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Google Books Settings -->
-                    <div class="mb-4">
-                        <h5 class="mb-3" style="color: #00b388;"><i class="fas fa-book-open me-2"></i>Google Books Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="mb-0" style="color: #00b388;"><i class="fas fa-book-open me-2"></i>Google Books Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-12">
@@ -251,9 +273,12 @@
                     </div>
 
                     <!-- Prowlarr Settings -->
-                    <div class="mb-4">
-                        <h5 class="mb-3" style="color: #ff6b35;"><i class="fas fa-search me-2"></i>Prowlarr Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="mb-0" style="color: #ff6b35;"><i class="fas fa-search me-2"></i>Prowlarr Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-md-6">
@@ -278,9 +303,12 @@
                     </div>
 
                     <!-- qBittorrent Settings -->
-                    <div class="mb-4">
-                        <h5 class="mb-3" style="color: #8e44ad;"><i class="fas fa-download me-2"></i>qBittorrent Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="mb-0" style="color: #8e44ad;"><i class="fas fa-download me-2"></i>qBittorrent Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <small class="text-muted">qBittorrent WebUI connection. Used by the Prowlarr search panel to add downloads directly.</small>
@@ -312,9 +340,12 @@
                     </div>
 
                     <!-- TMDB Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-info mb-3"><i class="fas fa-database me-2"></i>TMDB Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-info mb-0"><i class="fas fa-database me-2"></i>TMDB Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <small class="text-muted">TMDB key required for Movie and TV Show lookups. <a href="https://www.themoviedb.org/settings/api">https://www.themoviedb.org/settings/api</a></small>
@@ -334,9 +365,12 @@
                     </div>
 
                     <!-- DuckDNS Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-warning mb-3"><i class="fas fa-globe me-2"></i>DuckDNS Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-warning mb-0"><i class="fas fa-globe me-2"></i>DuckDNS Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-12">
@@ -375,9 +409,12 @@
                     </div>
 
                     <!-- Auto-Updater Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-warning mb-3"><i class="fas fa-sync-alt me-2"></i>Auto-Updater Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-warning mb-0"><i class="fas fa-sync-alt me-2"></i>Auto-Updater Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-12">
@@ -415,9 +452,12 @@
                     </div>
 
                     <!-- Tunnel Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-primary mb-3"><i class="fas fa-cloud me-2"></i>Tunnel Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-primary mb-0"><i class="fas fa-cloud me-2"></i>Tunnel Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-12">
@@ -448,9 +488,12 @@
                     </div>
 
                     <!-- Authentication Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-warning mb-3"><i class="fas fa-lock me-2"></i>Authentication Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-warning mb-0"><i class="fas fa-lock me-2"></i>Authentication Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-12">
@@ -487,9 +530,12 @@
                     </div>
 
                     <!-- Application Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-info mb-3"><i class="fas fa-sliders-h me-2"></i>Application Settings</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-info mb-0"><i class="fas fa-sliders-h me-2"></i>Application Settings</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-12">
@@ -522,9 +568,12 @@
                     </div>
 
                     <!-- Version Information -->
-                    <div class="mb-4">
-                        <h5 class="text-success mb-3"><i class="fas fa-code-branch me-2"></i>Version Information</h5>
-                        <div class="card bg-dark border-secondary">
+                    <div class="mb-3 settings-block">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-success mb-0"><i class="fas fa-code-branch me-2"></i>Version Information</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
                                 <div class="version-info">
                                     v{{ config.app.version }}
@@ -666,9 +715,50 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
+     Settings accordion styles
+════════════════════════════════════════════════════════ -->
+<style>
+.settings-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 10px 4px;
+    border-bottom: 1px solid #333;
+    user-select: none;
+    transition: opacity 0.15s;
+}
+.settings-block-header:hover { opacity: 0.8; }
+.settings-chevron {
+    color: #888;
+    font-size: 0.8rem;
+    transition: transform 0.25s ease;
+    flex-shrink: 0;
+}
+.settings-block.open .settings-chevron { transform: rotate(180deg); }
+</style>
+
+<!-- ═══════════════════════════════════════════════════════
      Shared JS: config modal, notifications, test connections
 ════════════════════════════════════════════════════════ -->
 <script>
+function toggleSettingsBlock(header) {
+    const block = header.closest('.settings-block');
+    const body  = block.querySelector('.settings-block-body');
+    const isOpen = block.classList.contains('open');
+    block.classList.toggle('open', !isOpen);
+    if (!isOpen) {
+        body.style.display = 'block';
+        body.style.opacity = '0';
+        body.style.transform = 'translateY(-6px)';
+        setTimeout(() => { body.style.transition = 'opacity 0.2s, transform 0.2s'; body.style.opacity = '1'; body.style.transform = 'translateY(0)'; }, 10);
+    } else {
+        body.style.opacity = '0';
+        body.style.transform = 'translateY(-6px)';
+        setTimeout(() => { body.style.display = 'none'; body.style.transition = ''; }, 200);
+    }
+}
+
 // ── Config dropdown data loaders ──────────────────────────────────────────────
 function fetchRadarrData() {
     fetch('/api/radarr/rootfolders')
@@ -960,6 +1050,32 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     });
 })();
+
+// ── Clear thumbnail cache ─────────────────────────────────────────────────────
+function clearThumbCache(btn) {
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Clearing…';
+    fetch('/api/books/covers/clear-cache', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            btn.innerHTML = d.success
+                ? `<i class="fas fa-check me-1"></i> Cleared ${d.deleted} files`
+                : '<i class="fas fa-times me-1"></i> Failed';
+            btn.classList.add(d.success ? 'btn-success' : 'btn-danger');
+        })
+        .catch(() => {
+            btn.innerHTML = '<i class="fas fa-times me-1"></i> Error';
+            btn.classList.add('btn-danger');
+        })
+        .finally(() => {
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.remove('btn-success', 'btn-danger');
+                btn.disabled = false;
+            }, 3000);
+        });
+}
 
 // ── Config form submit ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
