@@ -119,7 +119,6 @@
         #epubViewer {
             width: 100%; height: 100%;
             background: #fff;
-            display: none;
         }
 
         /* ── TOC — inline panel, not a slide-in overlay ───────────────────── */
@@ -168,10 +167,14 @@
         .toc-entry.depth-2 { padding-left: 46px; font-size: 0.8rem;  color: #666; }
 
         /* ── Loading / error ──────────────────────────────────────────────── */
+        /* Full-screen overlay so epub renders into a visible, correctly-sized
+           container from the start — prevents blank pages on first load */
         #statusMsg {
-            position: fixed; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center; color: #555; z-index: 50;
+            position: fixed; top: 50px; bottom: 54px; left: 0; right: 0;
+            z-index: 50; background: #fff;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center; color: #555;
             font-family: Arial, sans-serif; font-size: 0.9rem;
         }
         /* Simple text spinner — CSS animation would flicker on e-ink */
@@ -311,9 +314,12 @@
 <div id="toolbar">
     <button class="tb-btn" onclick="goBack()">&#8592; Library</button>
     <span id="bookTitle">Loading&hellip;</span>
+    <button class="tb-btn" id="wishBtn" style="display:none"
+            onclick="toggleReaderWishlist()">&#9825;</button>
     {% if file_type == 'epub' %}
     <button class="tb-btn" id="bookmarkBtn" onclick="toggleBookmark()" title="Bookmark">&#128278;</button>
     <button class="tb-btn" id="tocBtn"      onclick="toggleToc()">Contents</button>
+    <button class="tb-btn" id="settingsBtn" onclick="toggleSettings()">&#9881;</button>
     {% endif %}
 </div>
 
@@ -350,6 +356,72 @@
 </div>
 {% endif %}
 
+<!-- ── Settings panel (epub only) ── -->
+{% if file_type == 'epub' %}
+<div id="settingsPanel">
+    <div class="settings-header">
+        <span>&#9881; Reading Settings</span>
+        <button onclick="closeSettings()">&#10005; Close</button>
+    </div>
+
+    <!-- Font size -->
+    <div class="settings-section">
+        <span class="settings-label">Font Size</span>
+        <div class="font-size-row">
+            <button onclick="stepFontSize(-10)">A&#8722;</button>
+            <input type="range" id="fontSizeSlider" min="70" max="200" step="10"
+                   oninput="onFontSizeSlide(this.value)">
+            <span id="fontSizeVal">100%</span>
+            <button onclick="stepFontSize(10)">A+</button>
+        </div>
+    </div>
+
+    <!-- Font family -->
+    <div class="settings-section">
+        <span class="settings-label">Font Style</span>
+        <div class="font-grid" id="fontGrid">
+            <button class="font-btn" data-font="Georgia, 'Times New Roman', serif"
+                    style="font-family:Georgia,serif;" onclick="selectFont(this)">Georgia</button>
+            <button class="font-btn" data-font="Arial, Helvetica, sans-serif"
+                    style="font-family:Arial,sans-serif;" onclick="selectFont(this)">Arial</button>
+            <button class="font-btn" data-font="'Times New Roman', Times, serif"
+                    style="font-family:'Times New Roman',serif;" onclick="selectFont(this)">Times</button>
+            <button class="font-btn" data-font="'Palatino Linotype', Palatino, serif"
+                    style="font-family:Palatino,serif;" onclick="selectFont(this)">Palatino</button>
+            <button class="font-btn" data-font="Verdana, Geneva, sans-serif"
+                    style="font-family:Verdana,sans-serif;" onclick="selectFont(this)">Verdana</button>
+        </div>
+    </div>
+
+    <!-- Theme -->
+    <div class="settings-section">
+        <span class="settings-label">Theme</span>
+        <div class="theme-row">
+            <button class="theme-btn" id="themeLightBtn" onclick="selectTheme('light')">
+                &#9728; Light
+            </button>
+            <button class="theme-btn" id="themeDarkBtn" onclick="selectTheme('dark')">
+                &#9790; Dark
+            </button>
+        </div>
+    </div>
+
+    <!-- Close + set-default row -->
+    <div class="settings-section">
+        <div class="apply-row">
+            <button class="apply-btn apply-default" onclick="saveAsDefault()">
+                &#9733; Save as default for all books
+            </button>
+        </div>
+        <div class="apply-row" style="margin-top:8px;">
+            <button class="apply-btn" onclick="closeSettings()">
+                Done
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- ── Footer ── -->
 <div id="footer">
     {% if file_type == 'epub' %}
@@ -376,8 +448,34 @@
          (they send ArrowRight / ArrowLeft key events via the browser)
 ════════════════════════════════════════════════════════════ -->
 {% if file_type == 'epub' %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+<!-- Error detection: run BEFORE CDN scripts so we catch load failures -->
+<script>
+window._showReaderError = function(msg) {
+    var el = document.getElementById('statusMsg');
+    if (!el) return;
+    el.innerHTML = '<p style="color:#c00;font-family:Arial;font-size:0.88rem;padding:0 16px;">' +
+        'Could not load reader:<br>' + (msg || 'Unknown error') + '</p>' +
+        '<br><button style="padding:8px 18px;border:2px solid #555;border-radius:4px;' +
+        'background:#fff;font-size:0.85rem;cursor:pointer;" onclick="goBack()">&#8592; Back to Library</button>';
+};
+// 25-second timeout — if status overlay is still visible, show an error
+window._loadTimer = setTimeout(function() {
+    var s = document.getElementById('statusMsg');
+    if (s && s.style.display !== 'none') {
+        window._showReaderError('Loading timed out — the book file may be too large for this browser, or the reader library failed to load.');
+    }
+}, 25000);
+// Catch any uncaught JS errors (covers syntax errors in the main script block)
+window.onerror = function(msg, src, line) {
+    clearTimeout(window._loadTimer);
+    window._showReaderError('JavaScript error: ' + msg);
+    return true;
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+        onerror="window._showReaderError('Failed to load JSZip library. Check your internet connection.')"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"
+        onerror="window._showReaderError('Failed to load epub.js library. Check your internet connection.')"></script>
 <script>
 const bookId  = "{{ book_id }}";
 const fileUrl = bookId.startsWith('local_')
@@ -387,10 +485,39 @@ const BM_KEY  = `epub_bm_${bookId}`;
 const LOC_KEY = `epub_loc_${bookId}`;
 
 let book, rendition;
-let locationsReady = false;
-let totalLocs      = 0;
-let bookmarkCfi    = localStorage.getItem(BM_KEY) || null;
-let tocOpen        = false;
+let locationsReady    = false;
+let totalLocs         = 0;
+let bookmarkCfi       = localStorage.getItem(BM_KEY) || null;
+let tocOpen           = false;
+
+// ── Wishlist (module-level) ───────────────────────────────────────────────
+const _bookDbId         = bookId.indexOf('local_') === 0 ? parseInt(bookId.slice(6), 10) : null;
+let   _readerWishlisted = false;
+
+function _updateWishBtn() {
+    const btn = document.getElementById('wishBtn');
+    if (!btn) return;
+    btn.innerHTML = _readerWishlisted ? '&#9829;' : '&#9825;';  // ♥ / ♡
+    btn.style.fontWeight  = _readerWishlisted ? 'bold' : 'normal';
+    btn.style.borderColor = _readerWishlisted ? '#c07000' : '';
+    btn.style.color       = _readerWishlisted ? '#c07000' : '';
+}
+function toggleReaderWishlist() {
+    if (!_bookDbId) return;
+    fetch('/api/books/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ db_id: _bookDbId, is_wishlist: _readerWishlisted ? 0 : 1 })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;
+        _readerWishlisted = !!data.book.is_wishlist;
+        _updateWishBtn();
+        showToast(_readerWishlisted ? 'Added to wishlist' : 'Removed from wishlist');
+    })
+    .catch(function() {});
+}
 
 // ── Navigation ────────────────────────────────────────────────────────────
 function goBack() {
@@ -518,135 +645,350 @@ function epubNext() { if (rendition) rendition.next(); }
 function epubPrev() { if (rendition) rendition.prev(); }
 
 // ── Init ──────────────────────────────────────────────────────────────────
-async function initEpub() {
+// Written as Promise chains (not async/await) for maximum Kindle browser
+// compatibility — older Paperwhite WebKit versions may not parse async functions.
+function initEpub() {
+    var _autoStatusDone = false;
+    var _storedNav = null;
+
+    // Verify libraries loaded
+    if (typeof ePub === 'undefined') {
+        window._showReaderError('epub.js did not load. Check your internet connection.');
+        return;
+    }
+
     try {
-        // Pass the URL directly to ePub() — epub.js handles XHR internally.
-        // This avoids pre-loading the full file as an ArrayBuffer, which can
-        // exhaust the Paperwhite's JS heap on books larger than ~15 MB.
+        // Pass URL directly — avoids loading full file into JS heap (important on Paperwhite)
         book = ePub(fileUrl, { openAs: 'epub' });
+    } catch(e) {
+        window._showReaderError('Failed to open book: ' + e.message);
+        return;
+    }
 
+    try {
         rendition = book.renderTo('epubViewer', {
-            width: '100%',
-            height: '100%',
-            spread: 'none',
-            allowScriptedContent: true
+            width: '100%', height: '100%',
+            spread: 'none', allowScriptedContent: true
         });
+    } catch(e) {
+        window._showReaderError('Failed to create reader: ' + e.message);
+        return;
+    }
 
-        // Kindle-friendly theme: serif font, larger type, no bright colours
-        rendition.themes.register('kindle', {
-            'body': {
-                'font-family': 'Georgia, "Times New Roman", serif !important',
-                'font-size':   '1.05rem !important',
-                'line-height': '1.75 !important',
-                'color':       '#111 !important',
-                'background':  '#fff !important',
-                'margin':      '0 !important',
-                'padding':     '12px 18px !important'
-            },
-            'p': {
-                'margin-bottom': '0.8em !important',
-                'text-align':    'justify !important'
-            },
-            'h1, h2, h3': {
-                'font-family': 'Arial, sans-serif !important',
-                'margin':      '1em 0 0.5em !important'
-            },
-            'a': { 'color': '#333 !important' }
-        });
-        rendition.themes.select('kindle');
+    // Kindle-friendly default theme (overridden by stored settings below)
+    rendition.themes.register('kindle', {
+        'body': {
+            'font-family': 'Georgia, "Times New Roman", serif !important',
+            'font-size':   '1.05rem !important',
+            'line-height': '1.75 !important',
+            'color':       '#111 !important',
+            'background':  '#fff !important',
+            'margin':      '0 !important',
+            'padding':     '12px 18px !important'
+        },
+        'p': { 'margin-bottom': '0.8em !important', 'text-align': 'justify !important' },
+        'h1, h2, h3': { 'font-family': 'Arial, sans-serif !important', 'margin': '1em 0 0.5em !important' },
+        'a': { 'color': '#333 !important' }
+    });
+    rendition.themes.select('kindle');
 
-        // Load navigation before first display so we can open at the first
-        // content page (toc[0]) rather than the cover/blank spine item.
-        const nav = await book.loaded.navigation;
+    // Step 1: load navigation
+    book.loaded.navigation
+        .then(function(nav) {
+            _storedNav = nav;
+            var rawHref = nav && nav.toc && nav.toc[0] ? nav.toc[0].href : null;
+            var firstHref = rawHref ? rawHref.split('#')[0] : undefined;
+            var startAt  = bookmarkCfi || firstHref || undefined;
 
-        // Strip any fragment identifier from the TOC href (e.g. "ch01.xhtml#start"
-        // → "ch01.xhtml"). epub.js spine lookup keys on bare filenames; a fragment
-        // causes spine.get() to return null which throws "no section found".
-        const rawHref = nav?.toc?.[0]?.href;
-        const firstContentHref = rawHref ? rawHref.split('#')[0] : undefined;
+            // Step 2: display first page (with fallback)
+            return rendition.display(startAt)
+                .catch(function(displayErr) {
+                    console.warn('display() fallback:', displayErr.message);
+                    return rendition.display(undefined);
+                });
+        })
+        .then(function() {
+            // Apply saved reader settings (font, size, theme)
+            applyStoredSettings();
 
-        try {
-            await rendition.display(bookmarkCfi || firstContentHref || undefined);
-        } catch (displayErr) {
-            // href didn't resolve — fall back to spine[0]
-            console.warn('display() fallback:', displayErr.message);
-            await rendition.display(undefined);
-        }
+            // Auto-status + wishlist init
+            if (_bookDbId) {
+                var wb = document.getElementById('wishBtn');
+                if (wb) wb.style.display = '';  // show for local books
 
-        // Title
-        const meta = await book.loaded.metadata;
-        document.getElementById('bookTitle').textContent = meta.title || 'Book';
-        document.title = meta.title || 'Reader';
+                fetch('/api/books/local/' + _bookDbId)
+                    .then(function(r) { return r.ok ? r.json() : null; })
+                    .then(function(data) {
+                        if (!data) return;
+                        // Wishlist
+                        _readerWishlisted = !!data.is_wishlist;
+                        _updateWishBtn();
+                        // Reading status
+                        if (data.reading_status === 'not_started') {
+                            fetch('/api/books/update', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ db_id: _bookDbId, reading_status: 'reading' })
+                            }).catch(function() {});
+                        }
+                        if (data.reading_status === 'complete' || data.reading_status === 'dnf') {
+                            _autoStatusDone = true;
+                        }
+                    })
+                    .catch(function() {});
+            }
 
-        // Show viewer, hide loading message
-        document.getElementById('statusMsg').style.display  = 'none';
-        document.getElementById('epubViewer').style.display = 'block';
+            // Step 3: load metadata for title
+            return book.loaded.metadata;
+        })
+        .then(function(meta) {
+            document.getElementById('bookTitle').textContent = meta.title || 'Book';
+            document.title = meta.title || 'Reader';
 
-        if (bookmarkCfi) applyHighlight(bookmarkCfi);
+            // Hide loading overlay (viewer is already visible behind it)
+            document.getElementById('statusMsg').style.display = 'none';
+            clearTimeout(window._loadTimer);
 
-        // TOC — nav already loaded above
-        if (nav?.toc?.length) buildToc(nav.toc);
-        else document.getElementById('tocBtn').style.display = 'none';
+            if (bookmarkCfi) applyHighlight(bookmarkCfi);
 
-        // Location tracking
-        rendition.on('relocated', location => {
-            updateFooter(location.start.cfi);
-            updateBookmarkBtn(location);
-        });
-        updateBookmarkBtn(rendition.currentLocation());
+            // TOC
+            if (_storedNav && _storedNav.toc && _storedNav.toc.length) {
+                buildToc(_storedNav.toc);
+            } else {
+                var tb = document.getElementById('tocBtn');
+                if (tb) tb.style.display = 'none';
+            }
 
-        // Generate locations
-        // Use 2400 instead of desktop's 1600 — Paperwhite renders wider
-        // virtual pages so fewer slices give the same granularity
-        book.ready.then(async () => {
-            const locCached = sessionStorage.getItem(LOC_KEY);
+            // Location tracking + auto-complete
+            rendition.on('relocated', function(location) {
+                updateFooter(location.start.cfi);
+                updateBookmarkBtn(location);
+                if (_bookDbId && !_autoStatusDone && locationsReady && totalLocs) {
+                    var pct = book.locations.percentageFromCfi(location.start.cfi);
+                    if (pct >= 0.90) {
+                        _autoStatusDone = true;
+                        fetch('/api/books/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ db_id: _bookDbId, reading_status: 'complete' })
+                        }).catch(function() {});
+                        showToast('Book marked as complete');
+                    }
+                }
+            });
+            updateBookmarkBtn(rendition.currentLocation());
+
+            // Step 4: generate location index (for "Page N of N")
+            return book.ready;
+        })
+        .then(function() {
+            var locCached = sessionStorage.getItem(LOC_KEY);
             if (locCached) {
                 try {
                     book.locations.load(locCached);
                     totalLocs = book.locations.total;
                     locationsReady = true;
-                    const l = rendition.currentLocation();
+                    var l = rendition.currentLocation();
                     if (l) updateFooter(l.start.cfi);
                     return;
                 } catch(e) { /* stale — regenerate */ }
             }
-            await book.locations.generate(2400);
-            totalLocs = book.locations.total;
-            locationsReady = true;
-            try { sessionStorage.setItem(LOC_KEY, book.locations.save()); } catch(e) {}
-            const l = rendition.currentLocation();
-            if (l) updateFooter(l.start.cfi);
+            return book.locations.generate(2400)
+                .then(function() {
+                    totalLocs = book.locations.total;
+                    locationsReady = true;
+                    try { sessionStorage.setItem(LOC_KEY, book.locations.save()); } catch(e) {}
+                    var l = rendition.currentLocation();
+                    if (l) updateFooter(l.start.cfi);
+                });
+        })
+        .catch(function(err) {
+            clearTimeout(window._loadTimer);
+            window._showReaderError('Failed to load book: ' + (err && err.message ? err.message : String(err)));
+            console.error(err);
         });
 
-        // ── Hardware page-turn buttons on Paperwhite ──────────────────────
-        // The Paperwhite's physical page-turn buttons send ArrowRight /
-        // ArrowLeft key events through the browser. This is also how the
-        // on-screen tap zones work, so one handler covers both.
-        document.addEventListener('keydown', e => {
-            if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') epubNext();
-            if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp'   || e.key === 'PageUp')   epubPrev();
-        });
+    // ── Hardware page-turn buttons on Paperwhite ──────────────────────────
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') epubNext();
+        if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp'   || e.key === 'PageUp')   epubPrev();
+    });
 
-        // ── Swipe ────────────────────────────────────────────────────────
-        // Threshold raised to 60px — Paperwhite touch registration is less
-        // precise than a phone screen and short swipes can misfire.
-        let tx = 0;
-        document.addEventListener('touchstart', e => {
-            tx = e.touches[0].clientX;
-        }, { passive: true });
-        document.addEventListener('touchend', e => {
-            const dx = e.changedTouches[0].clientX - tx;
-            if (Math.abs(dx) > 60) { dx < 0 ? epubNext() : epubPrev(); }
-        });
+    // ── Swipe ─────────────────────────────────────────────────────────────
+    var _tx = 0;
+    document.addEventListener('touchstart', function(e) {
+        _tx = e.touches[0].clientX;
+    }, { passive: true });
+    document.addEventListener('touchend', function(e) {
+        var dx = e.changedTouches[0].clientX - _tx;
+        if (Math.abs(dx) > 60) { dx < 0 ? epubNext() : epubPrev(); }
+    });
+}
 
-    } catch (err) {
-        document.getElementById('statusMsg').innerHTML =
-            `<p style="color:#c00;padding:0 20px;font-family:Arial,sans-serif;">
-                Failed to load book:<br><small>${err.message}</small>
-             </p>
-             <button class="tb-btn" style="margin-top:16px;" onclick="goBack()">&#8592; Back to Library</button>`;
-        console.error(err);
-    }
+// ════════════════════════════════════════════════════════════
+//  SETTINGS — font size, font family, theme (light/dark)
+//
+//  Storage keys:
+//    reader_defaults          — global default settings object
+//    reader_settings_<bookId> — per-book overrides
+//
+//  Settings object shape: { fontSize, fontFamily, theme }
+//    fontSize   : integer percent (70–200, step 10)
+//    fontFamily : CSS font-family string
+//    theme      : 'light' | 'dark'
+// ════════════════════════════════════════════════════════════
+
+const SETTINGS_DEFAULTS_KEY = 'reader_defaults';
+const SETTINGS_BOOK_KEY     = `reader_settings_${bookId}`;
+
+// Working copy — populated on panel open from stored values
+let _pendingSettings = {};
+let settingsOpen = false;
+
+function _loadSettings() {
+    // Merge: global defaults < per-book overrides
+    const defaults = _parseJSON(localStorage.getItem(SETTINGS_DEFAULTS_KEY)) || {};
+    const perBook  = _parseJSON(localStorage.getItem(SETTINGS_BOOK_KEY))     || {};
+    return Object.assign(
+        { fontSize: 100, fontFamily: "Georgia, 'Times New Roman', serif", theme: 'light' },
+        defaults,
+        perBook
+    );
+}
+
+function _parseJSON(s) {
+    try { return s ? JSON.parse(s) : null; } catch(e) { return null; }
+}
+
+// Apply a settings object to the epub rendition theme
+function _applyThemeToRendition(s) {
+    if (!rendition) return;
+    const isDark = s.theme === 'dark';
+    rendition.themes.register('reader-custom', {
+        'body': {
+            'font-family':  `${s.fontFamily} !important`,
+            'font-size':    `${s.fontSize}% !important`,
+            'line-height':  '1.75 !important',
+            'color':        (isDark ? '#dddddd' : '#111111') + ' !important',
+            'background':   (isDark ? '#1a1a1a' : '#ffffff') + ' !important',
+            'margin':       '0 !important',
+            'padding':      '12px 18px !important'
+        },
+        'p': {
+            'margin-bottom': '0.8em !important',
+            'text-align':    'justify !important'
+        },
+        'h1, h2, h3': {
+            'font-family': 'Arial, sans-serif !important',
+            'margin':      '1em 0 0.5em !important'
+        },
+        'a': { 'color': (isDark ? '#aaccff' : '#333333') + ' !important' }
+    });
+    rendition.themes.select('reader-custom');
+
+    // Also update the outer page background so chrome matches
+    document.body.style.background = isDark ? '#1a1a1a' : '#ffffff';
+    document.getElementById('epubViewer').style.background = isDark ? '#1a1a1a' : '#ffffff';
+}
+
+// Apply currently saved settings (called on book load)
+function applyStoredSettings() {
+    const s = _loadSettings();
+    _applyThemeToRendition(s);
+}
+
+// ── Panel open/close ──────────────────────────────────────────────────────────
+function toggleSettings() {
+    settingsOpen ? closeSettings() : openSettings();
+}
+
+function openSettings() {
+    settingsOpen = true;
+    // Close TOC if open
+    if (tocOpen) closeToc();
+
+    // Populate panel controls from current (merged) settings
+    const s = _loadSettings();
+    _pendingSettings = Object.assign({}, s);
+
+    // Font size slider
+    const slider = document.getElementById('fontSizeSlider');
+    slider.value = s.fontSize;
+    document.getElementById('fontSizeVal').textContent = s.fontSize + '%';
+
+    // Font family buttons
+    document.querySelectorAll('.font-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.font === s.fontFamily);
+    });
+
+    // Theme buttons
+    _updateThemeBtns(s.theme);
+
+    document.getElementById('settingsPanel').classList.add('open');
+}
+
+function closeSettings() {
+    settingsOpen = false;
+    document.getElementById('settingsPanel').classList.remove('open');
+}
+
+// ── Controls (auto-save on every change) ─────────────────────────────────────
+function onFontSizeSlide(val) {
+    _pendingSettings.fontSize = parseInt(val);
+    document.getElementById('fontSizeVal').textContent = val + '%';
+    _autoSave();
+    _applyThemeToRendition(_pendingSettings);
+}
+
+function stepFontSize(delta) {
+    const cur    = _pendingSettings.fontSize || 100;
+    const next   = Math.min(200, Math.max(70, cur + delta));
+    _pendingSettings.fontSize = next;
+    const slider = document.getElementById('fontSizeSlider');
+    slider.value = next;
+    document.getElementById('fontSizeVal').textContent = next + '%';
+    _autoSave();
+    _applyThemeToRendition(_pendingSettings);
+}
+
+function selectFont(btn) {
+    _pendingSettings.fontFamily = btn.dataset.font;
+    document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    _autoSave();
+    _applyThemeToRendition(_pendingSettings);
+}
+
+function selectTheme(theme) {
+    _pendingSettings.theme = theme;
+    _updateThemeBtns(theme);
+    _autoSave();
+    _applyThemeToRendition(_pendingSettings);
+}
+
+function _updateThemeBtns(theme) {
+    const lb = document.getElementById('themeLightBtn');
+    const db = document.getElementById('themeDarkBtn');
+    if (!lb || !db) return;
+    lb.classList.toggle('selected', theme === 'light');
+    db.classList.toggle('selected', theme === 'dark');
+}
+
+// Auto-save: every change writes to per-book AND global default
+function _autoSave() {
+    const s = Object.assign({}, _pendingSettings);
+    localStorage.setItem(SETTINGS_BOOK_KEY,     JSON.stringify(s));
+    localStorage.setItem(SETTINGS_DEFAULTS_KEY, JSON.stringify(s));
+}
+
+// Explicit "save as default for all books" button
+function saveAsDefault() {
+    const s = Object.assign({}, _pendingSettings);
+    localStorage.setItem(SETTINGS_DEFAULTS_KEY, JSON.stringify(s));
+    // Clear any per-book overrides so the default propagates everywhere
+    localStorage.removeItem(SETTINGS_BOOK_KEY);
+    showToast('Default settings saved for all books');
+    closeSettings();
 }
 
 initEpub();

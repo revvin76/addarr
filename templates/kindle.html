@@ -3,551 +3,581 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Books - Addarr</title>
+    <title>My Books</title>
     <style>
-        /* ── Reset ────────────────────────────────────────────────────────── */
+        /* ── No transitions or animations — prevents e-ink full-page refresh ── */
         *, *::before, *::after {
-            box-sizing: border-box;
-            margin: 0; padding: 0;
+            box-sizing: border-box; margin: 0; padding: 0;
             animation: none !important;
             transition: none !important;
         }
 
-        html { overflow-y: auto; }
-
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 16px;
-            line-height: 1.5;
+        html, body {
+            height: 100%; width: 100%;
+            overflow: hidden;   /* no page scroll — everything is paged */
             background: #fff;
             color: #111;
+            font-family: Arial, Helvetica, sans-serif;
             -webkit-text-size-adjust: 100%;
         }
 
-        /* ── Header ───────────────────────────────────────────────────────── */
-        header {
-            background: #1a1a1a;
-            color: #fff;
-            padding: 10px 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+        /* ── Header ── */
+        #header {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            height: 50px;
+            display: flex; align-items: center; gap: 6px;
+            background: #1a1a1a; color: #fff;
+            padding: 0 10px;
+            border-bottom: 2px solid #000;
         }
-        header h1 { font-size: 1rem; font-weight: bold; color: #fff; }
-        .header-count {
-            font-size: 0.78rem;
-            background: #c0392b;
-            color: #fff;
-            padding: 2px 8px;
-            border-radius: 10px;
-            white-space: nowrap;
+        #header h1 { flex: 1; font-size: 0.92rem; font-weight: bold; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .hdr-btn {
+            background: #333; border: 1px solid #666; color: #fff;
+            border-radius: 4px; padding: 5px 11px; font-size: 0.8rem;
+            cursor: pointer; min-height: 36px; white-space: nowrap; flex-shrink: 0;
+        }
+        .hdr-btn:active { background: #555; }
+        .hdr-btn.active { background: #555; border-color: #aaa; }
+
+        /* ── Footer / page navigation ── */
+        #footer {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+            height: 50px;
+            display: flex; align-items: center; justify-content: space-between;
+            background: #fff; border-top: 2px solid #222;
+            padding: 0 10px;
+        }
+        .nav-btn {
+            background: #fff; border: 2px solid #555; color: #111;
+            border-radius: 4px; padding: 6px 0; font-size: 1.3rem;
+            cursor: pointer; min-height: 40px; width: 52px; text-align: center;
+        }
+        .nav-btn:active { background: #e0e0e0; }
+        .nav-btn:disabled { opacity: 0.25; cursor: default; background: #fff; }
+        #pageInfo {
+            font-size: 0.82rem; color: #555; text-align: center; flex: 1;
         }
 
-        /* ── Search ───────────────────────────────────────────────────────── */
-        .search-bar {
-            padding: 8px 12px;
-            background: #f0f0f0;
-            border-bottom: 1px solid #ccc;
-            display: flex;
-            gap: 6px;
+        /* ── Book grid: 2 columns × 3 rows, fills the space between header and footer ── */
+        #booksGrid {
+            position: fixed;
+            top: 50px; bottom: 50px;
+            left: 0; right: 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            /* No gap — borders handled per-card */
         }
-        .search-bar input {
-            flex: 1;
-            font-size: 16px;
-            padding: 9px 10px;
-            border: 2px solid #888;
-            border-radius: 4px;
+
+        /* ── Book card ── */
+        .book-card {
+            display: flex; flex-direction: column;
+            cursor: pointer; overflow: hidden;
             background: #fff;
-            color: #111;
-            outline: none;
+            border-right: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+        }
+        /* No right border on even (right column) cards */
+        .book-card:nth-child(2n) { border-right: none; }
+        /* No bottom border on last row */
+        .book-card:nth-child(n+5) { border-bottom: none; }
+        .book-card:active { background: #efefef; }
+
+        /* Empty slot (when fewer than 6 books on page) */
+        .book-card-empty {
+            border-right: 1px solid #eee;
+            border-bottom: 1px solid #eee;
+            background: #fafafa;
+        }
+        .book-card-empty:nth-child(2n) { border-right: none; }
+        .book-card-empty:nth-child(n+5) { border-bottom: none; }
+
+        /* Cover image area — fills card except the label strip */
+        .book-cover-wrap {
+            flex: 1;
+            overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            background: #f0f0f0;
+            position: relative;
+        }
+        .book-cover {
+            width: 100%; height: 100%;
+            object-fit: scale-down;
+            display: block;
+        }
+        /* Badge overlaid on cover (status / wishlist) */
+        .cover-badges {
+            position: absolute; bottom: 4px; left: 4px;
+            display: flex; flex-direction: column; gap: 2px;
+        }
+        .cover-badge {
+            font-size: 0.6rem; font-family: Arial, sans-serif;
+            padding: 2px 5px; border-radius: 3px; white-space: nowrap;
+            line-height: 1.4;
+        }
+        .cb-reading  { background: rgba(30,90,160,0.88); color: #fff; }
+        .cb-complete { background: rgba(30,110,50,0.88);  color: #fff; }
+        .cb-dnf      { background: rgba(160,30,30,0.88);  color: #fff; }
+        .cb-bm       { background: rgba(180,110,0,0.88);  color: #fff; }
+        .cb-heart    { background: rgba(192,57,43,0.88);   color: #fff; }
+
+        /* Label strip at the bottom of each card */
+        .book-label {
+            height: 62px;
+            padding: 3px 5px 2px;
+            border-top: 1px solid #e8e8e8;
+            background: #fff;
+            overflow: hidden;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .book-label-title {
+            font-size: 0.7rem; font-weight: bold; color: #111;
+            line-height: 1.25;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        /* Bottom row: author + action buttons */
+        .book-label-foot {
+            display: flex; align-items: center; gap: 4px;
+            flex-shrink: 0;
+        }
+        .book-label-author {
+            font-size: 0.58rem; color: #c0392b;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            flex: 1;
+        }
+        /* Tiny action buttons on the card */
+        .card-act-btn {
+            background: #fff; border: 1px solid #aaa; color: #555;
+            border-radius: 3px; font-size: 0.6rem; padding: 2px 5px;
+            cursor: pointer; min-height: 22px; white-space: nowrap; flex-shrink: 0;
+        }
+        .card-act-btn:active { background: #ddd; }
+        .card-act-btn.heart-on  { color: #c0392b; border-color: #c0392b; }
+        .card-act-btn.dnf-on    { color: #fff; background: #c0392b; border-color: #c0392b; }
+
+        /* ── Search / filter overlay (full-screen, no transitions) ── */
+        #searchOverlay {
+            display: none;
+            position: fixed; top: 50px; bottom: 50px; left: 0; right: 0;
+            background: #fff; z-index: 200;
+            overflow: hidden;
+        }
+        #searchOverlay.open { display: flex; flex-direction: column; }
+
+        .so-header {
+            flex-shrink: 0;
+            display: flex; gap: 6px; align-items: center;
+            padding: 8px 10px;
+            background: #f0f0f0;
+            border-bottom: 2px solid #222;
+        }
+        .so-header input {
+            flex: 1; font-size: 16px; padding: 8px 10px;
+            border: 2px solid #888; border-radius: 4px;
+            outline: none; background: #fff; color: #111;
             -webkit-appearance: none;
         }
-        .search-btn {
-            font-size: 14px;
-            padding: 9px 14px;
-            border: 2px solid #555;
-            border-radius: 4px;
-            background: #fff;
-            color: #111;
-            cursor: pointer;
-            min-height: 44px;
-            min-width: 54px;
-            font-weight: bold;
+        .so-btn {
+            padding: 8px 14px; border: 2px solid #555; border-radius: 4px;
+            background: #fff; color: #111; font-size: 0.85rem;
+            cursor: pointer; min-height: 42px; white-space: nowrap;
         }
-        .search-btn:active { background: #ddd; }
-        .search-btn.clear-btn {
-            min-width: 44px;
-            color: #c0392b;
-            border-color: #c0392b;
-        }
+        .so-btn:active { background: #ddd; }
 
-        /* ── Filter strip ─────────────────────────────────────────────────── */
-        .filter-strip {
-            padding: 6px 12px;
-            background: #f0f0f0;
-            border-bottom: 1px solid #ccc;
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        .filter-label {
-            font-size: 0.75rem;
-            color: #555;
-            white-space: nowrap;
+        .so-filters {
+            flex-shrink: 0;
+            display: flex; flex-wrap: wrap; gap: 5px;
+            padding: 8px 10px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
         }
         .filter-btn {
-            font-size: 0.72rem;
-            padding: 5px 10px;
-            border: 1px solid #aaa;
-            border-radius: 3px;
-            background: #fff;
-            color: #333;
-            cursor: pointer;
-            min-height: 34px;
+            font-size: 0.75rem; padding: 6px 12px;
+            border: 1px solid #aaa; border-radius: 3px;
+            background: #fff; color: #333;
+            cursor: pointer; min-height: 36px;
         }
         .filter-btn:active { background: #ddd; }
-        .filter-btn.active {
-            background: #1a1a1a;
-            color: #fff;
-            border-color: #1a1a1a;
-        }
-        .filter-btn.active-wishlist {
-            background: #c0392b;
-            color: #fff;
-            border-color: #c0392b;
-        }
+        .filter-btn.active      { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+        .filter-btn.active-wish { background: #c0392b; color: #fff; border-color: #c0392b; }
 
-        /* ── A-Z ──────────────────────────────────────────────────────────── */
-        .az-toggle-row {
-            padding: 6px 12px;
-            background: #f0f0f0;
-            border-bottom: 1px solid #ccc;
+        /* Scrollable results list inside overlay */
+        #searchResults {
+            flex: 1; overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
-        .az-toggle {
-            font-size: 13px;
-            padding: 7px 14px;
-            border: 2px solid #555;
-            border-radius: 4px;
-            background: #fff;
-            color: #111;
-            cursor: pointer;
-            min-height: 40px;
+        .sr-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-bottom: 1px solid #ddd;
+            cursor: pointer; background: #fff;
         }
-        .az-toggle:active { background: #ddd; }
-        .az-bar {
-            display: none;
-            padding: 8px 12px;
-            background: #f0f0f0;
-            border-bottom: 1px solid #ccc;
-        }
-        .az-bar.open { display: block; }
-        .az-grid { display: flex; flex-wrap: wrap; gap: 5px; }
-        .az-btn {
-            padding: 7px 9px;
-            border: 1px solid #aaa;
-            border-radius: 3px;
-            background: #fff;
-            color: #333;
-            font-size: 0.82rem;
-            cursor: pointer;
-            min-height: 38px;
-            min-width: 38px;
-            text-align: center;
-        }
-        .az-btn:active { background: #ddd; }
-        .az-btn:disabled { opacity: 0.3; cursor: default; }
-
-        /* ── Book list ────────────────────────────────────────────────────── */
-        #booksGrid { padding: 0; }
-
-        .book-item {
-            display: flex;
-            gap: 10px;
-            align-items: flex-start;
-            padding: 12px 12px;
-            border-bottom: 1px solid #ddd;
-            background: #fff;
-            cursor: pointer;
-        }
-        .book-item:nth-child(even) { background: #f8f8f8; }
-        .book-item:active { background: #e0e0e0; }
-
-        .book-thumb {
-            width: 60px;
-            height: 90px;
-            object-fit: cover;
-            flex-shrink: 0;
-            border: 1px solid #ccc;
+        .sr-item:active { background: #e8e8e8; }
+        .sr-cover {
+            width: 44px; height: 66px;
+            object-fit: cover; border: 1px solid #ccc; flex-shrink: 0;
             background: #eee;
         }
-        .book-thumb-placeholder {
-            width: 60px;
-            height: 90px;
-            flex-shrink: 0;
-            background: #e8e8e8;
-            border: 1px solid #ccc;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.4rem;
-            color: #aaa;
-        }
+        .sr-info { flex: 1; min-width: 0; }
+        .sr-title  { font-size: 0.88rem; font-weight: bold; color: #111; word-break: break-word; line-height: 1.3; }
+        .sr-author { font-size: 0.76rem; color: #c0392b; margin-top: 2px; }
+        .sr-meta   { font-size: 0.68rem; color: #777;    margin-top: 2px; }
 
-        .book-info { flex: 1; min-width: 0; }
-        .book-title {
-            font-size: 0.9rem;
-            font-weight: bold;
-            color: #111;
-            white-space: normal;
-            word-break: break-word;
-            line-height: 1.35;
-        }
-        .book-author {
-            font-size: 0.8rem;
-            color: #c0392b;
-            margin-top: 3px;
-        }
-        .book-meta {
-            font-size: 0.72rem;
-            color: #777;
-            margin-top: 3px;
-        }
-        .book-genre {
-            font-size: 0.68rem;
-            color: #999;
-            margin-top: 2px;
-        }
-        .bm-badge {
-            display: inline-block;
-            font-size: 0.7rem;
-            background: #e8a000;
-            color: #000;
-            padding: 2px 6px;
-            border-radius: 3px;
-            margin-top: 4px;
-        }
+        .sr-empty  { padding: 30px 20px; text-align: center; color: #888; font-size: 0.88rem; }
 
-        /* Reading status badge */
-        .rs-badge {
-            display: inline-block;
-            font-size: 0.65rem;
-            padding: 2px 6px;
-            border-radius: 3px;
-            margin-top: 4px;
-        }
-        .rs-not_started { background: #e8e8e8; color: #666; }
-        .rs-reading     { background: #d0e8f8; color: #1a5a8a; }
-        .rs-complete    { background: #d0f0d8; color: #1a6a30; }
-        .rs-dnf         { background: #f8d0d0; color: #8a1a1a; }
-
-        /* Heart / wishlist badge */
-        .heart-badge {
-            display: inline-block;
-            font-size: 0.75rem;
-            color: #c0392b;
-            margin-top: 4px;
-            margin-left: 4px;
-        }
-
-        /* ── Empty states ─────────────────────────────────────────────────── */
-        .empty-msg {
-            padding: 40px 20px;
-            text-align: center;
-            color: #666;
-            font-size: 0.9rem;
-        }
-        #emptySearch {
+        /* ── Status toast ── */
+        #toast {
             display: none;
-            padding: 20px;
-            text-align: center;
-            color: #666;
-            border-top: 1px solid #ddd;
-            font-size: 0.85rem;
+            position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+            background: #111; color: #fff; padding: 10px 22px;
+            border-radius: 6px; font-size: 0.85rem; z-index: 400;
+            white-space: nowrap; border: 1px solid #444;
         }
-
-        /* ── Back to top ──────────────────────────────────────────────────── */
-        #backToTopRow { padding: 16px; text-align: center; border-top: 1px solid #ddd; }
-        #backToTopBtn {
-            font-size: 14px;
-            padding: 10px 20px;
-            border: 2px solid #555;
-            border-radius: 4px;
-            background: #fff;
-            color: #111;
-            cursor: pointer;
-            min-height: 44px;
-        }
-        #backToTopBtn:active { background: #ddd; }
+        #toast.show { display: block; }
     </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <header>
-        <h1>&#128218; My Books</h1>
-        <span class="header-count">{{ total_downloaded }} books</span>
-    </header>
+<!-- Header -->
+<div id="header">
+    <h1>&#128218; My Books <span id="hdrCount" style="font-size:0.72rem;font-weight:normal;opacity:0.7;"></span></h1>
+    <button class="hdr-btn" id="filterToggleBtn" onclick="toggleSearch()">&#9776; Browse</button>
+    <button class="hdr-btn" id="searchBtn" onclick="openSearch()">&#128269;</button>
+</div>
 
-    <!-- Search -->
-    <div class="search-bar">
-        <input type="text" id="bookSearch"
-               placeholder="Title, author or genre…"
-               autocomplete="off" autocorrect="off"
-               autocapitalize="off" spellcheck="false">
-        <button class="search-btn" id="doSearch">Search</button>
-        <button class="search-btn clear-btn" id="clearSearch" style="display:none">&#10005;</button>
+<!-- Book grid (filled by JS) -->
+<div id="booksGrid"></div>
+
+<!-- Footer page navigation -->
+<div id="footer">
+    <button class="nav-btn" id="prevBtn" onclick="changePage(-1)" disabled>&#8249;</button>
+    <span id="pageInfo">&#8212;</span>
+    <button class="nav-btn" id="nextBtn" onclick="changePage(1)" disabled>&#8250;</button>
+</div>
+
+<!-- Search / filter overlay -->
+<div id="searchOverlay">
+    <div class="so-header">
+        <input type="text" id="searchInput" placeholder="Title, author or genre&hellip;"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="so-btn" onclick="doSearch()">Go</button>
+        <button class="so-btn" onclick="closeSearch()">&#10005;</button>
     </div>
-
-    <!-- Status filter strip -->
-    <div class="filter-strip">
-        <span class="filter-label">Filter:</span>
-        <button class="filter-btn active" data-filter="all"          id="fAll">All</button>
-        <button class="filter-btn"        data-filter="not_started"  id="fNotStarted">Not Started</button>
-        <button class="filter-btn"        data-filter="reading"      id="fReading">Reading</button>
-        <button class="filter-btn"        data-filter="complete"     id="fComplete">Complete</button>
-        <button class="filter-btn"        data-filter="dnf"          id="fDnf">DNF</button>
-        <button class="filter-btn"        data-filter="wishlist"     id="fWishlist">&#9825; Wishlist</button>
+    <div class="so-filters">
+        <button class="filter-btn active" data-f="all">All</button>
+        <button class="filter-btn" data-f="not_started">Not Started</button>
+        <button class="filter-btn" data-f="reading">Reading</button>
+        <button class="filter-btn" data-f="complete">Complete</button>
+        <button class="filter-btn" data-f="dnf">DNF</button>
+        <button class="filter-btn" data-f="wishlist">&#9829; Wishlist</button>
     </div>
+    <div id="searchResults"></div>
+</div>
 
-    <!-- A-Z -->
-    <div class="az-toggle-row">
-        <button class="az-toggle" id="azToggle">A&#8211;Z jump</button>
-    </div>
-    <div class="az-bar" id="azBar">
-        <div class="az-grid" id="azGrid"></div>
-    </div>
+<!-- Toast -->
+<div id="toast"></div>
 
-    <!-- Book list -->
-    {% if books %}
-    <div id="booksGrid">
-        {% for book in books %}
-        {% set rs = book.reading_status or 'not_started' %}
-        {% set rs_label = {'not_started': '', 'reading': 'Reading…', 'complete': '✓ Done', 'dnf': 'DNF'} %}
-        <div class="book-item"
-             data-title="{{ book.title | lower }}"
-             data-author="{{ (book.author or '') | lower }}"
-             data-genre="{{ (book.genre or '') | lower }}"
-             data-reading-status="{{ rs }}"
-             data-wishlist="{{ 1 if book.is_wishlist else 0 }}"
-             data-id="{{ book.id }}">
+<!-- ════════════════════════════════════════════════════════════════════════
+     All books rendered by Jinja into a JS array; page grid is drawn by JS.
+     Keeping data in JS avoids repeating heavy DOM nodes for all 6 slots.
+════════════════════════════════════════════════════════════════════════ -->
+<script>
+var ALL_BOOKS = [
+    {% for book in books %}
+    {
+        id:            {{ book.id }},
+        title:         {{ (book.title or book.filename or '')|tojson }},
+        author:        {{ (book.author or '')|tojson }},
+        genre:         {{ (book.genre or '')|tojson }},
+        year:          {{ book.year or 'null' }},
+        pages:         {{ book.pages or 'null' }},
+        status:        {{ (book.reading_status or 'not_started')|tojson }},
+        isWishlist:    {{ 1 if book.is_wishlist else 0 }},
+        titleLower:    {{ ((book.title or book.filename or '')|lower)|tojson }},
+        authorLower:   {{ ((book.author or '')|lower)|tojson }},
+        genreLower:    {{ ((book.genre or '')|lower)|tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
 
-            <img src="/api/book/cover/{{ book.id }}?w=60&h=90"
-                 class="book-thumb"
-                 alt="{{ book.title }}"
-                 onerror="this.onerror=null;this.outerHTML='<div class=\'book-thumb-placeholder\'>&#128218;</div>'">
+var BOOKS_PER_PAGE = 6;
+var currentPage    = 0;
+var activeFilter   = 'all';
+var searchTerm     = '';
+var filtered       = ALL_BOOKS.slice();
+var searchOpen     = false;
 
-            <div class="book-info">
-                <div class="book-title">{{ book.title or book.filename }}</div>
-                {% if book.author %}
-                <div class="book-author">{{ book.author }}</div>
-                {% endif %}
-                <div class="book-meta">
-                    {% if book.year %}{{ book.year }}{% endif %}
-                    {% if book.pages %}&middot; {{ book.pages }}pp{% endif %}
-                </div>
-                {% if book.genre %}
-                <div class="book-genre">{{ book.genre | truncate(40, true, '…') }}</div>
-                {% endif %}
-                <div>
-                    {% if rs != 'not_started' %}
-                    <span class="rs-badge rs-{{ rs }}">{{ rs_label.get(rs, rs) }}</span>
-                    {% endif %}
-                    {% if book.is_wishlist %}
-                    <span class="heart-badge">&#9829;</span>
-                    {% endif %}
-                    <!-- Bookmark badge injected here by JS if a bookmark exists -->
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="empty-msg">
-        <p>&#128218;</p>
-        <p style="margin-top:10px;">No downloaded books found.</p>
-    </div>
-    {% endif %}
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showToast(msg, ms) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(function() { el.classList.remove('show'); }, ms || 2200);
+}
 
-    <div id="emptySearch">No books match your search.</div>
-
-    {% if books %}
-    <div id="backToTopRow">
-        <button id="backToTopBtn">&#8679; Back to top</button>
-    </div>
-    {% endif %}
-
-    <script>
-    // ── Helpers ──────────────────────────────────────────────────────────────
-    function allItems() {
-        return Array.from(document.querySelectorAll('.book-item'));
-    }
-
-    // ── Active filter state ──────────────────────────────────────────────────
-    var activeFilter = 'all';
-    var searchActive = false;
-
-    // ── Filter logic ─────────────────────────────────────────────────────────
-    function applyFilters() {
-        var term = document.getElementById('bookSearch').value.trim().toLowerCase();
-        var any  = false;
-
-        allItems().forEach(function(item) {
-            var titleMatch  = !term || (item.dataset.title  || '').indexOf(term) !== -1;
-            var authorMatch = !term || (item.dataset.author || '').indexOf(term) !== -1;
-            var genreMatch  = !term || (item.dataset.genre  || '').indexOf(term) !== -1;
-            var textOk = titleMatch || authorMatch || genreMatch;
-
-            var statusOk = true;
-            if (activeFilter === 'wishlist') {
-                statusOk = item.dataset.wishlist === '1';
-            } else if (activeFilter !== 'all') {
-                statusOk = item.dataset.readingStatus === activeFilter;
-            }
-
-            var show = textOk && statusOk;
-            item.style.display = show ? '' : 'none';
-            if (show) any = true;
-        });
-
-        document.getElementById('emptySearch').style.display = any ? 'none' : 'block';
-    }
-
-    // ── Search ───────────────────────────────────────────────────────────────
-    function doSearch() {
-        var term = document.getElementById('bookSearch').value.trim();
-        document.getElementById('clearSearch').style.display = term ? '' : 'none';
-        searchActive = !!term;
-        applyFilters();
-    }
-
-    function clearSearch() {
-        searchActive = false;
-        document.getElementById('bookSearch').value = '';
-        document.getElementById('clearSearch').style.display = 'none';
-        applyFilters();
-    }
-
-    document.getElementById('doSearch').addEventListener('click', doSearch);
-    document.getElementById('clearSearch').addEventListener('click', clearSearch);
-    document.getElementById('bookSearch').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.keyCode === 13) doSearch();
+// ── Filter + render ──────────────────────────────────────────────────────────
+function applyFilter() {
+    var t = searchTerm.toLowerCase();
+    filtered = ALL_BOOKS.filter(function(b) {
+        var textOk = !t ||
+            b.titleLower.indexOf(t)  !== -1 ||
+            b.authorLower.indexOf(t) !== -1 ||
+            b.genreLower.indexOf(t)  !== -1;
+        var statusOk =
+            activeFilter === 'all'      ? true :
+            activeFilter === 'wishlist' ? b.isWishlist === 1 :
+                                          b.status === activeFilter;
+        return textOk && statusOk;
     });
+    currentPage = 0;
+    renderGrid();
+}
 
-    // ── Status filter buttons ─────────────────────────────────────────────────
-    document.querySelector('.filter-strip').addEventListener('click', function(e) {
-        var btn = e.target.closest('.filter-btn');
-        if (!btn) return;
-        activeFilter = btn.dataset.filter;
-        // Update button styles
-        document.querySelectorAll('.filter-btn').forEach(function(b) {
-            b.classList.remove('active', 'active-wishlist');
-        });
-        if (activeFilter === 'wishlist') btn.classList.add('active-wishlist');
-        else btn.classList.add('active');
-        applyFilters();
-    });
+function renderGrid() {
+    var grid  = document.getElementById('booksGrid');
+    var start = currentPage * BOOKS_PER_PAGE;
+    var page  = filtered.slice(start, start + BOOKS_PER_PAGE);
+    var html  = '';
 
-    // ── A-Z ──────────────────────────────────────────────────────────────────
-    function buildAzNav() {
-        var grid = document.getElementById('azGrid');
-        if (!grid) return;
-        var used = {};
-        allItems().forEach(function(item) {
-            var t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
-            var c = t.charAt(0);
-            if (/[0-9]/.test(c))      used['0'] = true;
-            else if (/[a-z]/i.test(c)) used[c.toLowerCase()] = true;
-        });
-        var chars = ['0','a','b','c','d','e','f','g','h','i','j','k','l','m',
-                     'n','o','p','q','r','s','t','u','v','w','x','y','z'];
-        chars.forEach(function(c) {
-            var btn = document.createElement('button');
-            btn.className = 'az-btn';
-            btn.textContent = c === '0' ? '0-9' : c.toUpperCase();
-            if (used[c]) btn.addEventListener('click', function() { scrollToLetter(c); });
-            else btn.disabled = true;
-            grid.appendChild(btn);
-        });
-    }
-
-    document.getElementById('azToggle').addEventListener('click', function() {
-        var bar    = document.getElementById('azBar');
-        var isOpen = bar.classList.toggle('open');
-        this.textContent = isOpen ? 'A–Z ▲ close' : 'A–Z jump';
-    });
-
-    function scrollToLetter(letter) {
-        document.getElementById('azBar').classList.remove('open');
-        document.getElementById('azToggle').textContent = 'A–Z jump';
-        var items = allItems();
-        for (var i = 0; i < items.length; i++) {
-            var item = items[i];
-            if (item.style.display === 'none') continue;
-            var t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
-            var c = t.charAt(0).toLowerCase();
-            var match = (letter === '0') ? /[0-9]/.test(c) : (c === letter);
-            if (match) { item.scrollIntoView({ behavior: 'auto', block: 'start' }); return; }
+    for (var i = 0; i < BOOKS_PER_PAGE; i++) {
+        var b = page[i];
+        if (!b) {
+            html += '<div class="book-card book-card-empty"></div>';
+            continue;
         }
+
+        // Build cover badges (status + wishlist + bookmark)
+        var badges = '';
+        if (b.status === 'reading')  badges += '<span class="cover-badge cb-reading">Reading&hellip;</span>';
+        if (b.status === 'complete') badges += '<span class="cover-badge cb-complete">&#10003; Done</span>';
+        if (b.status === 'dnf')      badges += '<span class="cover-badge cb-dnf">DNF</span>';
+        if (b.isWishlist)            badges += '<span class="cover-badge cb-heart">&#9829; Wishlist</span>';
+
+        // Bookmark badge from localStorage
+        var bmPage = localStorage.getItem('epub_bm_local_' + b.id + '_page');
+        if (localStorage.getItem('epub_bm_local_' + b.id)) {
+            var bmLabel = bmPage ? ('&#128278; p.' + bmPage.split('/')[0]) : '&#128278;';
+            badges += '<span class="cover-badge cb-bm">' + bmLabel + '</span>';
+        }
+
+        var heartCls = b.isWishlist ? 'card-act-btn heart-on' : 'card-act-btn';
+        var heartLbl = b.isWishlist ? '&#9829;' : '&#9825;';
+        var dnfCls   = b.status === 'dnf' ? 'card-act-btn dnf-on' : 'card-act-btn';
+        var dnfLbl   = b.status === 'dnf' ? '&#10005;DNF' : 'DNF';
+
+        html += '<div class="book-card">' +
+            // Cover area: tap to open book
+            '<div class="book-cover-wrap" onclick="openBook(' + b.id + ')">' +
+                '<img class="book-cover" ' +
+                     'src="/api/book/cover/' + b.id + '?w=200&h=280" ' +
+                     'alt="' + esc(b.title) + '" ' +
+                     'onerror="this.onerror=null;this.src=\'/static/images/apple-touch-icon.png\'">' +
+                (badges ? '<div class="cover-badges">' + badges + '</div>' : '') +
+            '</div>' +
+            // Label strip: title + author + action buttons
+            '<div class="book-label">' +
+                '<div class="book-label-title">' + esc(b.title) + '</div>' +
+                '<div class="book-label-foot">' +
+                    '<div class="book-label-author">' + esc(b.author || '') + '</div>' +
+                    '<button class="' + heartCls + '" ' +
+                            'onclick="kindleToggleWishlist(' + b.id + ', event)">' + heartLbl + '</button>' +
+                    '<button class="' + dnfCls + '" ' +
+                            'onclick="kindleToggleDnf(' + b.id + ', event)">' + dnfLbl + '</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
     }
 
-    // ── Bookmark badges ──────────────────────────────────────────────────────
-    function applyBookmarkBadges() {
-        allItems().forEach(function(card) {
-            var id    = card.dataset.id;
-            var bmKey = 'epub_bm_local_' + id;
-            var info  = card.querySelector('.book-info');
-            if (!info) return;
-            var badgeContainer = info.querySelector('.badge-row') || info.lastElementChild;
-            var existing = info.querySelector('.bm-badge');
+    grid.innerHTML = html;
 
-            if (!localStorage.getItem(bmKey)) {
-                if (existing) existing.remove();
-                return;
-            }
+    // Update nav
+    var total = Math.max(1, Math.ceil(filtered.length / BOOKS_PER_PAGE));
+    document.getElementById('pageInfo').textContent = 'Page ' + (currentPage + 1) + ' of ' + total;
+    document.getElementById('prevBtn').disabled = currentPage === 0;
+    document.getElementById('nextBtn').disabled = (currentPage + 1) >= total;
+    document.getElementById('hdrCount').textContent =
+        filtered.length === ALL_BOOKS.length
+            ? '(' + ALL_BOOKS.length + ')'
+            : '(' + filtered.length + ' of ' + ALL_BOOKS.length + ')';
+}
 
-            var badge = existing || document.createElement('span');
-            badge.className = 'bm-badge';
-            var pageInfo = localStorage.getItem(bmKey + '_page') || '';
-            if (pageInfo) {
-                var parts = pageInfo.split('/');
-                badge.textContent = '🔖 p.' + parts[0];
-            } else {
-                badge.textContent = '🔖 Bookmarked';
-            }
-            if (!existing) {
-                // Append after the status/heart badges row
-                var lastDiv = info.querySelector('.book-info > div:last-child') || info;
-                lastDiv.appendChild(badge);
-            }
-        });
+// ── Page navigation ──────────────────────────────────────────────────────────
+function changePage(dir) {
+    var total = Math.max(1, Math.ceil(filtered.length / BOOKS_PER_PAGE));
+    var next  = currentPage + dir;
+    if (next < 0 || next >= total) return;
+    currentPage = next;
+    renderGrid();
+}
+
+function openBook(id) {
+    window.location.href = '/read/local/' + id;
+}
+
+// ── Search overlay ───────────────────────────────────────────────────────────
+function openSearch() {
+    searchOpen = true;
+    document.getElementById('searchOverlay').classList.add('open');
+    document.getElementById('searchInput').value = searchTerm;
+    renderSearchResults(_getSearchResults());
+    try { document.getElementById('searchInput').focus(); } catch(e) {}
+}
+function closeSearch() {
+    searchOpen = false;
+    document.getElementById('searchOverlay').classList.remove('open');
+}
+function toggleSearch() {
+    searchOpen ? closeSearch() : openSearch();
+}
+
+function doSearch() {
+    searchTerm = document.getElementById('searchInput').value.trim();
+    renderSearchResults(_getSearchResults());
+    // Also update the main grid
+    applyFilter();
+}
+
+function _getSearchResults() {
+    var t = searchTerm.toLowerCase();
+    return ALL_BOOKS.filter(function(b) {
+        var textOk = !t ||
+            b.titleLower.indexOf(t)  !== -1 ||
+            b.authorLower.indexOf(t) !== -1 ||
+            b.genreLower.indexOf(t)  !== -1;
+        var statusOk =
+            activeFilter === 'all'      ? true :
+            activeFilter === 'wishlist' ? b.isWishlist === 1 :
+                                          b.status === activeFilter;
+        return textOk && statusOk;
+    });
+}
+
+function renderSearchResults(books) {
+    var html = '';
+    for (var i = 0; i < books.length; i++) {
+        var b = books[i];
+        var meta = [];
+        if (b.year)  meta.push(b.year);
+        if (b.pages) meta.push(b.pages + 'pp');
+        if (b.genre) meta.push(b.genre.split(',')[0].trim());
+        var statusLabel = {reading:'Reading…', complete:'✓ Done', dnf:'DNF', not_started:''}[b.status] || '';
+        if (statusLabel) meta.push(statusLabel);
+        if (b.isWishlist) meta.push('♥ Wishlist');
+
+        html += '<div class="sr-item" onclick="openBook(' + b.id + ')">' +
+            '<img class="sr-cover" src="/api/book/cover/' + b.id + '?w=44&h=66" ' +
+                 'alt="" onerror="this.onerror=null;this.src=\'/static/images/apple-touch-icon.png\'">' +
+            '<div class="sr-info">' +
+                '<div class="sr-title">' + esc(b.title) + '</div>' +
+                (b.author ? '<div class="sr-author">' + esc(b.author) + '</div>' : '') +
+                (meta.length ? '<div class="sr-meta">' + esc(meta.join(' · ')) + '</div>' : '') +
+            '</div>' +
+        '</div>';
     }
+    if (!html) html = '<div class="sr-empty">No books found.</div>';
+    document.getElementById('searchResults').innerHTML = html;
+}
 
-    // ── Card tap → reader ────────────────────────────────────────────────────
-    document.getElementById('booksGrid') && document.getElementById('booksGrid')
-        .addEventListener('click', function(e) {
-            var item = e.target.closest('.book-item');
-            if (!item) return;
-            var id = item.dataset.id;
-            if (id) window.location.href = '/read/local/' + id;
-        });
-
-    // ── Back to top ──────────────────────────────────────────────────────────
-    var bttBtn = document.getElementById('backToTopBtn');
-    if (bttBtn) bttBtn.addEventListener('click', function() { window.scrollTo(0, 0); });
-
-    // ── Init ─────────────────────────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', function() {
-        buildAzNav();
-        applyBookmarkBadges();
-        applyFilters();
+// ── Filter buttons (inside the search overlay) ───────────────────────────────
+document.querySelector('.so-filters').addEventListener('click', function(e) {
+    var btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    activeFilter = btn.dataset.f;
+    document.querySelectorAll('.filter-btn').forEach(function(b) {
+        b.classList.remove('active', 'active-wish');
     });
+    if (activeFilter === 'wishlist') btn.classList.add('active-wish');
+    else btn.classList.add('active');
+    // Refresh results and main grid
+    renderSearchResults(_getSearchResults());
+    applyFilter(); // re-renders grid and resets page to 0
+});
 
-    document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) applyBookmarkBadges();
-    });
-    window.addEventListener('pageshow', applyBookmarkBadges);
-    </script>
+// ── Search input: search on Enter ────────────────────────────────────────────
+document.getElementById('searchInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.keyCode === 13) doSearch();
+});
+
+// ── Hardware page-turn keys + swipe ──────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+    if (searchOpen) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') changePage(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp'   || e.key === 'PageUp')   changePage(-1);
+});
+
+var _swipeX = 0;
+document.addEventListener('touchstart', function(e) {
+    if (searchOpen) return;
+    _swipeX = e.touches[0].clientX;
+}, { passive: true });
+document.addEventListener('touchend', function(e) {
+    if (searchOpen) return;
+    var dx = e.changedTouches[0].clientX - _swipeX;
+    if (Math.abs(dx) > 60) changePage(dx < 0 ? 1 : -1);
+});
+
+// ── Refresh bookmark badges when returning from reader ───────────────────────
+// Called on page show / visibility change so badges stay current
+function refreshBadges() {
+    // Badges are baked into renderGrid() — just re-render the current page
+    renderGrid();
+}
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) refreshBadges();
+});
+window.addEventListener('pageshow', refreshBadges);
+
+// ── Card quick actions ───────────────────────────────────────────────────────
+function kindleToggleWishlist(id, e) {
+    e.stopPropagation();
+    var bk = null;
+    for (var i = 0; i < ALL_BOOKS.length; i++) { if (ALL_BOOKS[i].id === id) { bk = ALL_BOOKS[i]; break; } }
+    if (!bk) return;
+    var newState = bk.isWishlist ? 0 : 1;
+    fetch('/api/books/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ db_id: id, is_wishlist: newState })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;
+        bk.isWishlist = data.book.is_wishlist ? 1 : 0;
+        renderGrid();
+    })
+    .catch(function() {});
+}
+
+function kindleToggleDnf(id, e) {
+    e.stopPropagation();
+    var bk = null;
+    for (var i = 0; i < ALL_BOOKS.length; i++) { if (ALL_BOOKS[i].id === id) { bk = ALL_BOOKS[i]; break; } }
+    if (!bk) return;
+    var newStatus = bk.status === 'dnf' ? 'not_started' : 'dnf';
+    fetch('/api/books/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ db_id: id, reading_status: newStatus })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;
+        bk.status = data.book.reading_status;
+        renderGrid();
+    })
+    .catch(function() {});
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+applyFilter();
+</script>
 
 </body>
 </html>

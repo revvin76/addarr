@@ -212,37 +212,36 @@
                         </div>
                     </div>
 
-                    <!-- Apify / Goodreads Settings -->
+                    <!-- Google Books Settings -->
                     <div class="mb-4">
-                        <h5 class="mb-3" style="color: #00b388;"><i class="fas fa-book-open me-2"></i>Apify / Goodreads Settings</h5>
+                        <h5 class="mb-3" style="color: #00b388;"><i class="fas fa-book-open me-2"></i>Google Books Settings</h5>
                         <div class="card bg-dark border-secondary">
                             <div class="card-body">
                                 <div class="row g-3">
                                     <div class="col-12">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="apifyEnabled"
-                                                name="APIFY_ENABLED" {% if config.apify.enabled %}checked{% endif %}>
-                                            <label class="form-check-label" for="apifyEnabled">Enable Apify Goodreads search</label>
+                                            <input class="form-check-input" type="checkbox" id="googleBooksEnabled"
+                                                name="GOOGLE_BOOKS_ENABLED" {% if config.google_books.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="googleBooksEnabled">Enable Google Books search</label>
                                             <small class="d-block text-muted mt-1">
-                                                When enabled, book searches use Goodreads via Apify instead of Readarr/Prowlarr.
-                                                Get a free API token at <a href="https://apify.com" target="_blank" class="text-info">apify.com</a>.
+                                                When enabled, book searches and metadata enrichment use the Google Books API.
+                                                Free up to 1,000 requests/day with no key. Add an API key for a higher quota.
                                             </small>
                                         </div>
                                     </div>
-                                    <div class="col-12 collapsible-content" id="apifyContent" {% if not config.apify.enabled %}style="display: none;"{% endif %}>
+                                    <div class="col-12 collapsible-content" id="googleBooksContent" {% if not config.google_books.enabled %}style="display: none;"{% endif %}>
                                         <div class="row g-3">
-                                            <div class="col-md-8">
-                                                <label for="apifyToken" class="form-label">Apify API Token</label>
+                                            <div class="col-12">
+                                                <label for="googleBooksApiKey" class="form-label">API Key <small class="text-muted">(optional)</small></label>
                                                 <input type="password" class="form-control bg-dark text-light border-secondary"
-                                                    id="apifyToken" name="APIFY_TOKEN" value="{{ config.apify.token }}"
-                                                    placeholder="apify_api_...">
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label for="apifyActor" class="form-label">Actor ID</label>
-                                                <input type="text" class="form-control bg-dark text-light border-secondary"
-                                                    id="apifyActor" name="APIFY_ACTOR" value="{{ config.apify.actor }}"
-                                                    placeholder="petr_cermak~goodreads-books">
-                                                <small class="text-muted">Default: petr_cermak~goodreads-books</small>
+                                                    id="googleBooksApiKey" name="GOOGLE_BOOKS_API_KEY"
+                                                    value="{{ config.google_books.api_key }}"
+                                                    placeholder="Leave blank to use anonymous access">
+                                                <small class="text-muted">
+                                                    Get a free key at
+                                                    <a href="https://console.developers.google.com/" target="_blank" class="text-info">console.developers.google.com</a>
+                                                    → enable the Books API.
+                                                </small>
                                             </div>
                                         </div>
                                     </div>
@@ -848,7 +847,7 @@ document.addEventListener('DOMContentLoaded', function () {
         checkbox.addEventListener('change', function () { toggleContent(this, content); });
     }
 
-    setupCollapsibleSection('apifyEnabled',     'apifyContent');
+    setupCollapsibleSection('googleBooksEnabled', 'googleBooksContent');
     setupCollapsibleSection('duckdnsEnabled',  'duckdnsContent');
     setupCollapsibleSection('enableAutoUpdate', 'autoUpdateContent');
     setupCollapsibleSection('tunnelEnabled',    'tunnelContent');

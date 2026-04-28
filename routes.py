@@ -321,22 +321,22 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @requires_auth
     def search():
         query = request.args.get('q') or request.form.get('query')
-        readarr_enabled = CONFIG.readarr.enabled
-        apify_enabled   = CONFIG.apify.enabled
+        readarr_enabled    = CONFIG.readarr.enabled
+        googlebooks_enabled = CONFIG.google_books.enabled
         logging.info(
             f"[SEARCH] query='{query}' | radarr={bool(CONFIG.radarr.url)} "
-            f"sonarr={bool(CONFIG.sonarr.url)} readarr={readarr_enabled} apify={apify_enabled}"
+            f"sonarr={bool(CONFIG.sonarr.url)} readarr={readarr_enabled} google_books={googlebooks_enabled}"
         )
 
         try:
-            book_search_enabled = readarr_enabled or apify_enabled
+            book_search_enabled = readarr_enabled or googlebooks_enabled
             max_workers = 3 if book_search_enabled else 2
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 movie_future = executor.submit(utils.search_radarr, query)
                 tv_future    = executor.submit(utils.search_sonarr, query)
-                if apify_enabled:
-                    book_future = executor.submit(utils.search_goodreads_apify, query)
+                if googlebooks_enabled:
+                    book_future = executor.submit(utils.search_google_books, query)
                 elif readarr_enabled:
                     book_future = executor.submit(utils.search_readarr, query)
                 else:
@@ -398,7 +398,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 all_results=len(combined_results),
                 query=query,
                 config=CONFIG._config,
-                readarr_enabled=readarr_enabled or apify_enabled
+                readarr_enabled=readarr_enabled or googlebooks_enabled
             )
 
         except Exception as e:
@@ -717,6 +717,48 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             except OSError:
                 pass
 
+    def _best_enrichment_match(results, title, author):
+        """Return the best-matching result from `results` using fuzzy title+author comparison.
+
+        Scoring: author match weighted 0.6, title match weighted 0.4.
+        Minimum combined score to accept a result: 0.35.
+        Returns None if no result clears the threshold.
+        """
+        import difflib
+
+        def _norm(s):
+            return (s or '').lower().strip()
+
+        title_n  = _norm(title)
+        author_n = _norm(author)
+
+        best_score  = 0.0
+        best_result = None
+
+        for r in results:
+            r_title = _norm(r.get('title', ''))
+            r_auth_raw = r.get('author') or {}
+            if isinstance(r_auth_raw, dict):
+                r_author = _norm(r_auth_raw.get('authorName', ''))
+            else:
+                r_author = _norm(str(r_auth_raw))
+
+            t_score = (difflib.SequenceMatcher(None, title_n, r_title).ratio()
+                       if title_n else 0.5)
+            a_score = (difflib.SequenceMatcher(None, author_n, r_author).ratio()
+                       if author_n else 0.5)
+
+            score = (a_score * 0.6) + (t_score * 0.4)
+            logging.debug("[enrichment_match] '%s' / '%s' → score %.3f", r_title, r_author, score)
+            if score > best_score:
+                best_score  = score
+                best_result = r
+
+        if best_score >= 0.35:
+            return best_result
+        logging.debug("[enrichment_match] best score %.3f below threshold — no match", best_score)
+        return None
+
     @app.route('/api/book/cover/<int:book_id>')
     @requires_auth
     def book_cover(book_id):
@@ -761,6 +803,22 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             if not cover_url:
                 logging.debug(f"[book_cover] no cover found for book_id={book_id}")
                 return '', 404
+
+            # ── Priority 0: local cover file (uploaded via UI) ─────────────────
+            if os.path.isabs(cover_url) and os.path.isfile(cover_url):
+                try:
+                    img = Image.open(cover_url).convert('RGB')
+                    img.thumbnail((w, h), Image.LANCZOS)
+                    os.makedirs(_THUMB_DIR, exist_ok=True)
+                    tmp = cache_file + '.tmp'
+                    img.save(tmp, format='JPEG', quality=72, optimize=True)
+                    os.replace(tmp, cache_file)
+                    response = send_file(cache_file, mimetype='image/jpeg')
+                    response.headers['Cache-Control'] = 'public, max-age=604800'
+                    return response
+                except Exception as exc:
+                    logging.warning(f"[book_cover] local file read failed book_id={book_id}: {exc}")
+                    return '', 404
 
             # ── Fetch remote image ─────────────────────────────────────────────
             if cover_url.startswith('/'):
@@ -816,30 +874,32 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         query = f"{title} {author}".strip() or os.path.splitext(
             os.path.basename(file_path))[0]
 
-        # ── 1. Goodreads ───────────────────────────────────────────────────────
-        goodreads_result = None
-        if CONFIG.apify.enabled and query:
+        # ── 1. Google Books ────────────────────────────────────────────────────
+        gb_result = None
+        if CONFIG.google_books.enabled and query:
             try:
-                results = utils.search_goodreads_apify(query)
+                results = utils.search_google_books(query)
                 if results:
-                    goodreads_result = results[0]
+                    gb_result = _best_enrichment_match(results, title, author)
+                    if gb_result is None:
+                        logging.info("[books/enrich] Google Books results present but no confident match for '%s'", query)
             except Exception as e:
-                logging.warning("[books/enrich] Goodreads error: %s", e)
+                logging.warning("[books/enrich] Google Books error: %s", e)
 
-        if goodreads_result:
+        if gb_result:
+            _gb_genres = gb_result.get('genres') or []
+            _gb_genre  = ', '.join(_gb_genres[:3]) if _gb_genres else None
             book = books_db.save_book({
                 'file_path':   file_path,
-                'title':       goodreads_result.get('title') or title,
-                'author':      (goodreads_result.get('author', {}) or {}).get('authorName')
-                               or author,
-                'cover_url':   goodreads_result.get('remotePoster')
-                               or goodreads_result.get('cover_url'),
-                'overview':    goodreads_result.get('overview'),
-                'year':        goodreads_result.get('year'),
-                'pages':       goodreads_result.get('pageCount'),
-                'goodreads_id': goodreads_result.get('goodreadsId')
-                                or goodreads_result.get('foreignBookId'),
-                'source':      'goodreads',
+                'title':       gb_result.get('title') or title,
+                'author':      (gb_result.get('author', {}) or {}).get('authorName') or author,
+                'cover_url':   gb_result.get('remotePoster') or gb_result.get('cover_url'),
+                'overview':    gb_result.get('overview'),
+                'year':        gb_result.get('year'),
+                'pages':       gb_result.get('pageCount'),
+                'isbn':        gb_result.get('isbn'),
+                'genre':       _gb_genre,
+                'source':      'google_books',
             })
             if book and book.get('id'):
                 _bust_thumb_cache(book['id'])
@@ -851,7 +911,9 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             try:
                 results = utils.search_readarr(query)
                 if results:
-                    readarr_result = results[0]
+                    readarr_result = _best_enrichment_match(results, title, author)
+                    if readarr_result is None:
+                        logging.info("[books/enrich] Readarr results present but no confident match for '%s'", query)
             except Exception as e:
                 logging.warning("[books/enrich] Readarr error: %s", e)
 
@@ -866,6 +928,8 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                  if img.get('coverType') in ('poster', 'cover')),
                 None
             )
+            _ra_genres = readarr_result.get('genres') or []
+            _ra_genre  = ', '.join(_ra_genres[:3]) if _ra_genres else None
             book = books_db.save_book({
                 'file_path':      file_path,
                 'title':          readarr_result.get('title') or title,
@@ -874,6 +938,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 'overview':       readarr_result.get('overview'),
                 'year':           (readarr_result.get('releaseDate') or '')[:4] or None,
                 'pages':          readarr_result.get('pageCount'),
+                'genre':          _ra_genre,
                 'foreign_book_id': str(readarr_result.get('foreignBookId', '')),
                 'source':         'readarr',
             })
@@ -882,7 +947,13 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             return jsonify({'status': 'ok', 'book': book})
 
         # ── 3. Nothing found — caller should show manual import ────────────────
-        return jsonify({'status': 'needs_manual'})
+        # Bust the thumb cache so any stale thumbnail from a previous wrong
+        # enrichment doesn't keep appearing on the card.
+        existing = books_db.get_book_by_path(file_path)
+        book_id  = existing['id'] if existing else None
+        if book_id:
+            _bust_thumb_cache(book_id)
+        return jsonify({'status': 'needs_manual', 'book_id': book_id})
 
     @app.route('/api/books/file-metadata')
     @requires_auth
@@ -936,8 +1007,10 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
 
         try:
             book = books_db.save_book(data)
-            # Cover may have changed — drop stale cached thumbnails
-            if book and book.get('id') and data.get('cover_url'):
+            # Always bust thumb cache — the caller may have changed the cover
+            # URL or any metadata that affects rendering, and stale thumbnails
+            # would otherwise persist until the next server-side cache miss.
+            if book and book.get('id'):
                 _bust_thumb_cache(book['id'])
             return jsonify({'success': True, 'book': book})
         except Exception as e:
@@ -984,6 +1057,183 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             return jsonify({'success': True, 'book': updated})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
+    # ── Cover management ──────────────────────────────────────────────────────
+
+    # Directory for user-uploaded full-res covers
+    _COVERS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'metadata', 'covers')
+
+    @app.route('/api/books/cover/<int:db_id>', methods=['DELETE'])
+    @requires_auth
+    def delete_book_cover(db_id):
+        """Remove the cover image for a local book.
+
+        Clears cover_url in DB, deletes the uploaded cover file (if local),
+        and busts the thumbnail cache.
+        """
+        book = books_db.get_book_by_id(db_id)
+        if not book:
+            return jsonify({'error': 'not found'}), 404
+
+        cover_url = book.get('cover_url') or ''
+        # Delete local cover file if one was uploaded
+        if os.path.isabs(cover_url) and os.path.isfile(cover_url):
+            try:
+                os.remove(cover_url)
+            except OSError as e:
+                logging.warning(f"[delete_cover] could not delete file {cover_url}: {e}")
+
+        # Directly NULL the cover_url column — can't use save_book() here because
+        # it skips None values (they mean "don't touch this field" in that API).
+        from datetime import datetime as _dt
+        with books_db._connect() as conn:
+            conn.execute(
+                'UPDATE books SET cover_url = NULL, updated_at = ? WHERE id = ?',
+                (_dt.utcnow().isoformat(), db_id)
+            )
+            conn.commit()
+        _bust_thumb_cache(db_id)
+        updated = books_db.get_book_by_id(db_id)
+        return jsonify({'success': True, 'book': updated})
+
+    @app.route('/api/books/cover/upload/<int:db_id>', methods=['POST'])
+    @requires_auth
+    def upload_book_cover(db_id):
+        """Upload a local image file as the book cover.
+
+        Resizes to a maximum of 400×600 px (preserving aspect ratio),
+        saves to metadata/covers/<db_id>.jpg, stores the absolute path
+        in the DB's cover_url, and busts the thumbnail cache.
+        """
+        book = books_db.get_book_by_id(db_id)
+        if not book:
+            return jsonify({'error': 'not found'}), 404
+
+        if 'cover' not in request.files:
+            return jsonify({'error': 'No file field named "cover"'}), 400
+        f = request.files['cover']
+        if not f or not f.filename:
+            return jsonify({'error': 'Empty file'}), 400
+
+        os.makedirs(_COVERS_DIR, exist_ok=True)
+        cover_path = os.path.join(_COVERS_DIR, f'{db_id}.jpg')
+        try:
+            img = Image.open(f.stream).convert('RGB')
+            img.thumbnail((400, 600), Image.LANCZOS)
+            tmp = cover_path + '.tmp'
+            img.save(tmp, format='JPEG', quality=85, optimize=True)
+            os.replace(tmp, cover_path)
+        except Exception as exc:
+            return jsonify({'error': f'Image processing failed: {exc}'}), 400
+
+        updated = books_db.save_book({'file_path': book['file_path'], 'cover_url': cover_path})
+        _bust_thumb_cache(db_id)
+        return jsonify({'success': True, 'book': updated})
+
+    @app.route('/api/books/refresh/<int:db_id>', methods=['POST'])
+    @requires_auth
+    def refresh_book_metadata(db_id):
+        """Re-fetch metadata (including cover and genre) from Goodreads or Readarr.
+
+        Uses the book's existing title + author as the search query.
+        Response: { status: 'ok'|'no_match', book: {...} }
+        """
+        book = books_db.get_book_by_id(db_id)
+        if not book:
+            return jsonify({'error': 'not found'}), 404
+
+        req_data      = request.get_json(force=True, silent=True) or {}
+        goodreads_url = (req_data.get('goodreads_url') or '').strip()
+
+        title  = book.get('title', '')
+        author = book.get('author', '')
+
+        # ── Extract hint from a Goodreads URL if provided ─────────────────────
+        # URL form: https://www.goodreads.com/en/book/show/12345-slug-title
+        # or        https://www.goodreads.com/book/show/12345-slug-title
+        import re as _re
+        _gr_id_from_url   = None
+        _title_from_slug  = None
+        if goodreads_url:
+            _id_m = _re.search(r'/show/(\d+)', goodreads_url)
+            if _id_m:
+                _gr_id_from_url = _id_m.group(1)
+            _slug_m = _re.search(r'/show/\d+[-/](.+?)(?:\?|$)', goodreads_url)
+            if _slug_m:
+                _title_from_slug = _slug_m.group(1).replace('-', ' ').strip()
+                logging.info("[books/refresh] URL slug title: '%s', GR id: %s",
+                             _title_from_slug, _gr_id_from_url)
+
+        # Build the search query — prefer URL-derived slug title for better matching
+        search_title = _title_from_slug or title
+        query        = f"{search_title} {author}".strip()
+
+        # ── Google Books ───────────────────────────────────────────────────────
+        if CONFIG.google_books.enabled and query:
+            try:
+                results = utils.search_google_books(query)
+                if results:
+                    r = _best_enrichment_match(results, search_title, author)
+                    if r is not None:
+                        _genres  = r.get('genres') or []
+                        _genre   = ', '.join(_genres[:3]) if _genres else None
+                        updated  = books_db.save_book({
+                            'file_path':  book['file_path'],
+                            'title':      r.get('title') or title,
+                            'author':     (r.get('author', {}) or {}).get('authorName') or author,
+                            'cover_url':  r.get('remotePoster') or r.get('cover_url'),
+                            'overview':   r.get('overview'),
+                            'year':       r.get('year'),
+                            'pages':      r.get('pageCount'),
+                            'isbn':       r.get('isbn'),
+                            'genre':      _genre,
+                            'source':     'google_books',
+                        })
+                        if updated and updated.get('id'):
+                            _bust_thumb_cache(updated['id'])
+                        return jsonify({'status': 'ok', 'book': updated})
+            except Exception as e:
+                logging.warning("[books/refresh] Google Books error: %s", e)
+
+        # ── Readarr ────────────────────────────────────────────────────────────
+        if CONFIG.readarr.enabled and query:
+            try:
+                results = utils.search_readarr(query)
+                if results:
+                    r = _best_enrichment_match(results, search_title, author)
+                    if r is not None:
+                        author_obj  = r.get('author') or {}
+                        author_name = (author_obj.get('authorName') if isinstance(author_obj, dict)
+                                       else str(author_obj)) or author
+                        images    = r.get('images') or []
+                        cover_url = next(
+                            (img.get('remoteUrl') or img.get('url')
+                             for img in images
+                             if img.get('coverType') in ('poster', 'cover')),
+                            None
+                        )
+                        _genres  = r.get('genres') or []
+                        _genre   = ', '.join(_genres[:3]) if _genres else None
+                        updated  = books_db.save_book({
+                            'file_path':       book['file_path'],
+                            'title':           r.get('title') or title,
+                            'author':          author_name,
+                            'cover_url':       cover_url,
+                            'overview':        r.get('overview'),
+                            'year':            (r.get('releaseDate') or '')[:4] or None,
+                            'pages':           r.get('pageCount'),
+                            'genre':           _genre,
+                            'foreign_book_id': str(r.get('foreignBookId', '')),
+                            'source':          'readarr',
+                        })
+                        if updated and updated.get('id'):
+                            _bust_thumb_cache(updated['id'])
+                        return jsonify({'status': 'ok', 'book': updated})
+            except Exception as e:
+                logging.warning("[books/refresh] Readarr error: %s", e)
+
+        return jsonify({'status': 'no_match', 'message': 'No matching book found online'})
 
     # ── Reader route for local (non-Readarr) books ─────────────────────────────
 

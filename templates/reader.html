@@ -69,7 +69,7 @@
         #prevZone:hover .nav-arrow, #nextZone:hover .nav-arrow { opacity: 1; }
 
         /* ── EPUB viewer ── */
-        #epubViewer { width: 100%; height: 100%; background: #fff; display: none; }
+        #epubViewer { width: 100%; height: 100%; background: #fff; }
 
         /* ── PDF viewer ── */
         #pdfViewer {
@@ -121,8 +121,10 @@
 
         /* ── Loading / error ── */
         #statusMsg {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; color: #999; z-index: 50;
+            position: fixed; inset: 0; z-index: 50;
+            background: #111;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: #999; text-align: center;
         }
         .spinner {
             width: 38px; height: 38px; border: 3px solid #333; border-top-color: #6ab759;
@@ -139,6 +141,85 @@
             white-space: nowrap;
         }
         #toast.show { opacity: 1; }
+
+        /* ── Settings panel ── */
+        #settingsOverlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+            z-index: 200; display: none;
+        }
+        #settingsOverlay.open { display: block; }
+        #settingsPanel {
+            position: fixed; top: 0; right: 0; bottom: 0;
+            width: min(320px, 88vw);
+            background: #181818; border-left: 1px solid #2e2e2e;
+            z-index: 201; display: flex; flex-direction: column; overflow: hidden;
+            transform: translateX(105%); transition: transform 0.22s ease;
+        }
+        #settingsPanel.open { transform: translateX(0); }
+        #settingsHeader {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; border-bottom: 1px solid #2e2e2e;
+            font-size: 0.82rem; color: #aaa; flex-shrink: 0;
+        }
+        #settingsClose {
+            background: none; border: none; color: #666; font-size: 1rem;
+            cursor: pointer; padding: 2px 6px; border-radius: 3px;
+        }
+        #settingsClose:hover { color: #fff; background: #2a2a2a; }
+        #settingsBody { overflow-y: auto; flex: 1; padding: 4px 0; }
+        .settings-section {
+            padding: 12px 14px;
+            border-bottom: 1px solid #242424;
+        }
+        .settings-label {
+            display: block; font-size: 0.72rem; color: #777; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 8px;
+        }
+        /* Font size row */
+        .font-size-row {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .fs-btn {
+            background: #222; border: 1px solid #3a3a3a; color: #ccc;
+            border-radius: 4px; padding: 4px 10px; font-size: 0.82rem; cursor: pointer;
+            flex-shrink: 0;
+        }
+        .fs-btn:hover { background: #333; color: #fff; }
+        #fontSizeSlider {
+            flex: 1; -webkit-appearance: none; appearance: none;
+            height: 4px; border-radius: 2px; background: #333; outline: none; cursor: pointer;
+        }
+        #fontSizeSlider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 16px; height: 16px;
+            border-radius: 50%; background: #6ab759; cursor: pointer;
+        }
+        #fontSizeVal { font-size: 0.78rem; color: #888; min-width: 38px; text-align: right; }
+        /* Font buttons */
+        .font-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+        .font-btn {
+            padding: 5px 10px; border: 1px solid #3a3a3a; border-radius: 4px;
+            background: #222; color: #bbb; font-size: 0.78rem; cursor: pointer;
+        }
+        .font-btn:hover { border-color: #555; color: #fff; }
+        .font-btn.selected { border-color: #6ab759; color: #6ab759; background: #1a2a1a; }
+        /* Theme buttons */
+        .theme-row { display: flex; gap: 8px; }
+        .theme-btn {
+            flex: 1; padding: 7px 0; border: 1px solid #3a3a3a; border-radius: 4px;
+            font-size: 0.78rem; cursor: pointer; text-align: center;
+        }
+        .theme-btn:hover { border-color: #555; }
+        .theme-btn.selected { border-color: #6ab759; font-weight: 600; }
+        #themeLightBtn { background: #f0f0f0; color: #111; }
+        #themeDarkBtn  { background: #111;    color: #eee; }
+        /* Apply buttons */
+        .apply-row { display: flex; gap: 8px; }
+        .apply-btn {
+            flex: 1; padding: 7px 0; border: 1px solid #3a3a3a; border-radius: 4px;
+            background: #222; color: #bbb; font-size: 0.78rem; cursor: pointer; text-align: center;
+        }
+        .apply-btn:hover { border-color: #555; color: #fff; }
+        .apply-btn.apply-default { background: #1a2a1a; border-color: #6ab759; color: #6ab759; }
     </style>
 </head>
 <body>
@@ -147,9 +228,12 @@
 <div id="toolbar">
     <button class="tb-btn" onclick="closeReader()">← Back</button>
     <span id="bookTitle">Loading…</span>
+    <button class="tb-btn" id="wishBtn" style="display:none"
+            onclick="toggleReaderWishlist()" title="Toggle wishlist">♡</button>
     {% if file_type == 'epub' %}
     <button class="tb-btn" id="bookmarkBtn" onclick="toggleBookmark()" title="Bookmark this page">🔖</button>
     <button class="tb-btn" id="tocBtn"      onclick="toggleToc()"    title="Table of contents">☰ Contents</button>
+    <button class="tb-btn" id="settingsBtn" onclick="toggleSettings()" title="Reading settings">⚙</button>
     {% endif %}
 </div>
 
@@ -178,6 +262,59 @@
         <button id="tocClose" onclick="closeToc()">✕</button>
     </div>
     <div id="tocList"></div>
+</div>
+{% endif %}
+
+<!-- ── Settings panel (epub only) ── -->
+{% if file_type == 'epub' %}
+<div id="settingsOverlay" onclick="closeSettings()"></div>
+<div id="settingsPanel">
+    <div id="settingsHeader">
+        <span>Reading Settings</span>
+        <button id="settingsClose" onclick="closeSettings()">✕</button>
+    </div>
+    <div id="settingsBody">
+        <!-- Font size -->
+        <div class="settings-section">
+            <span class="settings-label">Font Size</span>
+            <div class="font-size-row">
+                <button class="fs-btn" onclick="adjFontSize(-1)">A−</button>
+                <input type="range" id="fontSizeSlider" min="10" max="32" value="17"
+                       oninput="onSliderMove(this.value)">
+                <span id="fontSizeVal">17px</span>
+                <button class="fs-btn" onclick="adjFontSize(1)">A+</button>
+            </div>
+        </div>
+        <!-- Font family -->
+        <div class="settings-section">
+            <span class="settings-label">Font</span>
+            <div class="font-grid" id="fontGrid">
+                <button class="font-btn" data-font="Georgia"   onclick="pickFont(this)">Georgia</button>
+                <button class="font-btn" data-font="Arial"     onclick="pickFont(this)">Arial</button>
+                <button class="font-btn" data-font="'Times New Roman'" onclick="pickFont(this)">Times</button>
+                <button class="font-btn" data-font="Palatino"  onclick="pickFont(this)">Palatino</button>
+                <button class="font-btn" data-font="Verdana"   onclick="pickFont(this)">Verdana</button>
+            </div>
+        </div>
+        <!-- Theme -->
+        <div class="settings-section">
+            <span class="settings-label">Theme</span>
+            <div class="theme-row">
+                <button class="theme-btn" id="themeLightBtn" onclick="pickTheme('light')">☀ Light</button>
+                <button class="theme-btn" id="themeDarkBtn"  onclick="pickTheme('dark')">🌙 Dark</button>
+            </div>
+        </div>
+        <!-- Save as default -->
+        <div class="settings-section">
+            <span class="settings-label">Save As</span>
+            <div class="apply-row">
+                <button class="apply-btn apply-default" onclick="saveAsDefault()">⋆ Save as default for all books</button>
+            </div>
+            <div class="apply-row" style="margin-top:8px;">
+                <button class="apply-btn" onclick="closeSettings()">Done</button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endif %}
 
@@ -219,10 +356,39 @@ const BM_KEY  = `epub_bm_${bookId}`;   // bookmark CFI in localStorage
 const LOC_KEY = `epub_loc_${bookId}`;  // generated locations in sessionStorage
 
 let book, rendition;
-let uiVisible      = true;
-let locationsReady = false;
-let totalLocs      = 0;
-let bookmarkCfi    = localStorage.getItem(BM_KEY) || null;
+let uiVisible        = true;
+let locationsReady   = false;
+let totalLocs        = 0;
+let bookmarkCfi      = localStorage.getItem(BM_KEY) || null;
+
+// ── Wishlist + auto-status (module-level so closures can access them) ─────
+const _bookDbId       = bookId.startsWith('local_') ? parseInt(bookId.slice(6), 10) : null;
+let   _readerWishlisted = false;
+let   _autoStatusDone   = false;
+
+function _updateWishBtn() {
+    const btn = document.getElementById('wishBtn');
+    if (!btn) return;
+    btn.textContent   = _readerWishlisted ? '♥' : '♡';
+    btn.style.color   = _readerWishlisted ? '#e74c3c' : '';
+    btn.style.borderColor = _readerWishlisted ? '#e74c3c' : '';
+}
+function toggleReaderWishlist() {
+    if (!_bookDbId) return;
+    fetch('/api/books/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ db_id: _bookDbId, is_wishlist: _readerWishlisted ? 0 : 1 })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) return;
+        _readerWishlisted = !!data.book.is_wishlist;
+        _updateWishBtn();
+        showToast(_readerWishlisted ? '♥ Added to wishlist' : 'Removed from wishlist');
+    })
+    .catch(() => {});
+}
 
 // ── Toast ─────────────────────────────────────────────────────────────────
 function showToast(msg, ms = 1800) {
@@ -385,14 +551,44 @@ async function initEpub() {
             await rendition.display(undefined);
         }
 
+        // Apply stored reading settings (font, size, theme)
+        applyStoredSettings();
+
+        // ── Auto reading status + wishlist init ───────────────────────────────
+        if (_bookDbId) {
+            // Show wishlist button now that we know it's a local book
+            const _wb = document.getElementById('wishBtn');
+            if (_wb) _wb.style.display = '';
+
+            fetch(`/api/books/local/${_bookDbId}`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    // Wishlist state
+                    _readerWishlisted = !!data.is_wishlist;
+                    _updateWishBtn();
+                    // Reading status
+                    if (data.reading_status === 'not_started') {
+                        fetch('/api/books/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ db_id: _bookDbId, reading_status: 'reading' })
+                        }).catch(() => {});
+                    }
+                    if (data.reading_status === 'complete' || data.reading_status === 'dnf') {
+                        _autoStatusDone = true;
+                    }
+                })
+                .catch(() => {});
+        }
+
         // Title
         const meta = await book.loaded.metadata;
         document.getElementById('bookTitle').textContent = meta.title || 'Book';
         document.title = meta.title || 'Reader';
 
-        // Show viewer
-        document.getElementById('statusMsg').style.display  = 'none';
-        document.getElementById('epubViewer').style.display = 'block';
+        // Hide loading overlay (viewer is already visible)
+        document.getElementById('statusMsg').style.display = 'none';
 
         // Apply saved bookmark highlight (shows on the bookmarked page automatically)
         if (bookmarkCfi) applyHighlight(bookmarkCfi);
@@ -401,11 +597,23 @@ async function initEpub() {
         if (nav?.toc?.length) buildToc(nav.toc);
         else document.getElementById('tocBtn').style.display = 'none';
 
-        // Track location changes: update footer + bookmark button state
+        // Track location changes: update footer + bookmark + auto-complete
         rendition.on('relocated', location => {
             updateFooter(location.start.cfi);
-            updateBookmarkBtn(location);   // highlight appears/disappears automatically;
-                                            // button turns gold only on the bookmarked page
+            updateBookmarkBtn(location);
+            // Auto-complete when reaching 90% of the book
+            if (_bookDbId && !_autoStatusDone && locationsReady && totalLocs) {
+                const pct = book.locations.percentageFromCfi(location.start.cfi);
+                if (pct >= 0.90) {
+                    _autoStatusDone = true;
+                    fetch('/api/books/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ db_id: _bookDbId, reading_status: 'complete' })
+                    }).catch(() => {});
+                    showToast('✓ Marked as complete');
+                }
+            }
         });
 
         // Initial button state
@@ -455,6 +663,118 @@ async function initEpub() {
 
 function epubNext() { if (rendition) rendition.next(); }
 function epubPrev() { if (rendition) rendition.prev(); }
+
+// ── Settings ──────────────────────────────────────────────────────────────
+const DEFAULTS_KEY = 'reader_defaults';
+const BOOK_KEY     = `reader_settings_${bookId}`;
+
+// Working state (not persisted until applySettings() is called)
+let draftSettings = { fontSize: 17, fontFamily: 'Georgia', theme: 'light' };
+
+function _loadSettings() {
+    const defaults  = JSON.parse(localStorage.getItem(DEFAULTS_KEY)  || '{}');
+    const perBook   = JSON.parse(localStorage.getItem(BOOK_KEY)       || '{}');
+    return Object.assign({ fontSize: 17, fontFamily: 'Georgia', theme: 'light' }, defaults, perBook);
+}
+
+function _applyThemeToRendition(s) {
+    if (!rendition) return;
+    const bg   = s.theme === 'dark' ? '#1c1c1c' : '#ffffff';
+    const fg   = s.theme === 'dark' ? '#d0d0d0' : '#111111';
+    rendition.themes.register('reader-custom', {
+        'body': {
+            'font-family': `${s.fontFamily}, serif !important`,
+            'font-size':   `${s.fontSize}px !important`,
+            'background':  `${bg} !important`,
+            'color':       `${fg} !important`,
+            'line-height': '1.7 !important',
+        },
+        'p': { 'font-family': `${s.fontFamily}, serif !important`,
+               'font-size':   `${s.fontSize}px !important`,
+               'color':       `${fg} !important` },
+    });
+    rendition.themes.select('reader-custom');
+}
+
+function applyStoredSettings() {
+    const s = _loadSettings();
+    draftSettings = Object.assign({}, s);
+    _applyThemeToRendition(s);
+    _syncSettingsUI(s);
+}
+
+function _syncSettingsUI(s) {
+    const slider = document.getElementById('fontSizeSlider');
+    const val    = document.getElementById('fontSizeVal');
+    if (slider) { slider.value = s.fontSize; }
+    if (val)    { val.textContent = `${s.fontSize}px`; }
+    document.querySelectorAll('.font-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.font === s.fontFamily);
+    });
+    const lightBtn = document.getElementById('themeLightBtn');
+    const darkBtn  = document.getElementById('themeDarkBtn');
+    if (lightBtn) lightBtn.classList.toggle('selected', s.theme === 'light');
+    if (darkBtn)  darkBtn.classList.toggle('selected',  s.theme === 'dark');
+}
+
+function toggleSettings() {
+    const panel   = document.getElementById('settingsPanel');
+    const overlay = document.getElementById('settingsOverlay');
+    const isOpen  = panel.classList.contains('open');
+    if (!isOpen) {
+        // Refresh draft from current stored settings before opening
+        draftSettings = _loadSettings();
+        _syncSettingsUI(draftSettings);
+    }
+    panel.classList.toggle('open', !isOpen);
+    overlay.classList.toggle('open', !isOpen);
+}
+function closeSettings() {
+    document.getElementById('settingsPanel').classList.remove('open');
+    document.getElementById('settingsOverlay').classList.remove('open');
+}
+
+function adjFontSize(delta) {
+    const slider = document.getElementById('fontSizeSlider');
+    const newVal = Math.min(32, Math.max(10, parseInt(slider.value, 10) + delta));
+    slider.value = newVal;
+    onSliderMove(newVal);
+}
+function onSliderMove(val) {
+    draftSettings.fontSize = parseInt(val, 10);
+    document.getElementById('fontSizeVal').textContent = `${draftSettings.fontSize}px`;
+    _applyThemeToRendition(draftSettings);
+    _autoSave();
+}
+function pickFont(btn) {
+    draftSettings.fontFamily = btn.dataset.font;
+    document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    _applyThemeToRendition(draftSettings);
+    _autoSave();
+}
+function pickTheme(t) {
+    draftSettings.theme = t;
+    document.getElementById('themeLightBtn').classList.toggle('selected', t === 'light');
+    document.getElementById('themeDarkBtn').classList.toggle('selected',  t === 'dark');
+    _applyThemeToRendition(draftSettings);
+    _autoSave();
+}
+
+// Auto-save: every change writes to per-book AND global default
+function _autoSave() {
+    const s = Object.assign({}, draftSettings);
+    localStorage.setItem(BOOK_KEY,     JSON.stringify(s));
+    localStorage.setItem(DEFAULTS_KEY, JSON.stringify(s));
+}
+
+function saveAsDefault() {
+    const s = Object.assign({}, draftSettings);
+    localStorage.setItem(DEFAULTS_KEY, JSON.stringify(s));
+    localStorage.removeItem(BOOK_KEY);
+    showToast('Settings saved as default for all books');
+    closeSettings();
+}
 
 initEpub();
 </script>

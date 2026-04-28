@@ -2,14 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.31] - 2026-04-27
+## [1.1.32] - 2026-04-28
 
-### Updated
+### Added
+- **Google Books API integration** — replaces Apify/Goodreads as the book metadata source. `search_google_books()` in `utils.py` calls the Google Books Volumes API, normalises results to the same internal book format (title, author, cover, overview, year, pages, ISBN, genres), and falls back gracefully. No API key required for up to ~1,000 requests/day; set `GOOGLE_BOOKS_API_KEY` for a higher quota. Configured via `GOOGLE_BOOKS_ENABLED` and `GOOGLE_BOOKS_API_KEY` env vars. Config section in the settings modal updated accordingly.
+- **Fuzzy match enrichment** — `_best_enrichment_match()` helper in `routes.py` uses `difflib.SequenceMatcher` to score each search result (author weight 0.6, title weight 0.4). A minimum combined score of 0.35 is required before a result is accepted. Both `books_enrich()` and `refresh_book_metadata()` use this instead of blindly taking `results[0]`, preventing wrong books from being matched when the file title differs from the canonical title.
+- **Goodreads URL hint in Edit Metadata modal** — a "Goodreads URL" field lets the user paste a Goodreads book URL (e.g. `https://www.goodreads.com/book/show/12345-slug-title`) before clicking **Refresh online**. The slug is extracted as a search query and the numeric ID is used for an exact-match pass before falling back to fuzzy matching — resolves cases where the file title and the real book title differ completely (e.g. "Breeding the Babysitter" → "Breeding the Nanny").
+- **Cover management endpoints** — three new API routes:
+  - `DELETE /api/books/cover/<id>` — clears `cover_url` in DB via direct SQL (bypasses `save_book`'s None-skip behaviour), deletes any uploaded local file, and busts the thumbnail cache.
+  - `POST /api/books/cover/upload/<id>` — accepts a multipart image upload, resizes to ≤ 400×600 px with Pillow (JPEG, quality 85), saves to `metadata/covers/<id>.jpg`, and stores the absolute path as `cover_url`.
+  - `POST /api/books/refresh/<id>` — re-fetches metadata from Google Books (then Readarr) using the book's existing title + author (or URL hint), updates all fields including genre, and busts the thumbnail cache.
+- **Edit Metadata modal — cover management UI** — Delete cover and Refresh online buttons added to the import modal; Upload image file input added alongside the Cover URL text field; cover preview refreshes after each action.
+- **Stale thumbnail clearing on no-match** — when `books_enrich()` returns `needs_manual`, the server now busts the thumbnail cache for that book and returns `book_id` in the response. The frontend clears the card's `<img>` to the placeholder icon so a previously wrong cover doesn't persist.
 
-- MANAGE BOOKS Filter by keywords fixed
-- MANAGE BOOKS Results list needs to use the same template as the other pages (/manage, /search /trending) with the larger thumbnail
-- MANAGE BOOKS ShowDetails card for books now modelled on the /manage version, but tailored for books
-- TRENDING When opening details for something thats already in the library, add to sonarr/radarr button should be replaced with "View in library" 
+### Fixed
+- **Blank epub pages on open** — epub.js renders into a hidden (`display:none`) container, producing a 0×0 iframe that stays blank until navigation forces a reflow. Fixed in both `reader.html` and `reader_kindle.html` by making `#epubViewer` always visible and using a full-screen solid overlay for the loading state instead.
+- **Save Metadata not updating the card** — two root causes: (a) CSS attribute selectors with Windows backslash paths failed silently, leaving `_importCard` as `null` so `patchBookCard` was never called. Fixed by adding a `[data-db-id]` integer fallback selector. (b) `patchBookCard` set `img.src` to the raw `cover_url` (a Windows file path, unusable by the browser). Fixed by always using the `/api/book/cover/<id>?t=<timestamp>` endpoint with a cache-bust timestamp.
+- **Delete cover showing wrong cover** — `save_book({'cover_url': None})` silently skips `None` values, so the DB column was never NULLed. The thumbnail cache was busted but the old URL remained, causing the cover to reappear on next load. Fixed by using a direct `UPDATE books SET cover_url = NULL` query in `delete_book_cover()`.
+- **Genre not showing on previously-enriched cards** — `enrichPendingBooks()` only targeted books with source `file`, `filename`, or `unknown`. Books already enriched via Goodreads/Readarr before the genre field was added had `source='goodreads'` but `genre=NULL`. Fixed by also re-enriching `source=google_books` / `readarr` cards where the `data-genre` attribute is empty.
+- **Edit Metadata modal not pre-populating** — the modal showed blank fields on open. Fixed by fetching `/api/books/local/<db_id>` first and populating all fields from the DB record before falling back to file-embedded metadata.
+- **Windows file paths losing backslashes in JS** — `data-file-path` values embedded into JS string literals via template literals (e.g. `'${path}'`) caused `\B` and `\A` to be interpreted as JS escape sequences, stripping the backslashes and producing malformed paths like `D:BooksBENEATH…`. Fixed in both detail-modal call sites by switching to `JSON.stringify(path)`, which produces properly escaped string literals.
+- **Google Books API key — trailing whitespace/comment** — a comment on the `GOOGLE_BOOKS_API_KEY=` line in `.env` was being read as part of the key value, sending a garbage string to Google and receiving 400. Fixed by blanking the line and adding `.strip()` in both `lazy_config.py` and `utils.py`.
+- **Apify actor 404** — the previously configured actor ID `mGuu1Iz5uU02gyvyF` was deleted from Apify. Resolved by replacing Apify/Goodreads with Google Books API entirely.
+
+### Changed
+- **Apify → Google Books** — `APIFY_ENABLED`, `APIFY_TOKEN`, and `APIFY_ACTOR` env vars retired; replaced by `GOOGLE_BOOKS_ENABLED` and `GOOGLE_BOOKS_API_KEY`. The `apify` config section in `lazy_config.py` is replaced by `google_books`. All references to `search_goodreads_apify()` replaced with `search_google_books()` throughout `routes.py` and `utils.py`.
+- **Book detail modal redesigned** — flex layout with cover on the left and metadata panel on the right; genre shown once as tag badges; synopsis capped at 5 lines with a Show More expander; reading status buttons in their own full-width row (colour-coded: secondary / info / success / danger); file path as a subtle single line; Edit Metadata as a full-width button.
+- **`save_book()` cover bust always fires** — `books_save_metadata()` now always busts the thumbnail cache on save regardless of whether `cover_url` was included, ensuring stale cached thumbnails are never served after any metadata change.
+
+## [1.1.31] - 2026-04-28
+
+### Added
+- **Genre metadata** — `dc:subject` extracted from EPUB files during scanning; stored in `books.genre` column (SQLite). Displayed on manage-books cards and in the detail modal. Also included in manual-import dialog. Backfilled automatically on next page load for existing records missing the field.
+- **Book reading status** — new `reading_status` column (`not_started` / `reading` / `complete` / `dnf`) and `is_wishlist` flag in the books DB. Status badge shown on each manage-books card and kindle library row. `PATCH /api/books/update` endpoint updates either field.
+- **Manage-books detail modal** — clicking a card now opens a rich local-DB modal (cover, title, author, year, pages, genre, synopsis, file info) with inline status buttons and a ♥ wishlist toggle. No Readarr API required.
+- **Manage-books filter** — status filter dropdown alongside search; filters by Not Started / Reading / Complete / DNF / Wishlist. Search now matches title **and** author **and** genre (previously title-only).
+- **Kindle library status filter** — filter strip below search: All / Not Started / Reading / Complete / DNF / Wishlist. Genre shown under meta line. Status and heart badges shown per row.
+- **Reader settings panel** — ⚙ button in epub reader toolbar opens a full-screen settings panel: font-size slider (70–200%, A−/A+ step buttons), five font-family choices (Georgia, Arial, Times, Palatino, Verdana), Light/Dark theme toggle. Settings can be saved for the current book only or set as the global default. Applied immediately on open; persisted in `localStorage`.
+- **DB migration** — `init_db()` now issues `ALTER TABLE … ADD COLUMN` for `genre`, `reading_status`, and `is_wishlist` so existing databases upgrade automatically on first start.
+- **`/api/books/local/<db_id>`** — new endpoint returning a single book record from the local DB; used by the manage-books detail modal.
+- **`/api/books/update`** — new `POST` endpoint that patches `reading_status` and/or `is_wishlist` for a book identified by `db_id`.
+
+### Fixed
+- **Manage-books keyword filter broken** — filter only matched `data-title`; author searches returned no results. Fixed by adding `data-author` and `data-genre` attributes to every book card and updating the filter to OR-match all three fields.
+- **Manage-books cover thumbnails** — book covers now served through the local `/api/book/cover/<id>` proxy (same path as the Kindle page) instead of raw external URLs, so they load correctly through the Pinggy tunnel.
+
+### Changed
+- **Trending / search — "Add to Sonarr/Radarr" → "View in Library"** — when an item's detail modal is opened and the item is already in the library, the action button is replaced with a "View in Library" link that navigates to `/manage?open=<id>&type=<type>`.
+- **`/manage` deep-link** — accepts `?open=<internal_id>&type=<movie|tv>` query params; scrolls to the matching card and opens its detail modal automatically (used by the "View in Library" button).
 
 ## [1.1.30] - 2026-04-27
 ### Fixed

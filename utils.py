@@ -518,114 +518,141 @@ class SharedUtils:
         
         return result
 
-    # ============ APIFY / GOODREADS METHODS ============
+    # ============ GOOGLE BOOKS METHODS ============
 
-    def search_goodreads_apify(self, query, max_items=12):
-        """Search Goodreads via Apify actor and normalise results to Addarr book format.
+    def search_google_books(self, query, max_items=10):
+        """Search Google Books API and normalise results to Addarr book format.
 
-        Uses the run-sync-get-dataset-items endpoint so the call blocks until
-        the actor run completes and returns all scraped items in one response.
+        No API key required for up to ~1,000 requests/day.
+        Set GOOGLE_BOOKS_API_KEY for a higher quota.
 
-        Actor default: petr_cermak~goodreads-books
-        Override via APIFY_ACTOR env var if you prefer a different actor.
+        Docs: https://developers.google.com/books/docs/v1/using#query-params
         """
         import re
-        token = self.config.apify.token
-        if not token:
-            logging.warning("[Apify] APIFY_TOKEN not configured — skipping Goodreads search")
-            return []
         try:
-            actor_id = self.config.apify.actor or 'petr_cermak~goodreads-books'
-            url = f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
-            payload = {
-                'search': query,
-                'maxItems': max_items,
-                'maxResults': max_items,   # some actors use this name
+            api_key = (getattr(self.config.google_books, 'api_key', '') or '').strip()
+            params  = {
+                'q':          query,
+                'maxResults': min(max_items, 40),   # API cap is 40
+                'printType':  'books',
+                'langRestrict': 'en',
             }
-            logging.info(f"[Apify] Goodreads search actor={actor_id!r} q={query!r}")
-            response = requests.post(
-                url,
-                params={'token': token},
-                json=payload,
-                timeout=90,   # actor runs can take a while
+            if api_key:
+                params['key'] = api_key
+
+            logging.info(f"[GoogleBooks] search q={query!r}")
+            response = requests.get(
+                'https://www.googleapis.com/books/v1/volumes',
+                params=params,
+                timeout=15,
             )
-            if response.status_code not in (200, 201):
-                logging.error(f"[Apify] HTTP {response.status_code}: {response.text[:400]}")
+            if response.status_code != 200:
+                logging.error(f"[GoogleBooks] HTTP {response.status_code}: {response.text[:400]}")
                 return []
-            items = response.json()
-            if not isinstance(items, list):
-                logging.error(f"[Apify] unexpected response type: {type(items).__name__} — {str(items)[:300]}")
-                return []
-            logging.info(f"[Apify] {len(items)} raw results for q={query!r}")
+
+            data  = response.json()
+            items = data.get('items') or []
+            logging.info(f"[GoogleBooks] {len(items)} results for q={query!r}")
 
             results = []
             for item in items:
-                # ── Goodreads book ID ──────────────────────────────────────────
-                book_url = item.get('url') or item.get('bookUrl') or ''
-                gid_match = re.search(r'/show/(\d+)', book_url)
-                foreign_id = (
-                    gid_match.group(1) if gid_match
-                    else str(item.get('goodreadsId') or item.get('bookId') or item.get('id') or '')
-                )
+                info = item.get('volumeInfo') or {}
+
+                # ── Title ──────────────────────────────────────────────────────
+                title = info.get('title', '')
+                subtitle = info.get('subtitle', '')
+                if subtitle:
+                    title = f"{title}: {subtitle}"
 
                 # ── Author ─────────────────────────────────────────────────────
-                author_raw = item.get('author') or item.get('authorName') or ''
-                if isinstance(author_raw, list):
-                    author_raw = ', '.join(str(a) for a in author_raw)
+                authors = info.get('authors') or []
+                author_str = ', '.join(authors) if authors else ''
 
                 # ── Cover image ────────────────────────────────────────────────
+                img_links = info.get('imageLinks') or {}
+                # Prefer highest-res available; upgrade thumbnail to larger size
                 cover_url = (
-                    item.get('coverUrl') or item.get('imageUrl') or
-                    item.get('thumbnailUrl') or item.get('image') or ''
+                    img_links.get('extraLarge') or
+                    img_links.get('large') or
+                    img_links.get('medium') or
+                    img_links.get('thumbnail') or
+                    img_links.get('smallThumbnail') or ''
                 )
+                # Google Books thumbnails use http — force https and strip zoom/edge params
+                if cover_url:
+                    cover_url = cover_url.replace('http://', 'https://')
+                    cover_url = re.sub(r'&?(zoom=\d+|edge=curl)', '', cover_url)
+                    # Bump to larger size by removing the zoom restriction
+                    cover_url = cover_url.rstrip('&?')
+
+                # ── Publication year ───────────────────────────────────────────
+                pub_date = info.get('publishedDate', '')
+                yr_match = re.search(r'(\d{4})', pub_date)
+                year     = yr_match.group(1) if yr_match else ''
+
+                # ── ISBN / ID ──────────────────────────────────────────────────
+                identifiers = info.get('industryIdentifiers') or []
+                isbn_13 = next((x['identifier'] for x in identifiers
+                                if x.get('type') == 'ISBN_13'), '')
+                isbn_10 = next((x['identifier'] for x in identifiers
+                                if x.get('type') == 'ISBN_10'), '')
+                isbn    = isbn_13 or isbn_10
+                # Use Google's volume ID as the foreignBookId
+                foreign_id = item.get('id', '') or isbn
+
+                # ── Genres ─────────────────────────────────────────────────────
+                categories = info.get('categories') or []
+                # Google sometimes returns broad categories like "Fiction / Fantasy"
+                # Split and flatten them
+                genres = []
+                for cat in categories:
+                    for part in cat.split('/'):
+                        g = part.strip()
+                        if g and g not in genres:
+                            genres.append(g)
+
+                # ── Page count ─────────────────────────────────────────────────
+                pages = 0
+                try:
+                    pages = int(info.get('pageCount') or 0)
+                except (ValueError, TypeError):
+                    pages = 0
+
                 images = (
                     [{'coverType': 'poster', 'remoteUrl': cover_url, 'url': cover_url}]
                     if cover_url else []
                 )
 
-                # ── Publication year ───────────────────────────────────────────
-                pub_date = (
-                    item.get('publishDate') or item.get('publicationDate') or
-                    item.get('firstPublishDate') or item.get('published') or ''
-                )
-                year = ''
-                if pub_date:
-                    yr_match = re.search(r'(\d{4})', str(pub_date))
-                    year = yr_match.group(1) if yr_match else ''
-
-                # ── Page count ─────────────────────────────────────────────────
-                pages = item.get('numberOfPages') or item.get('pageCount') or item.get('pages') or 0
-                try:
-                    pages = int(pages)
-                except (ValueError, TypeError):
-                    pages = 0
-
                 book_entry = {
-                    'title': item.get('title', ''),
-                    'overview': item.get('description') or item.get('overview') or '',
+                    'title':        title,
+                    'overview':     info.get('description', ''),
                     'foreignBookId': foreign_id,
+                    'goodreadsId':  '',          # not available from Google Books
+                    'isbn':         isbn,
                     'author': {
-                        'authorName': author_raw,
+                        'authorName':      author_str,
                         'foreignAuthorId': None,
-                        'overview': '',
-                        'images': [],
+                        'overview':        '',
+                        'images':          [],
                     },
-                    'releaseDate': str(pub_date) if pub_date else '',
-                    'pageCount': pages,
-                    'images': images,
+                    'releaseDate':  pub_date,
+                    'pageCount':    pages,
+                    'images':       images,
                     'remotePoster': cover_url,
-                    'year': year,
-                    'ratings': {'value': item.get('rating') or item.get('ratingScore') or 0},
-                    'media_type': 'book',
-                    '_source': 'apify',
+                    'cover_url':    cover_url,
+                    'year':         year,
+                    'genres':       genres,
+                    'ratings':      {'value': info.get('averageRating', 0)},
+                    'media_type':   'book',
+                    '_source':      'google_books',
                 }
                 results.append(book_entry)
-                # Persist to local cache so details lookups are free
                 save_book_metadata(book_entry)
+
             return results
 
         except Exception as e:
-            logging.error(f"[Apify] Goodreads search error: {e}", exc_info=True)
+            logging.error(f"[GoogleBooks] search error: {e}", exc_info=True)
             return []
 
     # ============ READARR METHODS ============
@@ -860,14 +887,14 @@ class SharedUtils:
         if not api_fallback:
             return book   # bulk load mode — no HTTP calls allowed
 
-        # 2. Goodreads / Apify fallback (when apify is enabled)
-        apify_on = False
+        # 2. Google Books fallback (when google_books is enabled)
+        gb_on = False
         try:
-            apify_on = bool(self.config.apify.enabled)
+            gb_on = bool(self.config.google_books.enabled)
         except Exception:
             pass
 
-        if apify_on and (not author_name or not poster_ok):
+        if gb_on and (not author_name or not poster_ok):
             title = book.get('title', '')
             if title:
                 auth_hint = ''
@@ -878,16 +905,11 @@ class SharedUtils:
                     pass
                 query = f"{title} {auth_hint}".strip() if auth_hint else title
                 try:
-                    logging.info(f"[enrich] Apify fallback for book {foreign_book_id}: {query!r}")
-                    results = self.search_goodreads_apify(query, max_items=5)
-                    # Best match: foreignBookId > exact title > first result
-                    matched = None
-                    for r in results:
-                        if str(r.get('foreignBookId')) == str(foreign_book_id):
-                            matched = r; break
-                    if not matched:
-                        tl = title.lower()
-                        matched = next((r for r in results if r.get('title', '').lower() == tl), None)
+                    logging.info(f"[enrich] Google Books fallback for book {foreign_book_id}: {query!r}")
+                    results = self.search_google_books(query, max_items=5)
+                    # Best match: exact title > first result
+                    tl = title.lower()
+                    matched = next((r for r in results if r.get('title', '').lower() == tl), None)
                     if not matched and results:
                         matched = results[0]
 
@@ -911,15 +933,14 @@ class SharedUtils:
                                 })
                                 book['remotePoster'] = mp
                                 poster_ok = True
-                        # Save under this book's foreignBookId if Apify returned a different one
+                        # Save under this book's foreignBookId if Google Books returned a different one
                         if str(matched.get('foreignBookId')) != str(foreign_book_id):
                             patched = dict(matched)
                             patched['foreignBookId'] = str(foreign_book_id)
                             save_book_metadata(patched)
-                            logging.debug(f"[cache] saved Apify data for book {foreign_book_id} (title match)")
-                        # (if IDs matched, search_goodreads_apify already saved it)
+                            logging.debug(f"[cache] saved Google Books data for book {foreign_book_id} (title match)")
                 except Exception as e:
-                    logging.warning(f"[enrich] Apify fallback error: {e}")
+                    logging.warning(f"[enrich] Google Books fallback error: {e}")
 
         # 3. Readarr author API — last resort for missing authorName
         if not author_name and self.config.readarr.url:
