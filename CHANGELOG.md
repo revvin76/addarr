@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.34] - 2026-04-29
+
+### Added
+- **Episode count indicator on manage cards** — TV show cards now display a `[downloaded/total]` episode count in place of the season count when episode data is available (e.g. `[12/15]`). Requires the episode counts to be present in the slim show dict (see Fixed below).
+- **Season episode counts on season headers** — each season header in the TV show detail modal now shows a `[downloaded/total]` badge on the far right, colour-coded green (complete), yellow (partial), or grey (none).
+- **Seasons collapsed by default** — season cards in the TV show detail modal now use Bootstrap collapse and start closed. Click any season header to expand it. Season 0 is labelled "Specials".
+
+### Fixed
+- **Missing Files / Missing Episodes filter not working** — `_slim_movie()` in `routes.py` was not including `hasFile` or `monitored`, so all movies were treated as missing and all monitor states were wrong. `_slim_show()` only kept `seasonCount` in statistics, discarding `episodeCount` and `episodeFileCount`, so the TV missing-episodes filter never matched anything. Both slim functions now include the fields needed by the filter and card display.
+- **Auto Search / Choose Source appearing on already-downloaded or unmonitored items** — both buttons now only render in the detail modal when the item is monitored AND has missing content (movie has no file; TV show has fewer downloaded episodes than total episodes).
+- **Monitor toggle requiring modal close/reopen to show search buttons** — after a successful monitor API call, the toggle handler now immediately injects or removes the Auto Search and Choose Source buttons in the open modal without any page interaction. Toggling to Monitored on a missing item adds the buttons; toggling to Unmonitored removes them.
+
+### Changed
+- **Watermark icons removed from all result cards** — the film (🎬) and TV (📺) icons overlaid on poster thumbnails have been removed from `manage.html`, `trending.html`, and `results.html`. The poster image itself is sufficient to identify media type; the icons added visual noise without useful information.
+
 ## [1.1.33] - 2026-04-28
 
 ### Added

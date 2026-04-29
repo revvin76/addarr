@@ -129,6 +129,14 @@
                     <i class="fas fa-sort-alpha-down me-1"></i>A–Z
                 </button>
                 <div id="azLetters" class="flex-grow-1"></div>
+                <div class="input-group input-group-sm flex-shrink-0" style="max-width:220px;">
+                    <span class="input-group-text"><i class="fas fa-triangle-exclamation"></i></span>
+                    <select id="availabilityFilter" class="form-select form-select-sm">
+                        <option value="all">All Availability</option>
+                        <option value="movie_missing_file">Movies Missing Files</option>
+                        <option value="tv_missing_episodes">TV Missing Episodes</option>
+                    </select>
+                </div>
                 <button id="backToTop" class="btn btn-sm btn-outline-secondary btn-back-to-top"
                         title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
                     <i class="fas fa-chevron-up"></i>
@@ -148,10 +156,21 @@
                 {% else %}
                     {% set item_id = item.tvdbId %}
                 {% endif %}
+                {% if item.media_type == 'tv' %}
+                    {% set ep_total = item.statistics.episodeCount or 0 %}
+                    {% set ep_got   = item.statistics.episodeFileCount or 0 %}
+                    {% set missing_ep = 'true' if ep_got < ep_total else 'false' %}
+                {% else %}
+                    {% set ep_total = 0 %}
+                    {% set ep_got   = 0 %}
+                    {% set missing_ep = 'false' %}
+                {% endif %}
                 <div class="col-6 col-md-4 col-lg-12 mb-3 media-item {{ item.media_type }}-item"
                     data-title="{{ item.title|lower }}"
                     data-id="{{ item_id }}"
                     data-media-type="{{ item.media_type }}"
+                    data-missing-files="{{ 'true' if item.media_type == 'movie' and not item.hasFile else 'false' }}"
+                    data-missing-episodes="{{ missing_ep }}"
                     onclick="showManageDetails('{{ item.media_type }}', '{{ item_id }}', {{ item.id }})">
 
                     <div class="search-result-card manage-result-card h-100 {{ item.media_type }}-card">
@@ -163,16 +182,9 @@
                                  alt="{{ item.title }}"
                                  onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
                             <div class="fade-overlay"></div>
-                            <div class="watermark-icon position-absolute">
-                                {% if item.media_type == 'movie' %}
-                                    <i class="fas fa-film"></i>
-                                {% else %}
-                                    <i class="fas fa-tv"></i>
-                                {% endif %}
-                            </div>
                         </div>
 
-                        <!-- Card content: title, year, runtime only — status loads on detail open -->
+                        <!-- Card content: title, year, runtime/seasons + episode count -->
                         <div class="search-result-content">
                             <h6 class="text-white truncate">{{ item.title }}</h6>
                             <div class="d-flex justify-content-between align-items-center">
@@ -181,7 +193,11 @@
                                     {% if item.media_type == 'movie' %}
                                         {% if item.runtime %}{{ item.runtime }} min{% endif %}
                                     {% else %}
-                                        {{ item.statistics.seasonCount }} seasons
+                                        {% if ep_total > 0 %}
+                                            [{{ ep_got }}/{{ ep_total }}]
+                                        {% else %}
+                                            {{ item.statistics.seasonCount }} seasons
+                                        {% endif %}
                                     {% endif %}
                                 </span>
                             </div>
@@ -257,8 +273,10 @@
         startProgressiveLoading();
 
         const mediaFilter  = document.getElementById('mediaFilter');
+        const availabilityFilter = document.getElementById('availabilityFilter');
         const searchButton = document.getElementById('searchButton');
         if (mediaFilter)   mediaFilter.addEventListener('change', updateMediaDisplay);
+        if (availabilityFilter) availabilityFilter.addEventListener('change', updateMediaDisplay);
         if (searchButton)  searchButton.addEventListener('click',  updateMediaDisplay);
 
         updateMediaDisplay();

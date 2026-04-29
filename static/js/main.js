@@ -38,6 +38,28 @@ const _bg = {
 window._bg = _bg;
 window._registerBgResume = fn => _bg.resumeQueue.push(fn);
 
+const _detailsScrollLock = {
+    y: 0,
+    locked: false
+};
+
+function _lockDetailsModalScroll() {
+    if (_detailsScrollLock.locked) return;
+    _detailsScrollLock.y = window.scrollY || window.pageYOffset || 0;
+    document.body.classList.add('details-modal-open');
+    document.body.style.top = `-${_detailsScrollLock.y}px`;
+    _detailsScrollLock.locked = true;
+}
+
+function _unlockDetailsModalScroll() {
+    if (!_detailsScrollLock.locked) return;
+    const y = _detailsScrollLock.y || 0;
+    document.body.classList.remove('details-modal-open');
+    document.body.style.top = '';
+    window.scrollTo(0, y);
+    _detailsScrollLock.locked = false;
+}
+
 function _pauseBackgroundFetches() {
     _bg.controller.abort();
     _bg.controller = new AbortController();   // fresh controller for next use
@@ -51,6 +73,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.modal').forEach(el => {
         el.addEventListener('hidden.bs.modal', _resumeBackgroundFetches);
     });
+    const detailsModal = document.getElementById('detailsModal');
+    if (detailsModal) {
+        detailsModal.addEventListener('shown.bs.modal', _lockDetailsModalScroll);
+        detailsModal.addEventListener('hidden.bs.modal', _unlockDetailsModalScroll);
+    }
 });
 
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -436,24 +463,44 @@ function renderMovieDetails(mediaData, fullData, mediaType, internalId) {
         <!-- Action Buttons -->
         <div class="row mb-3">
             <div class="col-12">
-                <div class="d-grid gap-2 d-flex">
-                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle" 
-                            data-type="${mediaType}" 
+                <div class="d-grid gap-2 d-flex flex-wrap">
+                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle"
+                            data-type="${mediaType}"
                             data-id="${internalId}"
-                            data-monitored="${fullData.monitored}">
+                            data-monitored="${fullData.monitored}"
+                            data-has-missing="${!fullData.on_disk}">
                         ${fullData.monitored ? 'Unmonitor' : 'Monitor'}
                     </button>
-                    <button class="btn btn-primary flex-fill search-btn" 
-                            data-type="${mediaType}" 
+                    ${fullData.monitored && !fullData.on_disk ? `
+                    <button class="btn btn-primary flex-fill search-btn"
+                            data-type="${mediaType}"
                             data-id="${internalId}">
-                        <i class="fas fa-search me-1"></i> Search
+                        <i class="fas fa-bolt me-1"></i> Auto Search
                     </button>
-                    <button class="btn btn-danger flex-fill delete-btn" 
-                            data-type="${mediaType}" 
+                    <button class="btn btn-outline-info flex-fill interactive-search-btn"
+                            data-type="${mediaType}"
+                            data-id="${internalId}">
+                        <i class="fas fa-list me-1"></i> Choose Source
+                    </button>` : ''}
+                    <button class="btn btn-danger flex-fill delete-btn"
+                            data-type="${mediaType}"
                             data-id="${internalId}">
                         <i class="fas fa-trash me-1"></i> Delete
                     </button>
                 </div>
+            </div>
+        </div>
+
+        <div id="interactiveSearchContainer" class="card bg-dark border-secondary mb-3" style="display:none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">RELEASES</h6>
+                <button class="btn btn-sm btn-outline-secondary" type="button"
+                        onclick="hideInteractiveSearchResults()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="card-body p-2" id="interactiveSearchResults">
+                <div class="text-center text-muted py-3">Loading releases...</div>
             </div>
         </div>
 
@@ -622,24 +669,44 @@ function renderTVDetails(mediaData, fullData, mediaType, internalId) {
         <!-- Action Buttons -->
         <div class="row mb-3">
             <div class="col-12">
-                <div class="d-grid gap-2 d-flex">
-                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle" 
-                            data-type="${mediaType}" 
+                <div class="d-grid gap-2 d-flex flex-wrap">
+                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle"
+                            data-type="${mediaType}"
                             data-id="${internalId}"
-                            data-monitored="${fullData.monitored}">
+                            data-monitored="${fullData.monitored}"
+                            data-has-missing="${downloadedEpisodes < totalEpisodes}">
                         ${fullData.monitored ? 'Unmonitor' : 'Monitor'}
                     </button>
-                    <button class="btn btn-primary flex-fill search-btn" 
-                            data-type="${mediaType}" 
+                    ${fullData.monitored && downloadedEpisodes < totalEpisodes ? `
+                    <button class="btn btn-primary flex-fill search-btn"
+                            data-type="${mediaType}"
                             data-id="${internalId}">
-                        <i class="fas fa-search me-1"></i> Search
+                        <i class="fas fa-bolt me-1"></i> Auto Search
                     </button>
-                    <button class="btn btn-danger flex-fill delete-btn" 
-                            data-type="${mediaType}" 
+                    <button class="btn btn-outline-info flex-fill interactive-search-btn"
+                            data-type="${mediaType}"
+                            data-id="${internalId}">
+                        <i class="fas fa-list me-1"></i> Choose Source
+                    </button>` : ''}
+                    <button class="btn btn-danger flex-fill delete-btn"
+                            data-type="${mediaType}"
                             data-id="${internalId}">
                         <i class="fas fa-trash me-1"></i> Delete
                     </button>
                 </div>
+            </div>
+        </div>
+
+        <div id="interactiveSearchContainer" class="card bg-dark border-secondary mb-3" style="display:none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">RELEASES</h6>
+                <button class="btn btn-sm btn-outline-secondary" type="button"
+                        onclick="hideInteractiveSearchResults()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="card-body p-2" id="interactiveSearchResults">
+                <div class="text-center text-muted py-3">Loading releases...</div>
             </div>
         </div>
 
@@ -717,15 +784,11 @@ function renderTVDetails(mediaData, fullData, mediaType, internalId) {
         <div class="seasons-container mb-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h6 class="mb-0">SEASONS</h6>
-                <button class="btn btn-sm btn-outline-primary" id="loadEpisodesBtn" data-series-id="${internalId}">
-                    <i class="fas fa-sync-alt me-1"></i> Load Episodes
-                </button>
             </div>
             <div id="seasonsList">
-                <!-- Seasons will be loaded here when user clicks the button -->
                 <div class="text-center text-muted p-4">
-                    <i class="fas fa-tv fa-2x mb-2"></i>
-                    <p>Click "Load Episodes" to view season details</p>
+                    <div class="spinner-border spinner-border-sm mb-2" role="status"></div>
+                    <p class="mb-0">Loading episodes...</p>
                 </div>
             </div>
         </div>
@@ -744,34 +807,26 @@ function renderTVDetails(mediaData, fullData, mediaType, internalId) {
     `;
     
     detailsContent.innerHTML = html;
-    
-    // Add event listener for the load episodes button
-    const loadEpisodesBtn = document.getElementById('loadEpisodesBtn');
-    if (loadEpisodesBtn) {
-        loadEpisodesBtn.addEventListener('click', function() {
-            const seriesId = this.getAttribute('data-series-id');
-            loadTVShowEpisodes(seriesId);
-        });
-    }
-    
+
     // Add event listeners to the new buttons
     attachButtonEventListeners();
+    loadTVShowEpisodes(internalId);
 }
 
 // New function to load episodes for TV shows
 function loadTVShowEpisodes(seriesId) {
-    const button = document.getElementById('loadEpisodesBtn');
     const seasonsList = document.getElementById('seasonsList');
     
-    // Check if elements exist
-    if (!button || !seasonsList) {
+    if (!seasonsList) {
         console.error('Required elements not found');
         return;
     }
     
-    // Show loading state
-    button.disabled = true;
-    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+    seasonsList.innerHTML = `
+        <div class="text-center text-muted p-4">
+            <div class="spinner-border spinner-border-sm mb-2" role="status"></div>
+            <p class="mb-0">Loading episodes...</p>
+        </div>`;
     
     fetch(`/api/series/${seriesId}/seasons`)
         .then(response => {
@@ -782,8 +837,6 @@ function loadTVShowEpisodes(seriesId) {
         })
         .then(seasonsWithEpisodes => {
             renderSeasonCards(seasonsWithEpisodes);
-            // Hide the button after successful load
-            button.style.display = 'none';
         })
         .catch(error => {
             console.error('Error loading episodes:', error);
@@ -792,78 +845,205 @@ function loadTVShowEpisodes(seriesId) {
                     Error loading episodes: ${error.message}
                     <button class="btn btn-sm btn-outline-danger ms-2" onclick="loadTVShowEpisodes(${seriesId})">Retry</button>
                 </div>`;
-            // Reset button
-            button.disabled = false;
-            button.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Load Episodes';
         });
+}
+
+function hideInteractiveSearchResults() {
+    const container = document.getElementById('interactiveSearchContainer');
+    const results = document.getElementById('interactiveSearchResults');
+    if (results) results.innerHTML = '';
+    if (container) container.style.display = 'none';
+}
+
+function renderInteractiveSearchResults(mediaType, internalId, releases) {
+    const container = document.getElementById('interactiveSearchContainer');
+    const resultsEl = document.getElementById('interactiveSearchResults');
+    if (!container || !resultsEl) return;
+
+    if (!Array.isArray(releases) || !releases.length) {
+        resultsEl.innerHTML = '<div class="text-muted text-center py-3">No releases found.</div>';
+        container.style.display = 'block';
+        return;
+    }
+
+    const sorted = releases.slice().sort((a, b) => (b.age || 0) - (a.age || 0));
+    resultsEl.innerHTML = sorted.map((release, idx) => {
+        const title = release.title || release.releaseTitle || 'Unknown release';
+        const indexer = release.indexer || release.indexerName || 'Unknown source';
+        const quality = release.quality?.quality?.name || release.quality?.name || release.quality || 'Unknown';
+        const size = release.size ? formatFileSize(release.size) : 'Unknown size';
+        const age = release.age ? `${release.age}d` : 'new';
+        const protocol = (release.protocol || '').toUpperCase();
+        const score = release.customFormatScore ?? release.rejections?.length ?? '';
+        const info = [quality, size, protocol, age].filter(Boolean).join(' • ');
+        return `
+            <div class="border rounded p-2 mb-2 bg-dark-subtle">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="flex-grow-1" style="min-width:0;">
+                        <div class="text-light fw-semibold text-truncate" title="${title.replace(/"/g, '&quot;')}">${title}</div>
+                        <div class="text-muted small">${indexer}</div>
+                        <div class="text-muted small">${info}${score !== '' ? ` • score ${score}` : ''}</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary flex-shrink-0"
+                            onclick="grabInteractiveRelease('${mediaType}', ${internalId}, ${idx}, this)">
+                        <i class="fas fa-download me-1"></i>Grab
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+    window._interactiveReleaseResults = sorted;
+    container.style.display = 'block';
+}
+
+function loadInteractiveSearchResults(mediaType, internalId, button) {
+    const container = document.getElementById('interactiveSearchContainer');
+    const resultsEl = document.getElementById('interactiveSearchResults');
+    if (!container || !resultsEl) return;
+
+    const originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+    container.style.display = 'block';
+    resultsEl.innerHTML = '<div class="text-center text-muted py-3">Loading releases...</div>';
+
+    fetch(`/api/${mediaType}/${internalId}/interactive-search`)
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok) throw new Error(data.error || 'Failed to load releases');
+            renderInteractiveSearchResults(mediaType, internalId, data.results || []);
+        })
+        .catch(error => {
+            console.error(error);
+            resultsEl.innerHTML = `<div class="alert alert-danger mb-0">Failed to load releases: ${error.message}</div>`;
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.innerHTML = originalHtml;
+        });
+}
+
+function grabInteractiveRelease(mediaType, internalId, idx, button) {
+    const releases = window._interactiveReleaseResults || [];
+    const release = releases[idx];
+    if (!release) return;
+
+    const originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+
+    fetch(`/api/${mediaType}/${internalId}/grab-release`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ release })
+    })
+    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.error || 'Failed to grab release');
+        button.classList.remove('btn-primary');
+        button.classList.add('btn-success');
+        button.innerHTML = '<i class="fas fa-check me-1"></i>Queued';
+        showNotification('Release queued successfully', 'success');
+    })
+    .catch(error => {
+        console.error(error);
+        button.classList.remove('btn-primary');
+        button.classList.add('btn-danger');
+        button.innerHTML = '<i class="fas fa-times me-1"></i>Failed';
+        showNotification(`Failed to queue release: ${error.message}`, 'error');
+        setTimeout(() => {
+            button.classList.remove('btn-danger');
+            button.classList.add('btn-primary');
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        }, 1800);
+    });
 }
 
 // Function to render season cards with episodes
 function renderSeasonCards(seasonsWithEpisodes) {
     const container = document.getElementById('seasonsList');
-    
-    // Check if container exists
+
     if (!container) {
         console.error('seasonsList container not found');
         return;
     }
-    
+
     if (!seasonsWithEpisodes || seasonsWithEpisodes.length === 0) {
         container.innerHTML = '<div class="alert alert-warning">No episodes data available</div>';
         return;
     }
-    
+
     // Sort seasons by season number
     seasonsWithEpisodes.sort((a, b) => a.seasonNumber - b.seasonNumber);
-    
-    const seasonsHtml = seasonsWithEpisodes.map(season => {
+
+    const seasonsHtml = seasonsWithEpisodes.map((season, idx) => {
+        const eps      = season.episodes || [];
+        const total    = eps.length;
+        const gotFiles = eps.filter(e => e.hasFile).length;
+        const collapseId = `season-collapse-${season.seasonNumber}`;
+        const headingId  = `season-heading-${season.seasonNumber}`;
+        const label = season.seasonNumber === 0 ? 'Specials' : `Season ${season.seasonNumber}`;
+
+        // Badge colour: green = complete, yellow = partial, secondary = 0
+        const badgeCls = gotFiles === total && total > 0 ? 'bg-success'
+                       : gotFiles > 0               ? 'bg-warning text-dark'
+                       : 'bg-secondary';
+
         return `
-            <div class="card season-card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0">Season ${season.seasonNumber}</h6>
+            <div class="card season-card mb-2">
+                <div class="card-header d-flex justify-content-between align-items-center"
+                     id="${headingId}"
+                     style="cursor:pointer;"
+                     data-bs-toggle="collapse"
+                     data-bs-target="#${collapseId}"
+                     aria-expanded="false"
+                     aria-controls="${collapseId}">
+                    <h6 class="mb-0">${label}</h6>
+                    <span class="badge ${badgeCls} ms-auto">[${gotFiles}/${total}]</span>
                 </div>
-                <div class="card-body p-0">
-                    <div class="episode-list">
-                        ${season.episodes && season.episodes.length > 0 ? 
-                            season.episodes.map(episode => `
-                                <div class="episode-item d-flex justify-content-between align-items-center ${episode.hasFile ? 'downloaded' : 'missing'}">
-                                    <div class="flex-grow-1">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div>
-                                                <span class="episode-number">${episode.episodeNumber}</span>
-                                                <span class="episode-title">Episode ${episode.episodeNumber}</span>
-                                                ${episode.title && episode.title !== `Episode ${episode.episodeNumber}` ? 
-                                                    `<small class="text-muted d-block">${episode.title}</small>` : ''}
+                <div id="${collapseId}" class="collapse" aria-labelledby="${headingId}">
+                    <div class="card-body p-0">
+                        <div class="episode-list">
+                            ${total > 0 ?
+                                eps.map(episode => {
+                                    const epTitle = (episode.title && episode.title !== `Episode ${episode.episodeNumber}`)
+                                        ? `<small class="text-muted d-block">${episode.title}</small>` : '';
+                                    const actionBtn = episode.hasFile
+                                        ? `<button class="btn btn-sm btn-danger delete-episode-btn"
+                                               data-episode-id="${episode.id}"
+                                               title="Delete episode file">
+                                               <i class="fas fa-trash"></i>
+                                           </button>`
+                                        : `<button class="btn btn-sm btn-primary search-episode-btn"
+                                               data-episode-id="${episode.id}"
+                                               title="Search for episode">
+                                               <i class="fas fa-search"></i>
+                                           </button>`;
+                                    return `
+                                        <div class="episode-item d-flex justify-content-between align-items-center ${episode.hasFile ? 'downloaded' : 'missing'}">
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <span class="episode-number">${episode.episodeNumber}</span>
+                                                        <span class="episode-title">Episode ${episode.episodeNumber}</span>
+                                                        ${epTitle}
+                                                    </div>
+                                                    <div class="episode-date">${formatEpisodeDate(episode.airDate)}</div>
+                                                </div>
                                             </div>
-                                            <div class="episode-date">${formatEpisodeDate(episode.airDate)}</div>
-                                        </div>
-                                    </div>
-                                    <div class="episode-actions ms-2">
-                                        ${episode.hasFile ? 
-                                            `<button class="btn btn-sm btn-danger delete-episode-btn" 
-                                                data-episode-id="${episode.id}"
-                                                title="Delete episode file">
-                                                <i class="fas fa-trash"></i>
-                                            </button>` :
-                                            `<button class="btn btn-sm btn-primary search-episode-btn" 
-                                                data-episode-id="${episode.id}"
-                                                title="Search for episode">
-                                                <i class="fas fa-search"></i>
-                                            </button>`
-                                        }
-                                    </div>
-                                </div>
-                            `).join('') : 
-                            '<div class="episode-item text-center p-2">No episodes available</div>'
-                        }
+                                            <div class="episode-actions ms-2">${actionBtn}</div>
+                                        </div>`;
+                                }).join('')
+                                : '<div class="episode-item text-center p-2 text-muted">No episodes available</div>'
+                            }
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            </div>`;
     }).join('');
-    
+
     container.innerHTML = seasonsHtml;
-    
+
     // Attach event listeners to the new buttons
     attachEpisodeEventListeners();
 }
@@ -1054,7 +1234,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
             player = null;
         }
         currentTrailerKey = null;
-    });
+    }, { once: true });
             
     modalEl.removeAttribute('aria-hidden');
     modalTitle.textContent = `${mediaType === 'tv' ? 'TV Show' : mediaType === 'book' ? 'Book' : 'Movie'} Details`;
@@ -1569,25 +1749,70 @@ function renderEpisodes(episodes) {
     });
 }
 
-function deleteEpisode(episodeId) {
+function deleteEpisode(episodeId, button) {
     if (!confirm('Delete this episode file?')) return;
+    const originalHtml = button ? button.innerHTML : null;
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+    }
     fetch(`/api/episode/${episodeId}`, { method: 'DELETE' })
         .then(res => {
-            if (res.ok) {
-                alert('Episode deleted');
+            if (!res.ok) throw new Error('Failed to delete episode');
+            if (button) {
+                const episodeItem = button.closest('.episode-item');
+                if (episodeItem) {
+                    episodeItem.classList.remove('downloaded');
+                    episodeItem.classList.add('missing');
+                }
+                button.outerHTML = `
+                    <button class="btn btn-sm btn-primary search-episode-btn"
+                            data-episode-id="${episodeId}"
+                            title="Search for episode">
+                        <i class="fas fa-search"></i>
+                    </button>`;
+                attachEpisodeEventListeners();
+            } else {
                 location.reload();
-            } else throw new Error();
+            }
+            showNotification('Episode deleted', 'success');
         })
-        .catch(() => alert('Failed to delete episode'));
+        .catch(err => {
+            console.error(err);
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+            }
+            showNotification('Failed to delete episode', 'error');
+        });
 }
 
-function searchEpisode(episodeId) {
+function searchEpisode(episodeId, button) {
+    const originalHtml = button ? button.innerHTML : null;
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+    }
     fetch(`/api/episode/${episodeId}/search`, { method: 'POST' })
         .then(res => {
-            if (res.ok) alert('Search started');
-            else throw new Error();
+            if (!res.ok) throw new Error('Search failed');
+            showNotification('Episode search started', 'success');
+            if (button) {
+                button.innerHTML = '<i class="fas fa-check text-success"></i>';
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.innerHTML = originalHtml;
+                }, 1600);
+            }
         })
-        .catch(() => alert('Search failed'));
+        .catch(err => {
+            console.error(err);
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+            }
+            showNotification('Search failed', 'error');
+        });
 }
 
 document.getElementById('deleteShowBtn')?.addEventListener('click', () => {
@@ -1610,29 +1835,114 @@ document.getElementById('searchAllMissingBtn')?.addEventListener('click', () => 
 });
 
 function attachButtonEventListeners() {
-  // Delete Show button
-  document.getElementById('deleteShowBtn')?.addEventListener('click', () => {
-    if (!currentShowId) return;
-    if (confirm('Delete the entire show?')) {
-      fetch(`/api/tv/${currentShowId}`, { method: 'DELETE' })
-        .then(r => r.ok ? location.reload() : alert('Failed to delete show'));
-    }
+  document.querySelectorAll('.monitor-toggle').forEach(btn => {
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      const mediaType = this.dataset.type;
+      const internalId = this.dataset.id;
+      const monitored = !(this.dataset.monitored === 'true');
+      const originalHtml = this.innerHTML;
+      this.disabled = true;
+      fetch(`/api/${mediaType}/${internalId}/monitor`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monitored })
+      })
+      .then(response => response.json().then(data => ({ ok: response.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.error || 'Failed to update monitor status');
+        this.dataset.monitored = monitored ? 'true' : 'false';
+        this.className = `btn ${monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle`;
+        this.innerHTML = monitored ? 'Unmonitor' : 'Monitor';
+        showNotification('Monitoring status updated', 'success');
+
+        // Show or hide Auto Search / Choose Source based on new monitored state
+        const hasMissing = this.dataset.hasMissing === 'true';
+        const btnRow = this.closest('.d-flex.flex-wrap');
+        if (btnRow) {
+          // Remove existing search buttons
+          btnRow.querySelectorAll('.search-btn, .interactive-search-btn').forEach(b => b.remove());
+          // Inject if now monitored and content is missing
+          if (monitored && hasMissing) {
+            const mType = this.dataset.type;
+            const mId   = this.dataset.id;
+            const deleteBtn = btnRow.querySelector('.delete-btn');
+            const searchHtml =
+              `<button class="btn btn-primary flex-fill search-btn" data-type="${mType}" data-id="${mId}">` +
+                `<i class="fas fa-bolt me-1"></i> Auto Search` +
+              `</button>` +
+              `<button class="btn btn-outline-info flex-fill interactive-search-btn" data-type="${mType}" data-id="${mId}">` +
+                `<i class="fas fa-list me-1"></i> Choose Source` +
+              `</button>`;
+            if (deleteBtn) {
+              deleteBtn.insertAdjacentHTML('beforebegin', searchHtml);
+            } else {
+              btnRow.insertAdjacentHTML('beforeend', searchHtml);
+            }
+            attachButtonEventListeners();
+          }
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        this.innerHTML = originalHtml;
+        showNotification(error.message || 'Failed to update monitoring status', 'error');
+      })
+      .finally(() => {
+        this.disabled = false;
+      });
+    };
   });
 
-  // Delete All Files button
-  document.getElementById('deleteAllFilesBtn')?.addEventListener('click', () => {
-    if (!currentShowId) return;
-    if (confirm('Delete all files for this show?')) {
-      fetch(`/api/tv/${currentShowId}/files`, { method: 'DELETE' })
-        .then(r => r.ok ? alert('All files deleted') : alert('Failed to delete files'));
-    }
+  document.querySelectorAll('.search-btn').forEach(btn => {
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      const mediaType = this.dataset.type;
+      const internalId = this.dataset.id;
+      const originalHtml = this.innerHTML;
+      this.disabled = true;
+      this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+      fetch(`/api/${mediaType}/${internalId}/search`, { method: 'POST' })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) throw new Error(data.error || 'Failed to initiate search');
+          showNotification('Automatic search started', 'success');
+        })
+        .catch(error => {
+          console.error(error);
+          showNotification(error.message || 'Failed to initiate search', 'error');
+        })
+        .finally(() => {
+          this.disabled = false;
+          this.innerHTML = originalHtml;
+        });
+    };
   });
 
-  // Search All Missing button
-  document.getElementById('searchAllMissingBtn')?.addEventListener('click', () => {
-    if (!currentShowId) return;
-    fetch(`/api/tv/${currentShowId}/search_missing`, { method: 'POST' })
-      .then(r => r.ok ? alert('Search started') : alert('Failed to search'));
+  document.querySelectorAll('.interactive-search-btn').forEach(btn => {
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      loadInteractiveSearchResults(this.dataset.type, this.dataset.id, this);
+    };
+  });
+
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      if (!confirm('Are you sure you want to delete this from your library?')) return;
+      const mediaType = this.dataset.type;
+      const internalId = this.dataset.id;
+      fetch(`/api/${mediaType}/${internalId}`, { method: 'DELETE' })
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to delete item');
+          showNotification('Item deleted successfully', 'success');
+          window.location.reload();
+        })
+        .catch(error => {
+          console.error(error);
+          showNotification(error.message || 'Failed to delete item', 'error');
+        });
+    };
   });
 }
 
@@ -3233,6 +3543,8 @@ function updateMediaDisplay() {
     
     const searchTerm = searchInput.value.toLowerCase();
     const currentFilter = document.getElementById('mediaFilter').value;
+    const availabilityFilter = document.getElementById('availabilityFilter');
+    const availabilityValue = availabilityFilter ? availabilityFilter.value : 'all';
     
     document.querySelectorAll('.media-item').forEach(item => {
         const title = item.dataset.title;
@@ -3245,8 +3557,11 @@ function updateMediaDisplay() {
                             (currentFilter === 'movie' && isMovie) ||
                             (currentFilter === 'tv' && isTV) ||
                             (currentFilter === 'book' && isBook);
+        const matchesAvailability = availabilityValue === 'all' ||
+                            (availabilityValue === 'movie_missing_file' && isMovie && item.dataset.missingFiles === 'true') ||
+                            (availabilityValue === 'tv_missing_episodes' && isTV && item.dataset.missingEpisodes === 'true');
 
-        item.style.display = (matchesSearch && matchesFilter) ? 'block' : 'none';
+        item.style.display = (matchesSearch && matchesFilter && matchesAvailability) ? 'block' : 'none';
     });
 }
 

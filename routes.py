@@ -595,6 +595,8 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     'year':          m.get('year'),
                     'certification': m.get('certification'),
                     'runtime':       m.get('runtime'),
+                    'hasFile':       bool(m.get('hasFile', False)),
+                    'monitored':     bool(m.get('monitored', False)),
                     'images':        [{'coverType': 'poster', 'remoteUrl': poster}] if poster else [],
                     'media_type':    'movie',
                 }
@@ -608,7 +610,12 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     'title':         s.get('title', ''),
                     'year':          s.get('year'),
                     'certification': s.get('certification'),
-                    'statistics':    {'seasonCount': stats.get('seasonCount', 0)},
+                    'monitored':     bool(s.get('monitored', False)),
+                    'statistics':    {
+                        'seasonCount':      stats.get('seasonCount', 0),
+                        'episodeCount':     stats.get('episodeCount', 0),
+                        'episodeFileCount': stats.get('episodeFileCount', 0),
+                    },
                     'images':        [{'coverType': 'poster', 'remoteUrl': poster}] if poster else [],
                     'media_type':    'tv',
                 }
@@ -862,13 +869,8 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             except OSError:
                 pass
 
-    def _best_enrichment_match(results, title, author):
-        """Return the best-matching result from `results` using fuzzy title+author comparison.
-
-        Scoring: author match weighted 0.6, title match weighted 0.4.
-        Minimum combined score to accept a result: 0.35.
-        Returns None if no result clears the threshold.
-        """
+    def _enrichment_match_score(result, title, author):
+        """Return a fuzzy title/author match score for an online book result."""
         import difflib
 
         def _norm(s):
@@ -877,26 +879,35 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         title_n  = _norm(title)
         author_n = _norm(author)
 
-        best_score  = 0.0
+        r_title = _norm(result.get('title', ''))
+        r_auth_raw = result.get('author') or {}
+        if isinstance(r_auth_raw, dict):
+            r_author = _norm(r_auth_raw.get('authorName', ''))
+        else:
+            r_author = _norm(str(r_auth_raw))
+
+        t_score = (difflib.SequenceMatcher(None, title_n, r_title).ratio()
+                   if title_n else 0.5)
+        a_score = (difflib.SequenceMatcher(None, author_n, r_author).ratio()
+                   if author_n else 0.5)
+        score = (a_score * 0.6) + (t_score * 0.4)
+        logging.debug("[enrichment_match] '%s' / '%s' → score %.3f", r_title, r_author, score)
+        return score
+
+    def _best_enrichment_match(results, title, author):
+        """Return the best-matching result from `results` using fuzzy title+author comparison.
+
+        Scoring: author match weighted 0.6, title match weighted 0.4.
+        Minimum combined score to accept a result: 0.35.
+        Returns None if no result clears the threshold.
+        """
+        best_score = 0.0
         best_result = None
 
         for r in results:
-            r_title = _norm(r.get('title', ''))
-            r_auth_raw = r.get('author') or {}
-            if isinstance(r_auth_raw, dict):
-                r_author = _norm(r_auth_raw.get('authorName', ''))
-            else:
-                r_author = _norm(str(r_auth_raw))
-
-            t_score = (difflib.SequenceMatcher(None, title_n, r_title).ratio()
-                       if title_n else 0.5)
-            a_score = (difflib.SequenceMatcher(None, author_n, r_author).ratio()
-                       if author_n else 0.5)
-
-            score = (a_score * 0.6) + (t_score * 0.4)
-            logging.debug("[enrichment_match] '%s' / '%s' → score %.3f", r_title, r_author, score)
+            score = _enrichment_match_score(r, title, author)
             if score > best_score:
-                best_score  = score
+                best_score = score
                 best_result = r
 
         if best_score >= 0.35:
@@ -1409,10 +1420,22 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
 
         req_data = request.get_json(force=True, silent=True) or {}
         override_query = (req_data.get('query') or '').strip()
+        req_title = (req_data.get('title') or '').strip()
+        req_author = (req_data.get('author') or '').strip()
+        goodreads_url = (req_data.get('goodreads_url') or '').strip()
 
-        title  = book.get('title', '')
-        author = book.get('author', '')
-        query  = override_query or f"{title} {author}".strip()
+        title = req_title or book.get('title', '')
+        author = req_author or book.get('author', '')
+
+        import re as _re
+        slug_title = ''
+        if goodreads_url:
+            _slug_m = _re.search(r'/show/\d+[-/](.+?)(?:\?|$)', goodreads_url)
+            if _slug_m:
+                slug_title = _slug_m.group(1).replace('-', ' ').strip()
+
+        search_title = slug_title or title
+        query = override_query or f"{search_title} {author}".strip()
 
         all_results = []
 
@@ -1424,6 +1447,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     _genres = r.get('genres') or []
                     all_results.append({
                         'source':          'Google Books',
+                        'source_key':      'google_books',
                         'title':           r.get('title') or '',
                         'author':          (r.get('author') or {}).get('authorName') or '',
                         'year':            r.get('year') or '',
@@ -1456,6 +1480,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     _genres = r.get('genres') or []
                     all_results.append({
                         'source':          'Readarr',
+                        'source_key':      'readarr',
                         'title':           r.get('title') or '',
                         'author':          author_name,
                         'year':            (r.get('releaseDate') or '')[:4] or '',
@@ -1469,6 +1494,19 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     })
             except Exception as e:
                 logging.warning("[search_online_all] Readarr error: %s", e)
+
+        for result in all_results:
+            result['_score'] = _enrichment_match_score(
+                {
+                    'title': result.get('title'),
+                    'author': {'authorName': result.get('author', '')},
+                },
+                search_title,
+                author,
+            )
+        all_results.sort(key=lambda r: (r.get('_score', 0), r.get('source_key') == 'readarr'), reverse=True)
+        for result in all_results:
+            result.pop('_score', None)
 
         return jsonify({'results': all_results})
 
@@ -1802,6 +1840,230 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     result['tv'][tid] = {'in_library': False}
 
         return jsonify(result)
+
+    @app.route('/api/<string:media_type>/<int:internal_id>/monitor', methods=['PUT'])
+    @requires_auth
+    def update_media_monitor(media_type, internal_id):
+        """Toggle monitored state for movies and TV series."""
+        if media_type not in ('movie', 'tv'):
+            return jsonify({'error': 'unsupported media type'}), 400
+
+        data = request.get_json(silent=True) or {}
+        monitored = bool(data.get('monitored'))
+
+        try:
+            if media_type == 'movie':
+                if not CONFIG.radarr.enabled:
+                    return jsonify({'error': 'Radarr not configured'}), 503
+                base_url = f"{CONFIG.radarr.url}/api/v3/movie/{internal_id}"
+                params = {'apikey': CONFIG.radarr.api_key}
+            else:
+                if not CONFIG.sonarr.enabled:
+                    return jsonify({'error': 'Sonarr not configured'}), 503
+                base_url = f"{CONFIG.sonarr.url}/api/v3/series/{internal_id}"
+                params = {'apikey': CONFIG.sonarr.api_key}
+
+            existing = requests.get(base_url, params=params, timeout=15)
+            if existing.status_code != 200:
+                return jsonify({'error': f'lookup failed: HTTP {existing.status_code}'}), existing.status_code
+
+            payload = existing.json()
+            payload['monitored'] = monitored
+
+            updated = requests.put(base_url, params=params, json=payload, timeout=15)
+            if updated.status_code not in (200, 202):
+                return jsonify({'error': updated.text[:400] or 'update failed'}), updated.status_code
+
+            return jsonify({'success': True, 'monitored': monitored})
+        except Exception as e:
+            logging.error("[monitor] %s %s failed: %s", media_type, internal_id, e, exc_info=True)
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/<string:media_type>/<int:internal_id>/search', methods=['POST'])
+    @requires_auth
+    def search_media_missing(media_type, internal_id):
+        """Trigger the standard Arr automatic search for a movie or TV series."""
+        if media_type not in ('movie', 'tv'):
+            return jsonify({'error': 'unsupported media type'}), 400
+
+        try:
+            if media_type == 'movie':
+                if not CONFIG.radarr.enabled:
+                    return jsonify({'error': 'Radarr not configured'}), 503
+                url = f"{CONFIG.radarr.url}/api/v3/command"
+                params = {'apikey': CONFIG.radarr.api_key}
+                payload = {'name': 'MoviesSearch', 'movieIds': [internal_id]}
+            else:
+                if not CONFIG.sonarr.enabled:
+                    return jsonify({'error': 'Sonarr not configured'}), 503
+                url = f"{CONFIG.sonarr.url}/api/v3/command"
+                params = {'apikey': CONFIG.sonarr.api_key}
+                payload = {'name': 'SeriesSearch', 'seriesId': internal_id}
+
+            r = requests.post(url, params=params, json=payload, timeout=20)
+            if r.status_code not in (200, 201):
+                return jsonify({'error': r.text[:400] or 'search failed'}), r.status_code
+            return jsonify({'success': True, 'result': r.json()})
+        except Exception as e:
+            logging.error("[auto_search] %s %s failed: %s", media_type, internal_id, e, exc_info=True)
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/<string:media_type>/<int:internal_id>/interactive-search')
+    @requires_auth
+    def interactive_search_media(media_type, internal_id):
+        """Return manual-search release candidates from Radarr/Sonarr."""
+        if media_type not in ('movie', 'tv'):
+            return jsonify({'error': 'unsupported media type'}), 400
+
+        try:
+            if media_type == 'movie':
+                if not CONFIG.radarr.enabled:
+                    return jsonify({'error': 'Radarr not configured'}), 503
+                url = f"{CONFIG.radarr.url}/api/v3/release"
+                params = {'apikey': CONFIG.radarr.api_key, 'movieId': internal_id}
+            else:
+                if not CONFIG.sonarr.enabled:
+                    return jsonify({'error': 'Sonarr not configured'}), 503
+                url = f"{CONFIG.sonarr.url}/api/v3/release"
+                params = {'apikey': CONFIG.sonarr.api_key, 'seriesId': internal_id}
+
+            r = requests.get(url, params=params, timeout=25)
+            if r.status_code != 200:
+                return jsonify({'error': r.text[:400] or 'interactive search failed'}), r.status_code
+
+            releases = r.json() if isinstance(r.json(), list) else []
+            return jsonify({'success': True, 'results': releases})
+        except Exception as e:
+            logging.error("[interactive_search] %s %s failed: %s", media_type, internal_id, e, exc_info=True)
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/<string:media_type>/<int:internal_id>/grab-release', methods=['POST'])
+    @requires_auth
+    def grab_release(media_type, internal_id):
+        """Send a selected manual-search release to Radarr/Sonarr for download."""
+        if media_type not in ('movie', 'tv'):
+            return jsonify({'error': 'unsupported media type'}), 400
+
+        data = request.get_json(silent=True) or {}
+        release = data.get('release')
+        if not isinstance(release, dict):
+            return jsonify({'error': 'release payload required'}), 400
+
+        try:
+            if media_type == 'movie':
+                if not CONFIG.radarr.enabled:
+                    return jsonify({'error': 'Radarr not configured'}), 503
+                url = f"{CONFIG.radarr.url}/api/v3/release"
+                params = {'apikey': CONFIG.radarr.api_key}
+                release.setdefault('movieId', internal_id)
+            else:
+                if not CONFIG.sonarr.enabled:
+                    return jsonify({'error': 'Sonarr not configured'}), 503
+                url = f"{CONFIG.sonarr.url}/api/v3/release"
+                params = {'apikey': CONFIG.sonarr.api_key}
+                release.setdefault('seriesId', internal_id)
+
+            r = requests.post(url, params=params, json=release, timeout=25)
+            if r.status_code not in (200, 201):
+                return jsonify({'error': r.text[:400] or 'grab failed'}), r.status_code
+            return jsonify({'success': True, 'result': r.json()})
+        except Exception as e:
+            logging.error("[grab_release] %s %s failed: %s", media_type, internal_id, e, exc_info=True)
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/series/<int:series_id>/seasons')
+    @requires_auth
+    def get_series_seasons(series_id):
+        """Return Sonarr episodes grouped by season for a series."""
+        if not CONFIG.sonarr.enabled:
+            return jsonify({'error': 'Sonarr not configured'}), 503
+
+        try:
+            episodes_url = f"{CONFIG.sonarr.url}/api/v3/episode"
+            r = requests.get(
+                episodes_url,
+                params={'apikey': CONFIG.sonarr.api_key, 'seriesId': series_id, 'includeImages': 'false'},
+                timeout=25
+            )
+            if r.status_code != 200:
+                return jsonify({'error': r.text[:400] or 'episode lookup failed'}), r.status_code
+
+            grouped = {}
+            for ep in r.json():
+                season_no = ep.get('seasonNumber', 0)
+                grouped.setdefault(season_no, {
+                    'seasonNumber': season_no,
+                    'episodes': [],
+                })
+                grouped[season_no]['episodes'].append({
+                    'id': ep.get('id'),
+                    'episodeNumber': ep.get('episodeNumber'),
+                    'title': ep.get('title') or f"Episode {ep.get('episodeNumber')}",
+                    'airDate': ep.get('airDateUtc') or ep.get('airDate'),
+                    'hasFile': ep.get('hasFile', False),
+                    'episodeFileId': ep.get('episodeFileId'),
+                    'monitored': ep.get('monitored', False),
+                })
+
+            seasons = list(grouped.values())
+            for season in seasons:
+                season['episodes'].sort(key=lambda e: (e.get('episodeNumber') or 0))
+            seasons.sort(key=lambda s: s['seasonNumber'])
+            return jsonify(seasons)
+        except Exception as e:
+            logging.error("[series_seasons] %s failed: %s", series_id, e, exc_info=True)
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/episode/<int:episode_id>/search', methods=['POST'])
+    @requires_auth
+    def search_episode_route(episode_id):
+        """Trigger Sonarr episode search for a single episode."""
+        if not CONFIG.sonarr.enabled:
+            return jsonify({'error': 'Sonarr not configured'}), 503
+        try:
+            r = requests.post(
+                f"{CONFIG.sonarr.url}/api/v3/command",
+                params={'apikey': CONFIG.sonarr.api_key},
+                json={'name': 'EpisodeSearch', 'episodeIds': [episode_id]},
+                timeout=20
+            )
+            if r.status_code not in (200, 201):
+                return jsonify({'error': r.text[:400] or 'episode search failed'}), r.status_code
+            return jsonify({'success': True})
+        except Exception as e:
+            logging.error("[episode_search] %s failed: %s", episode_id, e, exc_info=True)
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/episode/<int:episode_id>', methods=['DELETE'])
+    @requires_auth
+    def delete_episode_route(episode_id):
+        """Delete a downloaded Sonarr episode file."""
+        if not CONFIG.sonarr.enabled:
+            return jsonify({'error': 'Sonarr not configured'}), 503
+        try:
+            ep = requests.get(
+                f"{CONFIG.sonarr.url}/api/v3/episode/{episode_id}",
+                params={'apikey': CONFIG.sonarr.api_key},
+                timeout=15
+            )
+            if ep.status_code != 200:
+                return jsonify({'error': ep.text[:400] or 'episode lookup failed'}), ep.status_code
+            ep_data = ep.json()
+            episode_file_id = ep_data.get('episodeFileId')
+            if not episode_file_id:
+                return jsonify({'error': 'episode has no file'}), 400
+
+            r = requests.delete(
+                f"{CONFIG.sonarr.url}/api/v3/episodefile/{episode_file_id}",
+                params={'apikey': CONFIG.sonarr.api_key},
+                timeout=20
+            )
+            if r.status_code not in (200, 202):
+                return jsonify({'error': r.text[:400] or 'delete failed'}), r.status_code
+            return jsonify({'success': True})
+        except Exception as e:
+            logging.error("[episode_delete] %s failed: %s", episode_id, e, exc_info=True)
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/check_library_status')
     @conditional_debug_log

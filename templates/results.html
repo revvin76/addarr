@@ -101,15 +101,6 @@
                                 alt="{{ result.title }}"
                                 onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
                             <div class="fade-overlay"></div>
-                            <div class="watermark-icon position-absolute">
-                                {% if result.media_type == 'movie' %}
-                                    <i class="fas fa-film"></i>
-                                {% elif result.media_type == 'book' %}
-                                    <i class="fas fa-book"></i>
-                                {% else %}
-                                    <i class="fas fa-tv"></i>
-                                {% endif %}
-                            </div>
                         </div>
 
                         <div class="search-result-content">

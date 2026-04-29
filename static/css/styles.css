@@ -376,17 +376,17 @@ iframe {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.82);
     z-index: 1040; /* Below modal (1050) but above everything else */
     display: none;
 }
 
 .overlay-backdrop {
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.82);
 }
 
 .modal-overlay-backdrop {
-    background-color: rgba(0, 0, 0, 0.9);
+    background-color: rgba(0, 0, 0, 0.94);
     z-index: 1060;
 }
 
@@ -401,6 +401,20 @@ iframe {
 
 .modal {
     z-index: 1070;
+}
+
+.modal-backdrop.show {
+    opacity: 0.88;
+}
+
+body.details-modal-open {
+    position: fixed;
+    overflow: hidden !important;
+    width: 100%;
+    left: 0;
+    right: 0;
+    overscroll-behavior: none;
+    touch-action: none;
 }
 #updatesListModal {
     z-index: 2070;
@@ -2057,6 +2071,63 @@ body.spinner-active {
     background-color: #1e1e1e;
     border-bottom: 1px solid #3a3a3a;
     box-shadow: 0 2px 10px rgba(0,0,0,0.55);
+}
+
+/* Normalize sticky toolbar controls across manage/results/trending/books */
+.page-sticky-controls .row.g-2 {
+    align-items: stretch;
+}
+
+.page-sticky-controls .input-group.input-group-sm,
+.page-sticky-controls form.d-flex {
+    min-height: 40px;
+}
+
+.page-sticky-controls .input-group.input-group-sm > .form-control,
+.page-sticky-controls .input-group.input-group-sm > .form-select,
+.page-sticky-controls .input-group.input-group-sm > .btn,
+.page-sticky-controls .input-group.input-group-sm > .input-group-text,
+.page-sticky-controls form.d-flex > .form-control,
+.page-sticky-controls form.d-flex > .btn {
+    min-height: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+}
+
+.page-sticky-controls .input-group.input-group-sm > .btn,
+.page-sticky-controls .input-group.input-group-sm > .input-group-text,
+.page-sticky-controls form.d-flex > .btn {
+    justify-content: center;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.page-sticky-controls .input-group.input-group-sm > .input-group-text {
+    min-width: 42px;
+    background-color: var(--accent-blue);
+    color: #fff;
+    border-color: var(--accent-blue);
+}
+
+.page-sticky-controls .input-group.input-group-sm > .btn:first-child,
+.page-sticky-controls .input-group.input-group-sm > .input-group-text:first-child {
+    min-width: 42px;
+}
+
+.page-sticky-controls .input-group.input-group-sm > .form-control,
+.page-sticky-controls .input-group.input-group-sm > .form-select,
+.page-sticky-controls form.d-flex > .form-control {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.page-sticky-controls form.d-flex {
+    align-items: stretch;
+}
+
+.page-sticky-controls form.d-flex > .form-control {
+    flex: 1 1 auto;
 }
 
 /* Inline back-to-top inside the sticky controls bar */
