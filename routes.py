@@ -930,7 +930,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             if os.path.isfile(cache_file):
                 logging.debug(f'[book_cover] HIT  book_{book_id}_{w}x{h}.jpg')
                 resp = send_file(cache_file, mimetype='image/jpeg')
-                resp.headers['Cache-Control'] = 'public, max-age=604800'  # 7 days
+                resp.headers['Cache-Control'] = 'public, max-age=3600'  # 1 hour
                 return resp
 
             # ── Cache miss — resolve cover URL ─────────────────────────────────
@@ -970,7 +970,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     img.save(tmp, format='JPEG', quality=72, optimize=True)
                     os.replace(tmp, cache_file)
                     response = send_file(cache_file, mimetype='image/jpeg')
-                    response.headers['Cache-Control'] = 'public, max-age=604800'
+                    response.headers['Cache-Control'] = 'public, max-age=3600'
                     return response
                 except Exception as exc:
                     logging.warning(f"[book_cover] local file read failed book_id={book_id}: {exc}")
@@ -1004,7 +1004,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 response = Response(img_resp.content,
                                     content_type=img_resp.headers.get('content-type', 'image/jpeg'))
 
-            response.headers['Cache-Control'] = 'public, max-age=604800'  # 7 days
+            response.headers['Cache-Control'] = 'public, max-age=3600'  # 7 days
             return response
 
         except Exception as e:

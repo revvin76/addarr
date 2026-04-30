@@ -151,70 +151,86 @@ def start_pinggy_tunnel():
     
     def tunnel_worker():
         global tunnel_process, tunnel_url
-        try:
-            print("🚀 Starting Pinggy Pro tunnel...")
-            logging.info("Starting Pinggy Pro tunnel...")
-            
-            # For Pinggy Pro: Use token and reserved subdomain
-            pinggy_token = CONFIG.tunnel.auth_token
-            reserved_subdomain = CONFIG.tunnel.reserved_subdomain
-            
-            # Build the connection arguments
-            connection_args = {
-                'forwardto': f"localhost:{CONFIG.app.port}",
-                'type': 'http',
-                'headermodification': ["X-Pinggy-No-Screen:bypass"],
-                'force': True
-            }
-            
-            # For Pinggy Pro with token authentication
-            if pinggy_token and reserved_subdomain:
-                # Remove .a.pinggy.link if present, just use the subdomain name
-                clean_subdomain = reserved_subdomain.replace('.a.pinggy.link', '').replace('.pinggy.io', '')
-                # The token+subdomain combination goes in the 'token' parameter
-                connection_args['token'] = f"{pinggy_token}+{clean_subdomain}"
-                print(f"🔐 Using Pinggy Pro authentication & subdomain: {clean_subdomain}")
-            elif pinggy_token:
-                connection_args['token'] = pinggy_token
-                print("🔐 Using Pinggy Pro authentication")
-            else:
-                print("🔐 Using public Pinggy tunnel")
-            
-            print(f"🎯 Starting tunnel on port {CONFIG.app.port}...")
-            print("🔄 Establishing tunnel connection...")
-            
-            # Start the tunnel with the correct parameters
-            tunnel_process = pinggy.start_tunnel(**connection_args)
-            
-            # Wait for tunnel with timeout
-            start_time = time.time()
-            max_wait = 30  # 30 second timeout
-            
-            print("⏳ Waiting for tunnel URLs...", end="", flush=True)
-            
-            while not hasattr(tunnel_process, 'urls') or not tunnel_process.urls:
-                if time.time() - start_time > max_wait:
-                    raise Exception(f"Tunnel connection timeout after {max_wait} seconds")
-                time.sleep(1)
-                print(".", end="", flush=True)  # Show progress
-            
-            print()  # New line after progress dots
-            
-            if tunnel_process.urls:
+
+        pinggy_token       = CONFIG.tunnel.auth_token
+        reserved_subdomain = CONFIG.tunnel.reserved_subdomain
+
+        # Build connection args once — they don't change between reconnects
+        connection_args = {
+            'forwardto':          f"localhost:{CONFIG.app.port}",
+            'type':               'http',
+            'headermodification': ["X-Pinggy-No-Screen:bypass"],
+            'force':              True,
+        }
+        if pinggy_token and reserved_subdomain:
+            clean_subdomain = (reserved_subdomain
+                               .replace('.a.pinggy.link', '')
+                               .replace('.pinggy.io', ''))
+            connection_args['token'] = f"{pinggy_token}+{clean_subdomain}"
+            print(f"🔐 Using Pinggy Pro authentication & subdomain: {clean_subdomain}")
+        elif pinggy_token:
+            connection_args['token'] = pinggy_token
+            print("🔐 Using Pinggy Pro authentication")
+        else:
+            print("🔐 Using public Pinggy tunnel")
+
+        retry_delay = 5   # seconds between reconnect attempts (doubles each time, capped at 60)
+        attempt     = 0
+
+        while True:   # ── Auto-reconnect loop ─────────────────────────────────
+            attempt += 1
+            try:
+                print(f"🚀 Starting Pinggy tunnel (attempt {attempt})...")
+                logging.info("Starting Pinggy tunnel (attempt %d)...", attempt)
+
+                tunnel_process = pinggy.start_tunnel(**connection_args)
+
+                # Wait up to 30 s for URLs to appear
+                start_time = time.time()
+                print("⏳ Waiting for tunnel URLs...", end="", flush=True)
+                while not (hasattr(tunnel_process, 'urls') and tunnel_process.urls):
+                    if time.time() - start_time > 30:
+                        raise Exception("Tunnel connection timeout after 30 s")
+                    time.sleep(1)
+                    print(".", end="", flush=True)
+                print()
+
                 with tunnel_url_lock:
-                    tunnel_url = tunnel_process.urls[1] if len(tunnel_process.urls) > 1 else tunnel_process.urls[0]
-                    tunnel_url_to_print = tunnel_url
-                print(f"✅ Pinggy Pro tunnel started successfully!")
-                print(f"   🌐 Public URL: {tunnel_url_to_print}")                
-                logging.info(f"Pinggy Pro tunnel started: {tunnel_url_to_print}")
-            else:
-                raise Exception("No tunnel URLs received")
-            
-        except Exception as e:
-            print(f"\n❌ Tunnel failed: {e}")
-            logging.error(f"Tunnel failed: {str(e)}")
-            with tunnel_url_lock:
-                tunnel_url = None
+                    tunnel_url = (tunnel_process.urls[1]
+                                  if len(tunnel_process.urls) > 1
+                                  else tunnel_process.urls[0])
+                    _url = tunnel_url
+                print(f"✅ Pinggy tunnel active: {_url}")
+                logging.info("Pinggy tunnel active: %s", _url)
+                retry_delay = 5  # reset back-off after a successful connect
+
+                # ── Monitor the live tunnel ─────────────────────────────────
+                # Poll every 10 s; if urls goes empty the tunnel has dropped.
+                while True:
+                    time.sleep(10)
+                    try:
+                        alive = (hasattr(tunnel_process, 'urls') and
+                                 bool(tunnel_process.urls))
+                    except Exception:
+                        alive = False
+                    if not alive:
+                        raise Exception("Tunnel disconnected (urls gone)")
+
+            except Exception as e:
+                print(f"\n⚠️  Tunnel error: {e} — reconnecting in {retry_delay} s...")
+                logging.warning("Tunnel error (attempt %d): %s — reconnecting in %d s",
+                                attempt, e, retry_delay)
+                with tunnel_url_lock:
+                    tunnel_url = None
+                # Close the dead tunnel object if possible
+                try:
+                    if tunnel_process and hasattr(tunnel_process, 'close'):
+                        tunnel_process.close()
+                except Exception:
+                    pass
+                tunnel_process = None
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60)  # exponential back-off, cap 60 s
     
     # Start tunnel in separate thread
     print("🧵 Starting tunnel thread...")

@@ -228,6 +228,12 @@
         .op-badge.readarr { background: #2d1a1a; color: #e07a7a; }
     </style>
     <script>
+    // Per-page-load timestamp — appended to every /api/book/cover/ request so
+    // the browser's HTTP cache (max-age=604800) never serves a stale thumbnail
+    // across page loads.  All cover fetches within the same page load share the
+    // same value so they still benefit from in-session browser caching.
+    const PAGE_TS = Date.now();
+
     // Sequential batch image loader — 20 at a time. Mirrors manage.html.
     function startProgressiveLoading() {
         const items = [...document.querySelectorAll('.book-item')];
@@ -241,9 +247,13 @@
             const promises = slice.map(item => {
                 const img = item.querySelector('.search-result-thumbnail');
                 if (!img) return Promise.resolve();
-                const src = img.getAttribute('data-src');
+                let src = img.getAttribute('data-src');
                 if (!src) return Promise.resolve();
-                if (img.src && img.src.endsWith(src)) return Promise.resolve();
+                // Append page-load cache buster to book cover proxy URLs
+                if (src.includes('/api/book/cover/')) {
+                    src += '&v=' + PAGE_TS;
+                }
+                if (img.src && img.src === src) return Promise.resolve();
                 return new Promise(resolve => {
                     img.onload  = resolve;
                     img.onerror = resolve;
@@ -890,7 +900,7 @@
             </div>` : '';
 
         const thmbSrc = book.id
-            ? `/api/book/cover/${book.id}?w=180&h=270`
+            ? `/api/book/cover/${book.id}?w=180&h=270&v=${PAGE_TS}`
             : (book.cover_url || '/static/images/apple-touch-icon.png');
 
         document.getElementById('detailsContent').innerHTML = `
