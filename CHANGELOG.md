@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.36] - 2026-05-02
+
+### Updated
+- Too many improvements to list!
+
+
 ## [1.1.34] - 2026-04-29
 
 ### Added

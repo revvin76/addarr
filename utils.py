@@ -354,40 +354,112 @@ class SharedUtils:
     def __init__(self, config_manager):
         self.config = config_manager
     
-    def fetch_trending_optimized(self, media_type='all'):
-        """Memory-optimized trending data fetch"""
+    def fetch_trending_optimized(self, media_type='all', category='trending', subcategory='week', content_type='movie'):
+        """Enhanced trending/popular data fetch with multi-level filtering.
+
+        Args:
+            media_type: 'all', 'movie', or 'tv' (legacy support)
+            category: 'trending', 'trailers', 'popular'
+            subcategory: depends on category
+                - trending: 'today', 'week'
+                - trailers: 'popular', 'streaming', 'ontv', 'forrent', 'theatres'
+                - popular: 'streaming', 'ontv', 'forrent', 'theatres'
+            content_type: 'movie' or 'tv'
+        """
         try:
-            # Use attribute access instead of dict access
             api_key = self.config.tmdb.key
             if not api_key:
                 return {'movies': [], 'tv_shows': []}
-            
+
             trending_data = {'movies': [], 'tv_shows': []}
             limit = 20
-            
-            if media_type in ['all', 'movie']:
-                with requests.get(
-                    "https://api.themoviedb.org/3/trending/movie/week",
-                    params={'api_key': api_key, 'language': 'en-GB'},
-                    timeout=5
-                ) as response:
-                    if response.status_code == 200:
-                        trending_data['movies'] = response.json().get('results', [])[:limit]
-            
-            if media_type in ['all', 'tv']:
-                with requests.get(
-                    "https://api.themoviedb.org/3/trending/tv/week", 
-                    params={'api_key': api_key, 'language': 'en-GB'},
-                    timeout=5
-                ) as response:
-                    if response.status_code == 200:
-                        trending_data['tv_shows'] = response.json().get('results', [])[:limit]
-            
+
+            # Legacy support: if called with old signature, use defaults
+            if not category or category == 'trending':
+                category = 'trending'
+                subcategory = subcategory or 'week'
+
+            # Fetch movies if requested
+            if content_type == 'movie' or media_type in ['all', 'movie']:
+                movie_data = self._fetch_tmdb_content(
+                    api_key, 'movie', category, subcategory, limit
+                )
+                trending_data['movies'] = movie_data
+
+            # Fetch TV shows if requested
+            if content_type == 'tv' or media_type in ['all', 'tv']:
+                tv_data = self._fetch_tmdb_content(
+                    api_key, 'tv', category, subcategory, limit
+                )
+                trending_data['tv_shows'] = tv_data
+
             return trending_data
-            
+
         except Exception as e:
             logging.error(f"Error fetching trending data: {str(e)}")
             return {'movies': [], 'tv_shows': []}
+
+    def _fetch_tmdb_content(self, api_key, media_type, category, subcategory, limit=20):
+        """Helper to fetch TMDB content based on category and subcategory."""
+        base_url = f"https://api.themoviedb.org/3"
+        params = {'api_key': api_key, 'language': 'en-GB'}
+
+        try:
+            if category == 'trending':
+                # /trending/{media_type}/{time_window}
+                time_window = 'day' if subcategory == 'today' else 'week'
+                url = f"{base_url}/trending/{media_type}/{time_window}"
+
+            elif category == 'trailers':
+                # For trailers, we discover and filter by videos
+                url = f"{base_url}/discover/{media_type}"
+                params['sort_by'] = 'popularity.desc'
+                params['with_videos'] = 'true'  # Only items with videos
+                # Filter by where_to_watch
+                if subcategory == 'streaming':
+                    params['with_watch_providers'] = 15  # Common streaming providers
+                    params['watch_region'] = 'US'
+                elif subcategory == 'ontv':
+                    params['with_networks'] = '1'  # Network TV
+                elif subcategory == 'theatres':
+                    params['release_date.gte'] = '2026-04-01'  # Recently/upcoming theatrical
+                    params['release_date.lte'] = '2026-12-31'
+                # forrent: general discover, no specific filter needed
+
+            elif category == 'popular':
+                # /discover/{media_type} with where_to_watch filters
+                url = f"{base_url}/discover/{media_type}"
+                params['sort_by'] = 'popularity.desc'
+
+                if subcategory == 'streaming':
+                    params['with_watch_providers'] = '15|8|337|283'  # Netflix, Disney+, Hulu, Prime Video (US)
+                    params['watch_region'] = 'US'
+                elif subcategory == 'ontv':
+                    params['with_networks'] = '1'
+                elif subcategory == 'forrent':
+                    # Popular general content without watch provider restrictions
+                    pass
+                elif subcategory == 'theatres':
+                    params['release_date.gte'] = '2026-04-01'
+                    params['release_date.lte'] = '2026-12-31'
+
+            else:
+                # Fallback to trending week
+                url = f"{base_url}/trending/{media_type}/week"
+
+            params['page'] = 1
+            response = requests.get(url, params=params, timeout=10)
+
+            if response.status_code == 200:
+                results = response.json().get('results', [])
+                return results[:limit]
+            else:
+                logging.warning(f"TMDB API returned {response.status_code} for {category}/{subcategory}")
+                return []
+
+        except Exception as e:
+            logging.error(f"Error fetching TMDB {media_type}/{category}/{subcategory}: {str(e)}")
+            return []
     
     def search_radarr(self, query):
         try:
@@ -413,57 +485,85 @@ class SharedUtils:
             logging.error(f"[Sonarr] search error: {str(e)}", exc_info=True)
             return []
 
-    def add_to_radarr(self, tmdb_id):
+    def add_to_radarr(self, tmdb_id, quality_profile_id=None):
         url = f"{self.config.radarr.url}/api/v3/movie"
         headers = {'Content-Type': 'application/json'}
+        # Use provided quality_profile_id or default from config
+        qp_id = quality_profile_id if quality_profile_id is not None else self.config.radarr.quality_profile_id
         payload = {
             'tmdbId': tmdb_id,
             'monitored': True,
             'rootFolderPath': self.config.radarr.root_folder,
-            'qualityProfileId': self.config.radarr.quality_profile_id,
+            'qualityProfileId': qp_id,
             'addOptions': {'searchForMovie': True}
         }
         response = requests.post(
-            url, 
-            json=payload, 
+            url,
+            json=payload,
             headers=headers,
             params={'apikey': self.config.radarr.api_key}
         )
         return response.status_code in [200, 201]
     
-    def add_to_sonarr(self, series_id, source="tmdb"):
+    def add_to_sonarr(self, series_id, season_filter='latest', source="tmdb"):
+        """Add a TV series to Sonarr with optional season filtering.
+
+        Args:
+            series_id: TMDB or TVDB ID
+            season_filter: 'all' (all seasons), 'latest' (most recent), 'future' (unaired)
+            source: 'tmdb' or 'tvdb'
+        """
         lookup_url = f"{self.config.sonarr.url}/api/v3/series/lookup"
         params = {'term': f'{source}:{series_id}', 'apikey': self.config.sonarr.api_key}
-        
+
         lookup_res = requests.get(lookup_url, params=params)
         if lookup_res.status_code != 200:
             return False
-        
+
         results = lookup_res.json()
         if not results or len(results) == 0:
             print(f"No series found on Sonarr for {source}:{series_id}")
             return False
-        
+
         series_data = lookup_res.json()[0]
-        
+
+        # Map season_filter to Sonarr monitor type
+        monitor_type = 'all'  # default
+        if season_filter == 'latest':
+            monitor_type = 'latest'
+        elif season_filter == 'future':
+            monitor_type = 'future'
+        elif season_filter == 'all':
+            monitor_type = 'all'
+
         series_data.update({
             'monitored': True,
+            'monitor': monitor_type,  # ROOT LEVEL — must be here, NOT in addOptions
             'rootFolderPath': self.config.sonarr.root_folder,
             'qualityProfileId': self.config.sonarr.quality_profile_id,
             'languageProfileId': self.config.sonarr.language_profile_id,
             'seasonFolder': True,
             'seriesType': 'standard',
             'addOptions': {
-                'searchForMissingEpisodes': True, 
-                'monitor': 'all'
+                'searchForMissingEpisodes': True
             }
-        })        
+        })
+
+        # Log the final payload for debugging
+        logging.info(f"[Sonarr] add_to_sonarr payload: series_id={series_id}, season_filter={season_filter}, monitor={monitor_type}")
+        logging.debug(f"[Sonarr] full series_data: {json.dumps(series_data, indent=2, default=str)}")
+
         response = requests.post(
             f"{self.config.sonarr.url}/api/v3/series",
             json=series_data,
             params={'apikey': self.config.sonarr.api_key}
         )
-        
+
+        if response.status_code in [200, 201]:
+            logging.info(f"[Sonarr] successfully added series {series_id} with monitor={monitor_type}")
+        else:
+            logging.error(f"[Sonarr] add_to_sonarr failed: HTTP {response.status_code}, response={response.text[:500]}")
+
         return response.status_code in [200, 201]
     
     def get_radarr_movies(self):

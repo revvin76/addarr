@@ -105,17 +105,228 @@ window.addEventListener('appinstalled', () => {
   // Optionally send analytics that PWA was installed
 });
 
+// Global cache for quality profiles and selection state
+const _addItemCache = {
+    qualityProfiles: null,
+    selectedQuality: {},
+    selectedSeason: {}
+};
+
 function addItem(mediaType, mediaId) {
-    const btn = event.target;
-    btn.disabled = true;
-    btn.textContent = 'Adding...';
-    
     console.log(`[addItem] Adding ${mediaType} ID: ${mediaId}`);
-    
+
+    // For movies, show quality selection modal
+    if (mediaType === 'movie') {
+        showQualitySelectionModal(mediaType, mediaId);
+        return;
+    }
+
+    // For TV shows, show season selection modal
+    if (mediaType === 'tv') {
+        showSeasonSelectionModal(mediaType, mediaId);
+        return;
+    }
+
+    // For books, add directly (no quality/season selection)
+    performAdd(mediaType, mediaId);
+}
+
+function showQualitySelectionModal(mediaType, mediaId) {
+    console.log('[showQualitySelectionModal] Fetching quality profiles...');
+
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('qualitySelectionModal');
+    if (!modal) {
+        const modalHtml = `
+        <div class="modal fade" id="qualitySelectionModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark border-secondary">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title">Select Quality Profile</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="qualityProfilesContent" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="qualityAddBtn" onclick="performAddWithQuality()">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modal = document.getElementById('qualitySelectionModal');
+    }
+
+    // Fetch quality profiles if not cached
+    if (!_addItemCache.qualityProfiles) {
+        fetch('/api/radarr/qualityprofile')
+            .then(res => res.json())
+            .then(profiles => {
+                console.log('[showQualitySelectionModal] Profiles:', profiles);
+                _addItemCache.qualityProfiles = profiles;
+                renderQualitySelection(profiles, mediaId);
+            })
+            .catch(error => {
+                console.error('[showQualitySelectionModal] Error:', error);
+                document.getElementById('qualityProfilesContent').innerHTML =
+                    '<div class="alert alert-danger">Failed to load quality profiles</div>';
+            });
+    } else {
+        renderQualitySelection(_addItemCache.qualityProfiles, mediaId);
+    }
+
+    modal.dataset.mediaId = mediaId;
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
+function renderQualitySelection(profiles, mediaId) {
+    const content = document.getElementById('qualityProfilesContent');
+    const defaultProfile = profiles.find(p => p.name === 'Default') || profiles[0];
+    const defaultId = defaultProfile?.id || null;
+
+    _addItemCache.selectedQuality[mediaId] = defaultId;
+
+    const html = `
+        <div class="mb-3">
+            <label class="form-label">Quality Profile</label>
+            <select id="qualityProfileSelect" class="form-select form-select-sm bg-secondary text-white" onchange="updateSelectedQuality('${mediaId}')">
+                ${profiles.map(profile => `
+                    <option value="${profile.id}" ${profile.id === defaultId ? 'selected' : ''}>
+                        ${profile.name}
+                    </option>
+                `).join('')}
+            </select>
+        </div>
+        <small class="text-muted">
+            Selected: <strong id="qualityName">${defaultProfile?.name || 'Default'}</strong>
+        </small>
+    `;
+    content.innerHTML = html;
+}
+
+function updateSelectedQuality(mediaId) {
+    const select = document.getElementById('qualityProfileSelect');
+    _addItemCache.selectedQuality[mediaId] = parseInt(select.value);
+    const profile = _addItemCache.qualityProfiles.find(p => p.id === _addItemCache.selectedQuality[mediaId]);
+    document.getElementById('qualityName').textContent = profile?.name || 'Unknown';
+}
+
+function performAddWithQuality() {
+    // This will be called from the modal, but we need mediaId context
+    // Store it in data attribute or use a better approach
+    const mediaId = document.getElementById('qualitySelectionModal').dataset.mediaId;
+    if (!mediaId) {
+        console.error('[performAddWithQuality] No media ID found');
+        return;
+    }
+    const qualityId = _addItemCache.selectedQuality[mediaId];
+    performAdd('movie', mediaId, qualityId);
+    bootstrap.Modal.getInstance(document.getElementById('qualitySelectionModal')).hide();
+}
+
+function showSeasonSelectionModal(mediaType, mediaId) {
+    console.log('[showSeasonSelectionModal] Showing season selection for TV:', mediaId);
+
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('seasonSelectionModal');
+    if (!modal) {
+        const modalHtml = `
+        <div class="modal fade" id="seasonSelectionModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark border-secondary">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title">Select Season(s) to Monitor</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="seasonOptionsContent"></div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="seasonAddBtn" onclick="performAddWithSeason()">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modal = document.getElementById('seasonSelectionModal');
+    }
+
+    _addItemCache.selectedSeason[String(mediaId)] = 'latest'; // Default
+
+    const html = `
+        <div class="season-selection">
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="seasonFilter" value="latest" id="seasonLatest" checked onchange="updateSelectedSeason('${mediaId}')">
+                <label class="form-check-label" for="seasonLatest">
+                    <strong>Latest Season</strong>
+                    <small class="text-muted d-block">Monitor only the most recent season</small>
+                </label>
+            </div>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="seasonFilter" value="all" id="seasonAll" onchange="updateSelectedSeason('${mediaId}')">
+                <label class="form-check-label" for="seasonAll">
+                    <strong>All Seasons</strong>
+                    <small class="text-muted d-block">Monitor all seasons including past ones</small>
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="seasonFilter" value="future" id="seasonFuture" onchange="updateSelectedSeason('${mediaId}')">
+                <label class="form-check-label" for="seasonFuture">
+                    <strong>Future Seasons</strong>
+                    <small class="text-muted d-block">Monitor only upcoming/unaired seasons</small>
+                </label>
+            </div>
+        </div>
+    `;
+    document.getElementById('seasonOptionsContent').innerHTML = html;
+
+    modal.dataset.mediaId = mediaId;
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
+function updateSelectedSeason(mediaId) {
+    const selected = document.querySelector('input[name="seasonFilter"]:checked');
+    _addItemCache.selectedSeason[String(mediaId)] = selected?.value || 'latest';
+}
+
+function performAddWithSeason() {
+    const modal = document.getElementById('seasonSelectionModal');
+    const mediaId = String(modal.dataset.mediaId);
+    if (!mediaId) {
+        console.error('[performAddWithSeason] No media ID found');
+        return;
+    }
+    const seasonFilter = _addItemCache.selectedSeason[String(mediaId)] || 'latest';
+    performAdd('tv', mediaId, null, seasonFilter);
+    bootstrap.Modal.getInstance(modal).hide();
+}
+
+function performAdd(mediaType, mediaId, qualityProfileId=null, seasonFilter='latest') {
+    const btn = document.querySelector(`[data-media-type="${mediaType}"][data-media-id="${mediaId}"]`)?.querySelector('.add-btn');
+
+    console.log(`[performAdd] Adding ${mediaType} ID: ${mediaId}`, { qualityProfileId, seasonFilter });
+
+    const payload = { media_type: mediaType, media_id: mediaId };
+    if (qualityProfileId !== null && qualityProfileId !== undefined) {
+        payload.quality_profile_id = qualityProfileId;
+    }
+    if (seasonFilter && mediaType === 'tv') {
+        payload.season_filter = seasonFilter;
+    }
+
     fetch('/add', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ media_type: mediaType, media_id: mediaId })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
     })
     .then(response => {
         if (!response.ok) {
@@ -124,44 +335,82 @@ function addItem(mediaType, mediaId) {
         return response.json();
     })
     .then(data => {
-        console.log(`[addItem] Response:`, data);
-        
+        console.log(`[performAdd] Response:`, data);
+
         if (data.success) {
             showNotification('Added successfully!', 'success');
-            
-            // Refresh the status badge for this item after delay (gives Radarr/Sonarr time to update)
+
+            // Update button to "View in Library" after successful add
+            if (btn) {
+                updateAddButtonToViewInLibrary(btn, mediaType, mediaId);
+            }
+
+            // Refresh the status badge after delay
             setTimeout(() => {
-                console.log(`[addItem] Refreshing badge after 1000ms delay`);
-                
-                // Try to find and update status badge wherever it might be
                 const resultItem = document.querySelector(
                     `.result-item[data-media-type="${mediaType}"][data-media-id="${mediaId}"]`
                 );
-                
+
                 if (resultItem) {
                     const card = resultItem.querySelector('.search-result-card');
                     if (card && typeof checkLibraryStatus === 'function') {
-                        console.log(`[addItem] Found card, calling checkLibraryStatus`);
                         checkLibraryStatus(mediaType, mediaId, card);
-                    } else {
-                        console.warn(`[addItem] Card or checkLibraryStatus function not available`);
                     }
-                } else {
-                    console.warn(`[addItem] Result item not found for ${mediaType} ${mediaId}`);
                 }
-            }, 1000); // Increased delay to 1000ms for Radarr/Sonarr to process
+            }, 1000);
         } else {
             showNotification('Error adding item: ' + (data.error || 'Unknown error'), 'error');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}`;
+            }
         }
-        btn.disabled = false;
-        btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}`;
     })
     .catch(error => {
-        console.error('[addItem] Error:', error);
+        console.error('[performAdd] Error:', error);
         showNotification('Error adding item: ' + error.message, 'error');
-        btn.disabled = false;
-        btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}`;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = `Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}`;
+        }
     });
+}
+
+function updateAddButtonToViewInLibrary(btn, mediaType, mediaId) {
+    // Fetch the internal ID to link to the library entry
+    fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
+        .then(response => response.json())
+        .then(data => {
+            const itemData = data.data || data;
+            const internalId = itemData.id;
+
+            // Update button styling
+            btn.className = 'btn btn-success add-btn';
+            btn.innerHTML = '<i class="fas fa-external-link-alt me-2"></i>View in Library';
+            btn.disabled = false;
+            btn.title = 'Go to library entry';
+
+            // Update onclick to navigate to library
+            btn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.location.href = `/manage?open=${encodeURIComponent(internalId)}&type=${mediaType}`;
+            };
+        })
+        .catch(error => {
+            console.error('Error fetching media details for button update:', error);
+            // Fallback: just show a generic "View in Library" link
+            btn.className = 'btn btn-success add-btn';
+            btn.innerHTML = '<i class="fas fa-external-link-alt me-2"></i>View in Library';
+            btn.disabled = false;
+            btn.title = 'Go to library';
+
+            btn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.location.href = `/manage?type=${mediaType}`;
+            };
+        });
 }
 
 function createDefaultPoster(title, year) {
@@ -1947,34 +2196,236 @@ function attachButtonEventListeners() {
 }
 
     function addItemFromModal(mediaType, mediaId) {
+        console.log(`[addItemFromModal] Adding ${mediaType} ID: ${mediaId}`);
+
+        // For movies, show quality selection modal
+        if (mediaType === 'movie') {
+            showQualitySelectionModalFromDetails(mediaType, mediaId);
+            return;
+        }
+
+        // For TV shows, show season selection modal
+        if (mediaType === 'tv') {
+            showSeasonSelectionModalFromDetails(mediaType, mediaId);
+            return;
+        }
+
+        // For books, add directly
+        performAddFromModal(mediaType, mediaId);
+    }
+
+    function showQualitySelectionModalFromDetails(mediaType, mediaId) {
+        console.log('[showQualitySelectionModalFromDetails] Fetching quality profiles...');
+
+        // Create quality selection modal if it doesn't exist
+        let modal = document.getElementById('qualitySelectionDetailsModal');
+        if (!modal) {
+            const modalHtml = `
+            <div class="modal fade" id="qualitySelectionDetailsModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content bg-dark border-secondary">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title">Select Quality Profile</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="qualityProfilesDetailsContent" class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="performAddFromModalWithQuality()">Add</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            modal = document.getElementById('qualitySelectionDetailsModal');
+        }
+
+        modal.dataset.mediaId = mediaId;
+
+        // Fetch quality profiles if not cached
+        if (!_addItemCache.qualityProfiles) {
+            fetch('/api/radarr/qualityprofile')
+                .then(res => res.json())
+                .then(profiles => {
+                    console.log('[showQualitySelectionModalFromDetails] Profiles:', profiles);
+                    _addItemCache.qualityProfiles = profiles;
+                    renderQualitySelectionForDetails(profiles, mediaId);
+                })
+                .catch(error => {
+                    console.error('[showQualitySelectionModalFromDetails] Error:', error);
+                    document.getElementById('qualityProfilesDetailsContent').innerHTML =
+                        '<div class="alert alert-danger">Failed to load quality profiles</div>';
+                });
+        } else {
+            renderQualitySelectionForDetails(_addItemCache.qualityProfiles, mediaId);
+        }
+
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+    }
+
+    function renderQualitySelectionForDetails(profiles, mediaId) {
+        const content = document.getElementById('qualityProfilesDetailsContent');
+        const defaultProfile = profiles.find(p => p.name === 'Default') || profiles[0];
+        const defaultId = defaultProfile?.id || null;
+
+        _addItemCache.selectedQuality[mediaId] = defaultId;
+
+        const html = `
+            <div class="mb-3">
+                <label class="form-label">Quality Profile</label>
+                <select id="qualityProfileDetailsSelect" class="form-select form-select-sm bg-secondary text-white" onchange="updateSelectedQualityDetails('${mediaId}')">
+                    ${profiles.map(profile => `
+                        <option value="${profile.id}" ${profile.id === defaultId ? 'selected' : ''}>
+                            ${profile.name}
+                        </option>
+                    `).join('')}
+                </select>
+            </div>
+            <small class="text-muted">
+                Selected: <strong id="qualityNameDetails">${defaultProfile?.name || 'Default'}</strong>
+            </small>
+        `;
+        content.innerHTML = html;
+    }
+
+    function updateSelectedQualityDetails(mediaId) {
+        const select = document.getElementById('qualityProfileDetailsSelect');
+        _addItemCache.selectedQuality[mediaId] = parseInt(select.value);
+        const profile = _addItemCache.qualityProfiles.find(p => p.id === _addItemCache.selectedQuality[mediaId]);
+        document.getElementById('qualityNameDetails').textContent = profile?.name || 'Unknown';
+    }
+
+    function showSeasonSelectionModalFromDetails(mediaType, mediaId) {
+        console.log('[showSeasonSelectionModalFromDetails] Showing season selection...');
+
+        // Create season selection modal if it doesn't exist
+        let modal = document.getElementById('seasonSelectionDetailsModal');
+        if (!modal) {
+            const modalHtml = `
+            <div class="modal fade" id="seasonSelectionDetailsModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content bg-dark border-secondary">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title">Select Season(s) to Monitor</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="seasonOptionsDetailsContent"></div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="performAddFromModalWithSeason()">Add</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            modal = document.getElementById('seasonSelectionDetailsModal');
+        }
+
+        modal.dataset.mediaId = mediaId;
+        _addItemCache.selectedSeason[String(mediaId)] = 'latest'; // Default
+
+        const html = `
+            <div class="season-selection">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="seasonFilterDetails" value="latest" id="seasonLatestDetails" checked onchange="updateSelectedSeasonDetails('${mediaId}')">
+                    <label class="form-check-label" for="seasonLatestDetails">
+                        <strong>Latest Season</strong>
+                        <small class="text-muted d-block">Monitor only the most recent season</small>
+                    </label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="seasonFilterDetails" value="all" id="seasonAllDetails" onchange="updateSelectedSeasonDetails('${mediaId}')">
+                    <label class="form-check-label" for="seasonAllDetails">
+                        <strong>All Seasons</strong>
+                        <small class="text-muted d-block">Monitor all seasons including past ones</small>
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="seasonFilterDetails" value="future" id="seasonFutureDetails" onchange="updateSelectedSeasonDetails('${mediaId}')">
+                    <label class="form-check-label" for="seasonFutureDetails">
+                        <strong>Future Seasons</strong>
+                        <small class="text-muted d-block">Monitor only upcoming/unaired seasons</small>
+                    </label>
+                </div>
+            </div>
+        `;
+        document.getElementById('seasonOptionsDetailsContent').innerHTML = html;
+
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+    }
+
+    function updateSelectedSeasonDetails(mediaId) {
+        const selected = document.querySelector('input[name="seasonFilterDetails"]:checked');
+        _addItemCache.selectedSeason[String(mediaId)] = selected?.value || 'latest';
+    }
+
+    function performAddFromModalWithQuality() {
+        const modal = document.getElementById('qualitySelectionDetailsModal');
+        const mediaId = modal.dataset.mediaId;
+        const qualityId = _addItemCache.selectedQuality[mediaId];
+        performAddFromModal('movie', mediaId, qualityId);
+        bootstrap.Modal.getInstance(modal).hide();
+    }
+
+    function performAddFromModalWithSeason() {
+        const modal = document.getElementById('seasonSelectionDetailsModal');
+        const mediaId = String(modal.dataset.mediaId);
+        const seasonFilter = _addItemCache.selectedSeason[mediaId] || 'latest';
+        performAddFromModal('tv', mediaId, null, seasonFilter);
+        bootstrap.Modal.getInstance(modal).hide();
+    }
+
+    function performAddFromModal(mediaType, mediaId, qualityProfileId=null, seasonFilter='latest') {
         const btn = document.getElementById('modalAddButton');
         const originalText = btn.innerHTML;
-        
+
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...`;
-        
+
+        const payload = { media_type: mediaType, media_id: mediaId };
+        if (qualityProfileId !== null && qualityProfileId !== undefined) {
+            payload.quality_profile_id = qualityProfileId;
+        }
+        if (seasonFilter && mediaType === 'tv') {
+            payload.season_filter = seasonFilter;
+        }
+
         fetch('/add', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ media_type: mediaType, media_id: mediaId })
+            body: JSON.stringify(payload)
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 btn.className = 'btn btn-success w-100';
                 btn.innerHTML = '✓ Added Successfully';
-                btn.disabled = true; // Disable button after successful addition
-                // Update status badge if visible
+                btn.disabled = true;
                 updateStatusInCard(mediaType, mediaId);
+
+                // Update button to "View in Library" after successful add
+                setTimeout(() => {
+                    updateModalButtonToViewInLibrary(btn, mediaType, mediaId);
+                }, 1500);
             } else {
                 btn.className = 'btn btn-danger w-100';
                 btn.innerHTML = 'Error Adding';
+                setTimeout(() => {
+                    btn.className = 'btn btn-primary w-100';
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }, 3000);
             }
-            setTimeout(() => {
-                btn.className = 'btn btn-primary w-100';
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }, 3000);
         })
         .catch(error => {
             console.error('Error:', error);
@@ -1986,6 +2437,44 @@ function attachButtonEventListeners() {
                 btn.disabled = false;
             }, 3000);
         });
+    }
+
+    function updateModalButtonToViewInLibrary(btn, mediaType, mediaId) {
+        // Fetch the internal ID to link to the library entry
+        fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
+            .then(response => response.json())
+            .then(data => {
+                const itemData = data.data || data;
+                const internalId = itemData.id;
+
+                // Update button to "View in Library" with link
+                btn.className = 'btn btn-success w-100';
+                btn.innerHTML = '<i class="fas fa-external-link-alt me-2"></i>View in Library';
+                btn.disabled = false;
+                btn.onclick = null;
+
+                // Convert to a link that navigates to the library
+                btn.href = `/manage?open=${encodeURIComponent(internalId)}&type=${mediaType}`;
+
+                // If it's still a button element, we might want to wrap it or change behavior
+                // For now, add event listener for click navigation
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    window.location.href = `/manage?open=${encodeURIComponent(internalId)}&type=${mediaType}`;
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching media details:', error);
+                // Fallback: just show a generic "View in Library" link
+                btn.className = 'btn btn-success w-100';
+                btn.innerHTML = '<i class="fas fa-external-link-alt me-2"></i>View in Library';
+                btn.disabled = false;
+                btn.href = `/manage?type=${mediaType}`;
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    window.location.href = `/manage?type=${mediaType}`;
+                });
+            });
     }
 
     function updateStatusInCard(mediaType, mediaId) {
@@ -3607,10 +4096,131 @@ function initializeClearSearch() {
     });
     
     clearButton.addEventListener('click', clearSearch);
-    
+
     // Initialize on page load
     updateClearButton();
 }
 
+// ── Keyboard detection and viewport management ──────────────────────────────
+// Handles Android soft keyboard appearing/disappearing to keep buttons visible
+// Fixed version: properly calculates scroll position to keep navbar visible and buttons centered above keyboard
+document.addEventListener('DOMContentLoaded', function() {
+    const mainSearchContainer = document.getElementById('mainSearchContainer');
+    const mainSearchInput = document.getElementById('mainSearchInput');
+    const navbar = document.querySelector('.container-fluid.bg-dark');
+
+    if (!mainSearchContainer || !mainSearchInput) return;
+
+    let lastVisualViewportHeight = window.visualViewport?.height || window.innerHeight;
+    let keyboardVisible = false;
+    let originalScrollPosition = 0;
+
+    // Constants
+    const NAVBAR_HEIGHT = 60; // Navbar is ~60px tall
+    const KEYBOARD_TRIGGER_THRESHOLD = 80; // Threshold to detect keyboard (in pixels)
+    const KEYBOARD_HEIGHT_ESTIMATE = 280; // Typical Android keyboard height
+    const TOP_MARGIN = 15; // Space between navbar and search form
+    const BOTTOM_MARGIN = 10; // Space between form and keyboard
+
+    function performKeyboardScroll() {
+        const searchFormWrapper = mainSearchContainer.querySelector('.search-form-wrapper');
+        if (!searchFormWrapper) return;
+
+        // Get the visual viewport height (height visible above keyboard)
+        const visualViewportHeight = window.visualViewport?.height || window.innerHeight;
+
+        // Get the form element's full height
+        const formRect = searchFormWrapper.getBoundingClientRect();
+        const formHeight = formRect.height;
+
+        // Calculate how much space we have above the keyboard
+        // visualViewportHeight is the actual visible space
+        const availableSpace = visualViewportHeight;
+
+        // Calculate the ideal scroll position:
+        // We want: navbar visible + form centered in remaining space above keyboard
+        // 1. Start with navbar height as minimum
+        // 2. Add space to center the form in the remaining viewport
+        const currentScrollY = window.scrollY;
+        const formTopAbsolute = currentScrollY + formRect.top;
+
+        // Target: navbar visible (60px) + some margin, then form positioned so buttons are above keyboard
+        // We need to ensure the bottom of the form (buttons) is at least BOTTOM_MARGIN pixels above keyboard
+        // Bottom of form would be at: scrollY + formRect.top + formHeight
+        // Keyboard starts at: visualViewportHeight
+        // So we need: scrollY + formRect.top + formHeight + BOTTOM_MARGIN <= visualViewportHeight
+        // Rearranging: scrollY <= visualViewportHeight - formRect.top - formHeight - BOTTOM_MARGIN
+
+        // But we also want to keep navbar visible, so:
+        // scrollY >= -formRect.top + NAVBAR_HEIGHT (approximately, when form is below navbar)
+
+        // The scroll position should place the top of the form at navbar height + margin
+        const targetScrollY = Math.max(
+            0, // Don't scroll above top
+            formTopAbsolute - NAVBAR_HEIGHT - TOP_MARGIN
+        );
+
+        // However, we also need to ensure buttons don't get covered by keyboard
+        // Check if the form fits in the remaining space
+        const spaceNeeded = NAVBAR_HEIGHT + formHeight + BOTTOM_MARGIN;
+
+        // If form doesn't fit with current scroll, push it up more
+        let finalScrollY = targetScrollY;
+
+        // Ensure the form bottom doesn't go below the visual viewport minus keyboard margin
+        const formBottomWithScroll = targetScrollY + formRect.top + formHeight;
+        const maxFormBottom = visualViewportHeight - BOTTOM_MARGIN;
+
+        if (formBottomWithScroll > maxFormBottom) {
+            // Form would be cut off, scroll more to compensate
+            finalScrollY = Math.max(0, visualViewportHeight - formRect.top - formHeight - BOTTOM_MARGIN);
+        }
+
+        // Scroll to the calculated position
+        window.scrollTo({
+            top: finalScrollY,
+            behavior: 'smooth',
+            left: 0
+        });
+    }
+
+    // Track visual viewport changes to detect keyboard appearance
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', function() {
+            const currentHeight = window.visualViewport.height;
+            const heightDifference = lastVisualViewportHeight - currentHeight;
+
+            // Keyboard appeared (viewport got smaller by significant amount)
+            if (heightDifference > KEYBOARD_TRIGGER_THRESHOLD && !keyboardVisible) {
+                keyboardVisible = true;
+                originalScrollPosition = window.scrollY;
+                performKeyboardScroll();
+            }
+            // Keyboard closed (viewport got larger)
+            else if (heightDifference < -KEYBOARD_TRIGGER_THRESHOLD && keyboardVisible) {
+                keyboardVisible = false;
+                // Optionally could restore original scroll, but let user keep current position
+            }
+
+            lastVisualViewportHeight = currentHeight;
+        });
+    }
+
+    // Fallback for browsers without visualViewport API
+    mainSearchInput.addEventListener('focus', function() {
+        setTimeout(() => {
+            // Trigger scroll after keyboard appears
+            keyboardVisible = true;
+            performKeyboardScroll();
+        }, 300);
+    });
+
+    // Also handle blur to detect keyboard closing on older browsers
+    mainSearchInput.addEventListener('blur', function() {
+        setTimeout(() => {
+            keyboardVisible = false;
+        }, 100);
+    });
+});
 
 

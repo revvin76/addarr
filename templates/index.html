@@ -24,48 +24,74 @@
     {% include 'partials/navbar.html' %}
 
     <!-- Main Content -->
-    <!-- Use dvh so the container shrinks when the mobile keyboard appears,
-         keeping the search buttons visible without scrolling. -->
-    <div class="container d-flex flex-column justify-content-center"
-         style="min-height: calc(100dvh - 60px); padding-bottom: env(keyboard-inset-height, 0px);">
+    <!-- Use 100vw/100vh units with flexbox to ensure proper layout without overflow -->
+    <div id="mainSearchContainer" class="search-container"
+         style="width: 100%; min-height: calc(100dvh - 60px); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; padding-bottom: max(20px, env(keyboard-inset-height, 0px)); box-sizing: border-box;">
         <div class="text-center mb-3 search-hero">
             <h3 class="text-light">Welcome to ADDARR</h3>
             <p class="text-light mb-0">Search for movies, TV shows{% if config.readarr.enabled %} and books{% endif %} to add to your media library.</p>
         </div>
-        <div class="col-12 col-xs-12 col-md-8 col-lg-8 mb-2">
+        <div class="search-form-wrapper" style="width: 100%; max-width: 500px;">
             <form action="/search" method="POST" onsubmit="return validateForm()">
-                <div class="col-12 mb-2">
+                <div class="mb-2">
                     <input type="text" class="form-control form-control-lg"
                         name="query" id="mainSearchInput"
                         placeholder="Search movies, TV shows{% if config.readarr.enabled %} and books{% endif %}..." required
                         autocomplete="off">
                 </div>
-                <div class="col-12 mb-2">
+                <div class="mb-2">
                     <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
                 </div>
-                <div class="col-12 mb-2 search-trending-btn">
+                <div class="mb-2 search-trending-btn">
                     <a href="/trending" class="btn btn-outline-info btn-lg w-100">
                         <i class="fas fa-fire me-2"></i>View Trending Media
                     </a>
                 </div>
             </form>
         </div>
+        <!-- Install button moved here for better visibility -->
+        <div style="margin-top: 20px;">
+            <button id="install-button" class="btn btn-primary" style="display: none;">
+                Install Addarr
+            </button>
+        </div>
     </div>
     <style>
-        /* Collapse the hero text when the virtual keyboard is open so buttons stay visible */
-        @media (max-height: 500px) {
-            .search-hero { display: none !important; }
-            .search-trending-btn { display: none !important; }
+        /* Main search container layout fixes */
+        .search-container {
+            position: relative;
+            overflow: visible; /* Allow scrolling for keyboard management */
+        }
+
+        .search-form-wrapper {
+            flex-shrink: 0;
+        }
+
+        /* Reduce hero text on small screens, but keep buttons visible */
+        @media (max-height: 600px) {
+            .search-hero h3 {
+                font-size: 1.3rem;
+                margin-bottom: 0.5rem;
+            }
+            .search-hero p {
+                font-size: 0.9rem;
+                margin-bottom: 1rem;
+            }
+        }
+
+        /* On very small screens, hide hero text but NEVER hide buttons */
+        @media (max-height: 450px) {
+            .search-hero {
+                display: none !important;
+            }
+            /* Always keep trending button visible */
+            .search-trending-btn {
+                display: block !important;
+            }
         }
     </style>
 
 <div class="config-overlay" id="debugOverlay"></div>
-
-<center>
-    <button id="install-button" class="btn btn-primary" style="display: none;">
-        Install Addarr
-    </button>
-</center>
 
 <!-- Log Panel -->
 <div id="logPanel" class="config-panel">

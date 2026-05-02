@@ -86,7 +86,7 @@
                 <div class="modal-body">
 
                     <!-- Radarr Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="radarr">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="text-radarr mb-0"><i class="fas fa-film me-2"></i>Radarr Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -127,7 +127,7 @@
                     </div>
 
                     <!-- Sonarr Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="sonarr">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="text-sonarr mb-0"><i class="fas fa-tv me-2"></i>Sonarr Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -174,7 +174,7 @@
                     </div>
 
                     <!-- Readarr Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="readarr">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="mb-0" style="color: #c0392b;"><i class="fas fa-book me-2"></i>Readarr Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -232,7 +232,7 @@
                     </div>
 
                     <!-- Google Books Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="googlebooks">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="mb-0" style="color: #00b388;"><i class="fas fa-book-open me-2"></i>Google Books Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -273,7 +273,7 @@
                     </div>
 
                     <!-- Prowlarr Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="prowlarr">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="mb-0" style="color: #ff6b35;"><i class="fas fa-search me-2"></i>Prowlarr Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -303,7 +303,7 @@
                     </div>
 
                     <!-- qBittorrent Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="qbittorrent">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="mb-0" style="color: #8e44ad;"><i class="fas fa-download me-2"></i>qBittorrent Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -340,7 +340,7 @@
                     </div>
 
                     <!-- TMDB Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="tmdb">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="text-info mb-0"><i class="fas fa-database me-2"></i>TMDB Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -365,7 +365,7 @@
                     </div>
 
                     <!-- DuckDNS Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="duckdns">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="text-warning mb-0"><i class="fas fa-globe me-2"></i>DuckDNS Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -409,7 +409,7 @@
                     </div>
 
                     <!-- Auto-Updater Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="autoupdate">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="text-warning mb-0"><i class="fas fa-sync-alt me-2"></i>Auto-Updater Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -452,7 +452,7 @@
                     </div>
 
                     <!-- Tunnel Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="tunnel">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="text-primary mb-0"><i class="fas fa-cloud me-2"></i>Tunnel Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -488,7 +488,7 @@
                     </div>
 
                     <!-- Authentication Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="authentication">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="text-warning mb-0"><i class="fas fa-lock me-2"></i>Authentication Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -530,7 +530,7 @@
                     </div>
 
                     <!-- Application Settings -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="application">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="text-info mb-0"><i class="fas fa-sliders-h me-2"></i>Application Settings</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -568,7 +568,7 @@
                     </div>
 
                     <!-- Version Information -->
-                    <div class="mb-3 settings-block">
+                    <div class="mb-3 settings-block" data-block-id="version">
                         <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
                             <h5 class="text-success mb-0"><i class="fas fa-code-branch me-2"></i>Version Information</h5>
                             <i class="fas fa-chevron-down settings-chevron"></i>
@@ -595,6 +595,31 @@
                                     <div class="col-md-4">
                                         <button type="button" class="btn btn-outline-info w-100" id="listUpdatesBtn" data-bs-dismiss="modal">
                                             <i class="fas fa-list me-2"></i>View Updates
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Server Management -->
+                    <div class="mb-3 settings-block" data-block-id="servermanagement">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-danger mb-0"><i class="fas fa-power-off me-2"></i>Server Management</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <p class="text-muted mb-3">
+                                            <i class="fas fa-exclamation-circle me-2"></i>
+                                            Restarting the server will briefly disconnect all users. The page will automatically refresh when the server comes back online.
+                                        </p>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-danger w-100" id="restartServerBtn">
+                                            <i class="fas fa-power-off me-2"></i>Restart Server
                                         </button>
                                     </div>
                                 </div>
@@ -746,7 +771,17 @@ function toggleSettingsBlock(header) {
     const block = header.closest('.settings-block');
     const body  = block.querySelector('.settings-block-body');
     const isOpen = block.classList.contains('open');
+    const blockId = block.dataset.blockId;
+
     block.classList.toggle('open', !isOpen);
+
+    // Save state to localStorage
+    if (blockId) {
+        const settingsState = JSON.parse(localStorage.getItem('settingsBlockState') || '{}');
+        settingsState[blockId] = !isOpen;
+        localStorage.setItem('settingsBlockState', JSON.stringify(settingsState));
+    }
+
     if (!isOpen) {
         body.style.display = 'block';
         body.style.opacity = '0';
@@ -917,6 +952,24 @@ function showNotification(message, type = 'success') {
     setTimeout(() => modalInstance.hide(), type === 'success' ? 2000 : 3000);
 }
 
+// ── Restore collapsed/expanded state from localStorage ───────────────────────
+function restoreSettingsBlockState() {
+    const settingsState = JSON.parse(localStorage.getItem('settingsBlockState') || '{}');
+    document.querySelectorAll('.settings-block[data-block-id]').forEach(block => {
+        const blockId = block.dataset.blockId;
+        const shouldBeOpen = settingsState[blockId];
+        const body = block.querySelector('.settings-block-body');
+
+        if (shouldBeOpen) {
+            block.classList.add('open');
+            body.style.display = 'block';
+        } else {
+            block.classList.remove('open');
+            body.style.display = 'none';
+        }
+    });
+}
+
 // ── Collapsible config sections ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
     function setupCollapsibleSection(checkboxId, contentId) {
@@ -951,6 +1004,8 @@ document.addEventListener('DOMContentLoaded', function () {
         configModal.addEventListener('show.bs.modal', function () {
             if (configOverlay) configOverlay.classList.add('open');
             loadConfigurationData();
+            // Restore settings block state when modal is opened
+            setTimeout(restoreSettingsBlockState, 100);
         });
         configModal.addEventListener('hide.bs.modal', function () {
             if (configOverlay) configOverlay.classList.remove('open');
@@ -1127,6 +1182,169 @@ document.addEventListener('DOMContentLoaded', function () {
         .finally(() => {
             submitBtn.innerHTML = origText;
             submitBtn.disabled  = false;
+        });
+    });
+});
+
+// ── Server Restart Indicator CSS ─────────────────────────────────────────────
+const restartIndicatorStyles = `
+    #restartIndicator {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #ff9a56 0%, #ff7b54 100%);
+        color: white;
+        padding: 20px;
+        text-align: center;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        display: none;
+        animation: slideDown 0.3s ease-out;
+    }
+    #restartIndicator.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+    #restartIndicator .spinner-border {
+        width: 24px;
+        height: 24px;
+        border-width: 2px;
+        flex-shrink: 0;
+    }
+    #restartIndicator-text {
+        font-weight: 500;
+        font-size: 1rem;
+    }
+    @keyframes slideDown {
+        from {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    @keyframes slideUp {
+        from {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+    }
+    #restartIndicator.hide {
+        animation: slideUp 0.3s ease-in;
+    }
+    body.restart-pending {
+        padding-top: 70px;
+    }
+`;
+if (document.head) {
+    const style = document.createElement('style');
+    style.textContent = restartIndicatorStyles;
+    document.head.appendChild(style);
+}
+
+// ── Server Restart Indicator HTML ─────────────────────────────────────────────
+function initRestartIndicator() {
+    if (!document.getElementById('restartIndicator')) {
+        const indicator = document.createElement('div');
+        indicator.id = 'restartIndicator';
+        indicator.innerHTML = `
+            <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Restarting...</span>
+            </div>
+            <div id="restartIndicator-text">Waiting for server to restart...</div>
+        `;
+        document.body.insertBefore(indicator, document.body.firstChild);
+    }
+}
+
+// ── Server Restart Handler ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    initRestartIndicator();
+    const restartBtn = document.getElementById('restartServerBtn');
+    if (!restartBtn) return;
+
+    restartBtn.addEventListener('click', function () {
+        if (!confirm('Are you sure you want to restart the server?\n\nAll users will be disconnected and the page will refresh automatically.')) {
+            return;
+        }
+
+        const origText = restartBtn.innerHTML;
+        restartBtn.disabled = true;
+        restartBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Restarting...';
+
+        fetch('/api/restart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const indicator = document.getElementById('restartIndicator');
+                const text = document.getElementById('restartIndicator-text');
+
+                indicator.classList.add('show');
+                document.body.classList.add('restart-pending');
+                text.textContent = 'Waiting for server to restart...';
+
+                const modal = bootstrap.Modal.getInstance(document.getElementById('configModal'));
+                if (modal) modal.hide();
+                setTimeout(() => {
+                    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                }, 100);
+
+                let retries = 0;
+                const maxRetries = 60;
+                const pollInterval = 1000;
+
+                function checkServerOnline() {
+                    fetch('/', { method: 'HEAD', cache: 'no-store' })
+                        .then(r => {
+                            if (r.ok) {
+                                text.textContent = 'Server is back online! Reloading...';
+                                setTimeout(() => {
+                                    indicator.classList.remove('show');
+                                    indicator.classList.add('hide');
+                                    setTimeout(() => window.location.reload(), 300);
+                                }, 1000);
+                            } else {
+                                throw new Error('Server not ready yet');
+                            }
+                        })
+                        .catch(err => {
+                            retries++;
+                            if (retries < maxRetries) {
+                                setTimeout(checkServerOnline, pollInterval);
+                            } else {
+                                text.textContent = 'Server restart timed out. Please refresh manually.';
+                                indicator.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+                                restartBtn.innerHTML = origText;
+                                restartBtn.disabled = false;
+                            }
+                        });
+                }
+
+                setTimeout(checkServerOnline, 2000);
+            } else {
+                throw new Error(data.error || 'Failed to restart server');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showNotification('Error: ' + err.message, 'error');
+            restartBtn.innerHTML = origText;
+            restartBtn.disabled = false;
         });
     });
 });

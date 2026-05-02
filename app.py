@@ -27,11 +27,13 @@ from update_manager import UpdateManager
 from utils import SharedUtils
 import routes
 import books_db
+from ruflo.restart_monitor_thread import RestartMonitor
 
 # Global variables for tunnel functionality - define them at module level
 tunnel_process = None
 tunnel_url = None
 tunnel_url_lock = threading.Lock()  # Lock to protect tunnel_url access
+restart_monitor = None
 
 # Setup basic logging
 def setup_basic_logging():
@@ -573,6 +575,11 @@ def startup_sequence():
     # Print welcome message
     print_welcome()
 
+    # Start restart monitor
+    global restart_monitor
+    restart_monitor = RestartMonitor(reload_file_path='.reload', check_interval=1.0)
+    restart_monitor.start()
+
     # # Print welcome message in main process only
     # if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
     #     print_welcome()
@@ -580,10 +587,17 @@ def startup_sequence():
 def shutdown_sequence():
     global tunnel_process  # Add this line to access the global variable
     global tunnel_should_run
+    global restart_monitor
     tunnel_should_run = False
-    
+
     logging.info("Shutting down application...")
-    
+
+    try:
+        if restart_monitor:
+            restart_monitor.stop()
+    except Exception as e:
+        logging.warning(f"Error stopping restart monitor: {e}")
+
     # Stop managers with error handling
     try:
         if hasattr(update_manager, 'stop'):

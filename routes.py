@@ -374,21 +374,75 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
 
     @app.route('/trending')
     @conditional_debug_log
-    @requires_auth  
+    @requires_auth
     def trending_media():
         try:
+            # Support both legacy and new parameter formats
             media_type = request.args.get('type', 'all')
-            trending_data = utils.fetch_trending_optimized(media_type)
-            
+            category = request.args.get('category', 'trending')
+            subcategory = request.args.get('subcategory', 'week')
+            content_type = request.args.get('media', 'movie')
+
+            # If media_type is specified (legacy), use it; otherwise use content_type
+            if media_type != 'all':
+                # Legacy request — use old parameter
+                trending_data = utils.fetch_trending_optimized(media_type)
+            else:
+                # New multi-filter request
+                trending_data = utils.fetch_trending_optimized(
+                    media_type='all',
+                    category=category,
+                    subcategory=subcategory,
+                    content_type=content_type
+                )
+
             return render_template(
                 'trending.html',
                 trending_data=trending_data,
                 media_type=media_type,
+                category=category,
+                subcategory=subcategory,
+                content_type=content_type,
                 config=CONFIG._config
             )
         except Exception as e:
             logging.error(f"Error loading trending media: {str(e)}")
             return render_template('error.html', error="Failed to load trending media")
+
+    @app.route('/api/trending')
+    @conditional_debug_log
+    @requires_auth
+    def api_trending():
+        """API endpoint for dynamic trending data loading"""
+        try:
+            category = request.args.get('category', 'trending')
+            subcategory = request.args.get('subcategory', 'week')
+            content_type = request.args.get('media', 'movie')
+
+            # Fetch data based on parameters
+            data = utils.fetch_trending_optimized(
+                media_type='all',
+                category=category,
+                subcategory=subcategory,
+                content_type=content_type
+            )
+
+            # Return only the appropriate content type
+            if content_type == 'movie':
+                results = data.get('movies', [])
+            else:
+                results = data.get('tv_shows', [])
+
+            return jsonify({
+                'success': True,
+                'category': category,
+                'subcategory': subcategory,
+                'media': content_type,
+                'results': results
+            })
+        except Exception as e:
+            logging.error(f"Error in API trending: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/logs')
     @conditional_debug_log
@@ -558,14 +612,18 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         media_type = data['media_type']
         media_id = data['media_id']
 
+        # Extract optional quality/season parameters
+        quality_profile_id = data.get('quality_profile_id')
+        season_filter = data.get('season_filter', 'latest')
+
         if media_type == 'movie':
-            success = utils.add_to_radarr(media_id)
+            success = utils.add_to_radarr(media_id, quality_profile_id)
             return jsonify({'success': success})
         elif media_type == 'book':
             success, message = utils.add_to_readarr(media_id)
             return jsonify({'success': success, 'message': message})
         else:
-            success = utils.add_to_sonarr(media_id)
+            success = utils.add_to_sonarr(media_id, season_filter)
             return jsonify({'success': success})
 
     @app.route('/manage')
@@ -2064,6 +2122,42 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         except Exception as e:
             logging.error("[episode_delete] %s failed: %s", episode_id, e, exc_info=True)
             return jsonify({'error': str(e)}), 500
+
+    # ── Server Management API ──────────────────────────────────────────────────────
+
+    @app.route('/api/restart', methods=['POST'])
+    @conditional_debug_log
+    @requires_auth
+    def restart_server():
+        """
+        Restart the Flask server by touching a .reload file.
+        The watchdog/entr process monitoring this file will detect the change
+        and cleanly restart the Flask process.
+        """
+        try:
+            # Path to the root directory .reload file
+            reload_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.reload')
+
+            # Create or touch the .reload file
+            # This signals the watchdog process to restart
+            open(reload_file_path, 'a').close()
+            os.utime(reload_file_path, None)
+
+            logging.info("Restart signal sent: .reload file touched at %s", reload_file_path)
+
+            return jsonify({
+                'success': True,
+                'message': 'Server restart initiated. Page will refresh automatically.',
+                'status': 'restarting'
+            }), 200
+
+        except Exception as e:
+            logging.error(f"Error initiating restart: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Failed to initiate restart: {str(e)}',
+                'status': 'error'
+            }), 500
 
     @app.route('/check_library_status')
     @conditional_debug_log

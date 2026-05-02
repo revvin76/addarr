@@ -533,16 +533,37 @@
                                            id="importCoverFile" accept="image/*"
                                            onchange="previewLocalCover(this)">
                                 </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        id="importDeleteCoverBtn" onclick="deleteCover()"
+                                        title="Remove the current cover image">
+                                    <i class="fas fa-trash me-1"></i>Delete cover
+                                </button>                                
                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                         id="importRefreshBtn" onclick="refreshMetadata()"
                                         title="Re-fetch metadata and cover from Goodreads/Readarr">
                                     <i class="fas fa-sync-alt me-1"></i>Refresh online
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger"
-                                        id="importDeleteCoverBtn" onclick="deleteCover()"
-                                        title="Remove the current cover image">
-                                    <i class="fas fa-trash me-1"></i>Delete cover
-                                </button>
+                                <!-- Online search results picker moved here - directly after Refresh button -->
+                                <div class="col-12">
+                                    <div id="onlinePickerWrap" style="display:none; margin-top:12px; padding: 12px; background:#242424; border-radius:6px; border:1px solid #333;">
+                                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                            <div style="font-size:0.78rem; font-weight:600; text-transform:uppercase;
+                                                        letter-spacing:0.06em; color:#aaa;">
+                                                Pick a result to fill the form
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                    id="onlinePickerCancelBtn"
+                                                    onclick="closeOnlinePickerWrap()"
+                                                    title="Close search results">
+                                                <i class="fas fa-times me-1"></i>Cancel
+                                            </button>
+                                        </div>
+                                        <div id="onlinePickerGrid"
+                                             style="display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+                                                    gap:10px; max-height:340px; overflow-y:auto; padding-right:4px;">
+                                        </div>
+                                    </div>
+                                </div>                                
                             </div>
                         </div>
                         <!-- Fields column -->
@@ -587,18 +608,6 @@
                                     <textarea class="form-control" id="importOverview" rows="4"></textarea>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Online search results picker (shown after "Refresh online") -->
-                    <div id="onlinePickerWrap" style="display:none; margin-top:18px;">
-                        <div style="font-size:0.78rem; font-weight:600; text-transform:uppercase;
-                                    letter-spacing:0.06em; color:#aaa; margin-bottom:10px;">
-                            Pick a result to fill the form
-                        </div>
-                        <div id="onlinePickerGrid"
-                             style="display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
-                                    gap:10px; max-height:340px; overflow-y:auto; padding-right:4px;">
                         </div>
                     </div>
 
@@ -1474,6 +1483,11 @@
         }
     }
 
+    function closeOnlinePickerWrap() {
+        /* Close the online search results picker */
+        document.getElementById('onlinePickerWrap').style.display = 'none';
+    }
+
     function applyPickerResult(res) {
         /* Fill the form fields from a picked search result (does NOT save yet). */
         const set = function(id, v) {
@@ -1506,6 +1520,9 @@
             '✓ Filled from ' + (res.source || 'online') + ' — click Save to apply.';
         document.getElementById('importSuccess').style.display = 'block';
         document.getElementById('importError').style.display = 'none';
+
+        // Auto-close the search results picker after selection
+        closeOnlinePickerWrap();
     }
 
     async function deleteCover() {

@@ -166,7 +166,7 @@ a {
 
 a:hover {
     color: var(--hover-blue);
-    text-decoration: underline;
+    text-decoration: none;
 }
 
 /* Table */

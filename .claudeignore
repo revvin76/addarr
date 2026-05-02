@@ -102,6 +102,3 @@ ssh*
 addarr.log
 .git/
 static/image_cache/*.*
-
-ruflo/
-ruflo/*.*
