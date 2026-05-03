@@ -21,75 +21,110 @@
     <meta name="theme-color" content="#1a1a1a" />
 </head>
 <body>
+    <script>
+    if (sessionStorage.getItem('addarr.homeState')) {
+        document.body.classList.add('home-restoring');
+    }
+    </script>
     {% include 'partials/navbar.html' %}
 
     <!-- Main Content -->
     <!-- Use 100vw/100vh units with flexbox to ensure proper layout without overflow -->
-    <div id="mainSearchContainer" class="search-container"
-         style="width: 100%; min-height: calc(100dvh - 60px); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; padding-bottom: max(20px, env(keyboard-inset-height, 0px)); box-sizing: border-box;">
-        <div class="text-center mb-3 search-hero">
+    <div id="mainSearchContainer" class="search-container main-search-container">
+        <div class="text-center mb-3 search-hero" id="homeHero">
             <h3 class="text-light">Welcome to ADDARR</h3>
-            <p class="text-light mb-0">Search for movies, TV shows{% if config.readarr.enabled %} and books{% endif %} to add to your media library.</p>
+            <p class="text-light mb-0" id="homeHeroCopy">Search for movies, TV shows{% if config.readarr.enabled %} and books{% endif %} to add to your media library.</p>
         </div>
-        <div class="search-form-wrapper" style="width: 100%; max-width: 500px;">
+
+        <div class="search-form-wrapper" id="homeSearchForm">
             <form action="/search" method="POST" onsubmit="return validateForm()">
-                <div class="mb-2">
-                    <input type="text" class="form-control form-control-lg"
+                <div class="manage-library-searchbar mb-3">
+                    <span class="manage-library-searchbar__icon"><i class="fas fa-magnifying-glass"></i></span>
+                    <input type="text" class="manage-library-searchbar__input"
                         name="query" id="mainSearchInput"
                         placeholder="Search movies, TV shows{% if config.readarr.enabled %} and books{% endif %}..." required
                         autocomplete="off">
+                    <button type="button" class="manage-library-searchbar__clear" id="clearSearch" disabled aria-label="Clear search">
+                    <i class="fas fa-xmark"></i>
+            </button>
                 </div>
-                <div class="mb-2">
+                <!-- <div class="mb-2">
                     <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
-                </div>
-                <div class="mb-2 search-trending-btn">
-                    <a href="/trending" class="btn btn-outline-info btn-lg w-100">
-                        <i class="fas fa-fire me-2"></i>View Trending Media
-                    </a>
-                </div>
+                </div> -->
             </form>
         </div>
+
         <!-- Install button moved here for better visibility -->
-        <div style="margin-top: 20px;">
-            <button id="install-button" class="btn btn-primary" style="display: none;">
+        <div class="install-button-wrap">
+            <button id="install-button" class="btn btn-primary install-button-hidden">
                 Install Addarr
             </button>
         </div>
     </div>
-    <style>
-        /* Main search container layout fixes */
-        .search-container {
-            position: relative;
-            overflow: visible; /* Allow scrolling for keyboard management */
-        }
 
-        .search-form-wrapper {
-            flex-shrink: 0;
-        }
+    <!-- Recently Downloaded Sections -->
+    <div class="recently-downloaded-container">
+        {% if config.tmdb.enabled %}
+        <section class="recently-downloaded-section" id="trendingSection" style="display: none;">
+            <div class="section-header" data-source="addarr">
+                <h3>Trending Media</h3>
+                <a href="/trending" class="view-all-link">View All</a>
+            </div>
+            <div class="carousel-container">
+                <button class="carousel-nav carousel-nav-prev" data-carousel="trendingCarousel" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+                <div class="carousel-wrapper">
+                    <div class="carousel" id="trendingCarousel"></div>
+                </div>
+                <button class="carousel-nav carousel-nav-next" data-carousel="trendingCarousel" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </section>
+        {% endif %}
 
-        /* Reduce hero text on small screens, but keep buttons visible */
-        @media (max-height: 600px) {
-            .search-hero h3 {
-                font-size: 1.3rem;
-                margin-bottom: 0.5rem;
-            }
-            .search-hero p {
-                font-size: 0.9rem;
-                margin-bottom: 1rem;
-            }
-        }
+        <!-- Recently Downloaded Movies -->
+        <section class="recently-downloaded-section" id="moviesSection" style="display: none;">
+            <div class="section-header" data-source="radarr">
+                <h3>Recently Downloaded Movies</h3>
+                <a href="/manage?type=movie" class="view-all-link">View All</a>
+            </div>
+            <div class="carousel-container">
+                <button class="carousel-nav carousel-nav-prev" data-carousel="moviesCarousel" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+                <div class="carousel-wrapper">
+                    <div class="carousel" id="moviesCarousel"></div>
+                </div>
+                <button class="carousel-nav carousel-nav-next" data-carousel="moviesCarousel" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </section>
 
-        /* On very small screens, hide hero text but NEVER hide buttons */
-        @media (max-height: 450px) {
-            .search-hero {
-                display: none !important;
-            }
-            /* Always keep trending button visible */
-            .search-trending-btn {
-                display: block !important;
-            }
-        }
-    </style>
+        <!-- Recently Downloaded TV -->
+        <section class="recently-downloaded-section" id="tvSection" style="display: none;">
+            <div class="section-header" data-source="sonarr">
+                <h3>Recently Downloaded TV Shows</h3>
+                <a href="/manage?type=tv" class="view-all-link">View All</a>
+            </div>
+            <div class="carousel-container">
+                <button class="carousel-nav carousel-nav-prev" data-carousel="tvCarousel" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+                <div class="carousel-wrapper">
+                    <div class="carousel" id="tvCarousel"></div>
+                </div>
+                <button class="carousel-nav carousel-nav-next" data-carousel="tvCarousel" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </section>
+
+        <!-- Recently Downloaded Books -->
+        <section class="recently-downloaded-section" id="booksSection" style="display: none;">
+            <div class="section-header" data-source="readarr">
+                <h3>Recently Downloaded Books</h3>
+                <a href="/manage-books" class="view-all-link">View All</a>
+            </div>
+            <div class="carousel-container">
+                <button class="carousel-nav carousel-nav-prev" data-carousel="booksCarousel" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+                <div class="carousel-wrapper">
+                    <div class="carousel" id="booksCarousel"></div>
+                </div>
+                <button class="carousel-nav carousel-nav-next" data-carousel="booksCarousel" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </section>
+    </div>
 
 <div class="config-overlay" id="debugOverlay"></div>
 
@@ -98,7 +133,7 @@
     <div class="config-header">
         <h3>Log Viewer</h3>
         <div class="d-flex align-items-center">
-            <div class="input-group input-group-sm me-2" style="width: 120px;">
+            <div class="input-group input-group-sm me-2 log-lines-group">
                 <span class="input-group-text">Lines:</span>
                 <input type="number" id="logLines" class="form-control" value="500" min="100" max="10000">
             </div>
@@ -229,6 +264,46 @@
 </div>
 
 <script>
+const HOME_STATE_KEY = 'addarr.homeState';
+
+function captureHomePageState() {
+    const state = {
+        scrollY: window.scrollY || window.pageYOffset || 0,
+        carousels: {}
+    };
+
+    document.querySelectorAll('.carousel-wrapper').forEach(wrapper => {
+        const carousel = wrapper.querySelector('.carousel');
+        if (!carousel || !carousel.id) return;
+        state.carousels[carousel.id] = wrapper.scrollLeft || 0;
+    });
+
+    sessionStorage.setItem(HOME_STATE_KEY, JSON.stringify(state));
+}
+
+function restoreHomePageState() {
+    const raw = sessionStorage.getItem(HOME_STATE_KEY);
+    if (!raw) return;
+
+    try {
+        const state = JSON.parse(raw);
+        requestAnimationFrame(() => {
+            window.scrollTo(0, Number(state.scrollY) || 0);
+            Object.entries(state.carousels || {}).forEach(([carouselId, scrollLeft]) => {
+                const carousel = document.getElementById(carouselId);
+                const wrapper = carousel ? carousel.parentElement : null;
+                if (wrapper) wrapper.scrollLeft = Number(scrollLeft) || 0;
+            });
+            document.body.classList.remove('home-restoring');
+        });
+    } catch (error) {
+        console.warn('Failed to restore home page state:', error);
+    } finally {
+        sessionStorage.removeItem(HOME_STATE_KEY);
+        document.body.classList.remove('home-restoring');
+    }
+}
+
 // Service Worker registration
 document.addEventListener('DOMContentLoaded', () => {
     if ('serviceWorker' in navigator) {
@@ -299,6 +374,239 @@ function loadEndpoints(appType) {
         container.appendChild(btn);
     });
 }
+</script>
+
+<script>
+// Fetch and display recently downloaded content
+async function loadRecentlyDownloaded() {
+    const tmdbEnabled = {{ 'true' if config.tmdb.enabled else 'false' }};
+    const readarrEnabled = {{ 'true' if config.readarr.enabled else 'false' }};
+    if (tmdbEnabled) {
+        showCarouselSkeleton('trendingSection', 'trendingCarousel', 6);
+    }
+    showCarouselSkeleton('moviesSection', 'moviesCarousel', 6);
+    showCarouselSkeleton('tvSection', 'tvCarousel', 6);
+    if (readarrEnabled) {
+        showCarouselSkeleton('booksSection', 'booksCarousel', 6);
+    }
+
+    const initialLoaders = [
+        loadRecentlyDownloadedSection('/api/recently-downloaded/movies', 'moviesSection', 'moviesCarousel', 'movie'),
+        loadRecentlyDownloadedSection('/api/recently-downloaded/tv', 'tvSection', 'tvCarousel', 'tv')
+    ];
+
+    if (tmdbEnabled) {
+        initialLoaders.unshift(loadRecentlyDownloadedSection('/api/home/trending', 'trendingSection', 'trendingCarousel', 'trending-movie'));
+    }
+
+    if (readarrEnabled) {
+        initialLoaders.push(loadRecentlyDownloadedSection('/api/recently-downloaded/books', 'booksSection', 'booksCarousel', 'book'));
+    }
+
+    await Promise.allSettled(initialLoaders);
+    restoreHomePageState();
+}
+
+function withQueryParam(url, key, value) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+}
+
+async function loadRecentlyDownloadedSection(url, sectionId, carouselId, type) {
+    const cachedUrl = withQueryParam(url, 'cached_only', '1');
+    const refreshUrl = withQueryParam(url, 'refresh', '1');
+
+    let showedCachedItems = false;
+
+    try {
+        const cachedResp = await fetch(cachedUrl);
+        const cachedData = await cachedResp.json();
+        if (cachedData.items && cachedData.items.length > 0) {
+            populateCarousel(carouselId, cachedData.items, type, cachedData.source);
+            document.getElementById(sectionId).style.display = 'block';
+            showedCachedItems = true;
+        }
+    } catch (err) {
+        console.warn(`Cached ${type} load skipped:`, err);
+    }
+
+    const refreshPromise = fetch(refreshUrl)
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.items && data.items.length > 0) {
+                populateCarousel(carouselId, data.items, type, data.source);
+                document.getElementById(sectionId).style.display = 'block';
+            } else {
+                hideCarouselSection(sectionId, carouselId);
+            }
+        })
+        .catch(err => {
+            console.error(`Error refreshing recently downloaded ${type}:`, err);
+            if (!showedCachedItems) {
+                hideCarouselSection(sectionId, carouselId);
+            }
+        });
+
+    if (!showedCachedItems) {
+        await refreshPromise;
+    }
+}
+
+function showCarouselSkeleton(sectionId, carouselId, count = 6) {
+    const section = document.getElementById(sectionId);
+    const carousel = document.getElementById(carouselId);
+    if (!section || !carousel) return;
+
+    section.style.display = 'block';
+    section.classList.add('is-loading');
+    carousel.innerHTML = Array.from({ length: count }).map(() => `
+        <div class="carousel-item carousel-item--skeleton" aria-hidden="true">
+            <div class="carousel-poster carousel-skeleton-block"></div>
+            <div class="carousel-info">
+                <div class="carousel-skeleton-line carousel-skeleton-line--title"></div>
+                <div class="carousel-skeleton-line carousel-skeleton-line--subtitle"></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function hideCarouselSection(sectionId, carouselId) {
+    const section = document.getElementById(sectionId);
+    const carousel = document.getElementById(carouselId);
+    if (carousel) carousel.innerHTML = '';
+    if (section) {
+        section.classList.remove('is-loading');
+        section.style.display = 'none';
+    }
+}
+
+function populateCarousel(carouselId, items, type, source) {
+    const carousel = document.getElementById(carouselId);
+    if (!carousel) return;
+    const section = carousel.closest('.recently-downloaded-section');
+    if (section) section.classList.remove('is-loading');
+
+    carousel.innerHTML = items.map(item => {
+        let link = null;  // null = non-clickable for Plex
+        let title = item.title;
+        let subtitle = '';
+        let imageSrc = item.poster || '/static/images/apple-touch-icon.png';
+
+        // Determine link based on type and source (source passed as parameter, not from item)
+        if (type === 'trending-movie') {
+            subtitle = item.year || 'Unknown';
+        } else if (type === 'movie') {
+            subtitle = item.year || 'Unknown';
+            if (item.tmdbId && item.tmdbId !== null) {
+                // Has TMDB ID (from Radarr, or enriched from Plex): direct link to movie
+                link = `/manage?view=movie&open=${item.tmdbId}&source=home&plexId=${encodeURIComponent(item.id || '')}&plexTitle=${encodeURIComponent(item.title || '')}&plexYear=${encodeURIComponent(item.year || '')}`;
+            } else {
+                // No TMDB ID found: navigate to manage page where user can search
+                link = `/manage?view=movie`;
+            }
+        } else if (type === 'tv') {
+            subtitle = `${item.seasons} season${item.seasons !== 1 ? 's' : ''}`;
+            if (item.tvdbId && item.tvdbId !== null) {
+                // Has TVDB ID (from Sonarr, or enriched from Plex): direct link to TV show
+                link = `/manage?view=tv&open=${item.tvdbId}&source=home&plexId=${encodeURIComponent(item.id || '')}&plexTitle=${encodeURIComponent(item.title || '')}&plexYear=${encodeURIComponent(item.year || '')}`;
+            } else if (item.sonarrId && item.sonarrId !== null) {
+                // Fallback to Sonarr's internal series id when TVDB is unavailable
+                link = `/manage?view=tv&open=${item.sonarrId}&source=home&openSource=sonarr&plexId=${encodeURIComponent(item.id || '')}&plexTitle=${encodeURIComponent(item.title || '')}&plexYear=${encodeURIComponent(item.year || '')}`;
+            } else {
+                // No TVDB ID found: navigate to manage page where user can search
+                link = `/manage?view=tv`;
+            }
+        } else if (type === 'book' && source === 'readarr') {
+            // Books: prefer foreignBookId because manage-books cards store that consistently.
+            const openId = item.foreignBookId || item.id;
+            if (openId) {
+                link = `/manage-books?open=${openId}&source=home`;
+            }
+            subtitle = item.author || 'Unknown Author';
+        }
+
+        // Build the element - use div for non-clickable, a for clickable
+        const isTrendingDetail = type === 'trending-movie' && item.tmdbId;
+        const element = link
+            ? `<a href="${link}" class="carousel-item" title="${title}">`
+            : isTrendingDetail
+                ? `<button type="button" class="carousel-item carousel-item--button" data-home-detail="movie" data-media-id="${item.tmdbId}" data-tmdb-only="1" title="${title}">`
+            : `<div class="carousel-item" title="${title}" style="cursor: default;">`;
+
+        const closeTag = link ? '</a>' : isTrendingDetail ? '</button>' : '</div>';
+
+        return `
+            ${element}
+                <img src="${imageSrc}" alt="${title}" class="carousel-poster" onerror="this.src='/static/images/apple-touch-icon.png'">
+                <div class="carousel-info">
+                    <div class="carousel-title">${title}</div>
+                    ${subtitle ? `<div class="carousel-subtitle">${subtitle}</div>` : ''}
+                    ${item.rating && item.rating !== 'N/A' ? `<div class="carousel-rating">★ ${item.rating}</div>` : ''}
+                </div>
+            ${closeTag}
+        `;
+    }).join('');
+}
+
+// Handle carousel navigation
+function setupCarouselNavigation() {
+    document.querySelectorAll('.carousel-nav').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const carouselId = btn.dataset.carousel;
+            const carousel = document.getElementById(carouselId);
+            if (!carousel) return;
+
+            const wrapper = carousel.parentElement;
+            const scrollAmount = 200;
+
+            if (btn.classList.contains('carousel-nav-prev')) {
+                wrapper.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+            } else if (btn.classList.contains('carousel-nav-next')) {
+                wrapper.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+            }
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modules = window.appModuleAvailability || {};
+    const setupMode = !modules.radarr && !modules.sonarr && !modules.readarr;
+    const hero = document.getElementById('homeHero');
+    const heroCopy = document.getElementById('homeHeroCopy');
+    const searchForm = document.getElementById('homeSearchForm');
+    if (!hero || !heroCopy || !searchForm) return;
+
+    hero.classList.toggle('setup-hero', setupMode);
+    heroCopy.textContent = setupMode
+        ? 'Addarr is ready to be configured. Open the menu, then tap the cog to connect your services and start searching.'
+        : 'Search for movies, TV shows{% if config.readarr.enabled %} and books{% endif %} to add to your media library.';
+    searchForm.classList.toggle('d-none', setupMode);
+
+    // Load recently downloaded content when page loads
+    if (!setupMode) {
+        loadRecentlyDownloaded();
+        // Setup carousel navigation after carousels are populated
+        setTimeout(setupCarouselNavigation, 100);
+    }
+
+    document.addEventListener('click', function(event) {
+        const trigger = event.target.closest('.carousel-item[href]');
+        if (!trigger) return;
+        captureHomePageState();
+    });
+
+    document.addEventListener('click', function(event) {
+        const trigger = event.target.closest('.carousel-item[data-home-detail]');
+        if (!trigger) return;
+        event.preventDefault();
+        const mediaType = trigger.dataset.homeDetail;
+        const mediaId = trigger.dataset.mediaId;
+        const tmdbOnly = trigger.dataset.tmdbOnly === '1';
+        if (typeof showDetails === 'function' && mediaType && mediaId) {
+            showDetails(mediaType, mediaId, tmdbOnly);
+        }
+    });
+});
 </script>
 
 <!-- Bootstrap JS -->

@@ -27,7 +27,13 @@ from update_manager import UpdateManager
 from utils import SharedUtils
 import routes
 import books_db
-from ruflo.restart_monitor_thread import RestartMonitor
+try:
+    from ruflo.restart_monitor_thread import RestartMonitor
+except ImportError:
+    try:
+        from restart_monitor_thread import RestartMonitor
+    except ImportError:
+        RestartMonitor = None
 
 # Global variables for tunnel functionality - define them at module level
 tunnel_process = None
@@ -524,9 +530,10 @@ def _background_azw3_scan():
 
 def startup_sequence():
     global tunnel_url  # Add this line to access the global variable
-    
-    # Only run in the main process, not the reloader process
-    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+
+    # In debug/reloader mode, only run in Werkzeug's child process.
+    # In normal mode, run in the main Python process.
+    if CONFIG.app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         return
         
     # Check for updates FIRST before anything else
@@ -577,8 +584,11 @@ def startup_sequence():
 
     # Start restart monitor
     global restart_monitor
-    restart_monitor = RestartMonitor(reload_file_path='.reload', check_interval=1.0)
-    restart_monitor.start()
+    if RestartMonitor is not None:
+        restart_monitor = RestartMonitor(reload_file_path='.reload', check_interval=1.0)
+        restart_monitor.start()
+    else:
+        logging.warning("RestartMonitor unavailable; automatic .reload restarts are disabled.")
 
     # # Print welcome message in main process only
     # if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':

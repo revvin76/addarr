@@ -8,11 +8,13 @@ import os
 from collections import deque
 import requests
 import re
+import difflib
 from datetime import datetime
 from update_manager import UpdateManager
 import books_db
 from PIL import Image
 import io, requests as req
+from urllib.parse import quote
 
 
 # Import shared utilities (will be passed from app.py)
@@ -72,6 +74,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     }
     MEM_CACHE_TTL    = 60    # seconds before re-reading disk cache
     STATUS_CACHE_TTL = 300   # 5 minutes — only status can go stale
+    RECENT_CACHE_TTL = 300   # 5 minutes for homepage recent payloads
 
     def get_cached_library(media_type):
         """Three-tier library cache:
@@ -137,6 +140,157 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 return disk_data
             return cache_entry['data'] if cache_entry['data'] is not None else []
 
+    def _normalize_media_title(value):
+        if not value:
+            return ''
+        return re.sub(r'[^a-z0-9]+', '', str(value).lower())
+
+    def _year_within_tolerance(base_year, candidate_year, tolerance=1):
+        try:
+            if not base_year or not candidate_year:
+                return False
+            return abs(int(candidate_year) - int(base_year)) <= tolerance
+        except (TypeError, ValueError):
+            return False
+
+    def _extract_media_title_variants(item):
+        variants = []
+        seen = set()
+
+        def _add_variant(value):
+            if not value:
+                return
+            value = str(value).strip()
+            if not value:
+                return
+            normalized = _normalize_media_title(value)
+            if not normalized or normalized in seen:
+                return
+            seen.add(normalized)
+            variants.append(value)
+
+        _add_variant(item.get('title'))
+        _add_variant(item.get('sortTitle'))
+        _add_variant(item.get('cleanTitle'))
+        _add_variant(item.get('originalTitle'))
+        for alt in item.get('alternateTitles') or []:
+            if isinstance(alt, dict):
+                _add_variant(alt.get('title'))
+            else:
+                _add_variant(alt)
+        return variants
+
+    def _title_similarity_score(query_title, candidate_title):
+        query_norm = _normalize_media_title(query_title)
+        candidate_norm = _normalize_media_title(candidate_title)
+        if not query_norm or not candidate_norm:
+            return 0
+        if query_norm == candidate_norm:
+            return 1.0
+        if query_norm in candidate_norm or candidate_norm in query_norm:
+            return 0.94
+
+        seq_score = difflib.SequenceMatcher(None, query_norm, candidate_norm).ratio()
+        query_tokens = set(re.findall(r'[a-z0-9]+', str(query_title or '').lower()))
+        candidate_tokens = set(re.findall(r'[a-z0-9]+', str(candidate_title or '').lower()))
+        token_score = 0.0
+        if query_tokens and candidate_tokens:
+            token_score = len(query_tokens & candidate_tokens) / max(len(query_tokens), len(candidate_tokens))
+        return max(seq_score, token_score)
+
+    def _rank_cached_library_matches(media_type, title, year, limit=12):
+        if not title or not year:
+            return []
+
+        cached_items = get_cached_library(media_type) or []
+        matches = []
+        for item in cached_items:
+            candidate_year = item.get('year')
+            if not _year_within_tolerance(year, candidate_year, tolerance=1):
+                continue
+
+            variants = _extract_media_title_variants(item)
+            if not variants:
+                continue
+
+            best_score = 0.0
+            for variant in variants:
+                best_score = max(best_score, _title_similarity_score(title, variant))
+
+            if best_score < 0.55:
+                continue
+
+            matches.append((best_score, item))
+
+        matches.sort(key=lambda row: (-row[0], abs(int(row[1].get('year', 0) or 0) - int(year or 0)), str(row[1].get('title') or '').lower()))
+        return matches[:limit]
+
+    def _find_sonarr_library_matches(title, year):
+        ranked = _rank_cached_library_matches('tv', title, year)
+        results = []
+        for score, item in ranked:
+            results.append({
+                'title': item.get('title'),
+                'year': item.get('year'),
+                'tvdbId': item.get('tvdbId'),
+                'sonarrId': item.get('id'),
+                'poster': (
+                    f"/api/img?url={quote((item.get('remotePoster') or ''))}&w=150&h=225&t={quote(item.get('title', ''))}"
+                    if item.get('remotePoster')
+                    else '/static/images/apple-touch-icon.png'
+                ),
+                'status': item.get('status'),
+                'score': round(score, 4),
+            })
+        return results
+
+    def _find_radarr_library_matches(title, year):
+        ranked = _rank_cached_library_matches('movie', title, year)
+        results = []
+        for score, item in ranked:
+            results.append({
+                'title': item.get('title'),
+                'year': item.get('year'),
+                'tmdbId': item.get('tmdbId'),
+                'radarrId': item.get('id'),
+                'poster': (
+                    f"/api/img?url={quote((item.get('remotePoster') or ''))}&w=150&h=225&t={quote(item.get('title', ''))}"
+                    if item.get('remotePoster')
+                    else '/static/images/apple-touch-icon.png'
+                ),
+                'status': item.get('status'),
+                'score': round(score, 4),
+            })
+        return results
+
+    def _best_cached_library_match(media_type, title, year):
+        ranked = _rank_cached_library_matches(media_type, title, year, limit=1)
+        if not ranked:
+            return None
+        score, item = ranked[0]
+        if score < 0.92:
+            return None
+        return item
+
+    def _load_recent_payload(cache_name, allow_stale=False):
+        from utils import load_media_cache
+        payload, timestamp = load_media_cache(cache_name)
+        if payload is None:
+            return None
+        if allow_stale or (time.time() - timestamp) < RECENT_CACHE_TTL:
+            return payload
+        return None
+
+    def _save_recent_payload(cache_name, payload):
+        from utils import save_media_cache
+        save_media_cache(cache_name, payload)
+
+    def _cached_only_requested():
+        return request.args.get('cached_only') == '1'
+
+    def _refresh_requested():
+        return request.args.get('refresh') == '1'
+
     # ============ ROUTE DEFINITIONS ============
     @app.route('/')
     @conditional_debug_log
@@ -164,6 +318,8 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         if is_kindle_request():
             return redirect(url_for('kindle_books'))
         try:
+            open_id = (request.args.get('open') or '').strip()
+            source_home = (request.args.get('source') or '').strip().lower() == 'home' and bool(open_id)
             from utils import scan_books_folder, extract_file_metadata, _title_from_filename
             books_db.init_db()
             root_folder = CONFIG.readarr.root_folder if CONFIG.readarr.enabled else None
@@ -224,7 +380,54 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     **fs,               # file_path, filename, extension, file_size, rel_path
                     **(rec or {}),      # DB fields override / supplement
                     'has_azw3': has_azw3,
+                    'file_state': 'downloaded',
                 })
+
+            local_foreign_ids = {
+                str(book.get('foreign_book_id') or '').strip()
+                for book in merged
+                if book.get('foreign_book_id')
+            }
+
+            if CONFIG.readarr.enabled:
+                try:
+                    readarr_books = get_cached_library('book') or []
+                    for book in readarr_books:
+                        foreign_id = str(book.get('foreignBookId') or '').strip()
+                        if not foreign_id or foreign_id in local_foreign_ids:
+                            continue
+
+                        statistics = book.get('statistics', {}) or {}
+                        is_missing = statistics.get('bookFileCount', 0) <= 0
+                        if not is_missing:
+                            continue
+
+                        merged.append({
+                            'file_path': book.get('path') or '',
+                            'filename': book.get('title') or 'Unknown',
+                            'extension': '',
+                            'file_size': 0,
+                            'rel_path': '',
+                            'id': None,
+                            'internal_id': book.get('id'),
+                            'foreign_book_id': book.get('foreignBookId'),
+                            'title': book.get('title'),
+                            'author': book.get('authorTitle'),
+                            'overview': book.get('overview'),
+                            'year': book.get('releaseDate', '')[:4] if book.get('releaseDate') else '',
+                            'pages': book.get('pageCount'),
+                            'isbn': book.get('isbn13') or book.get('isbn10'),
+                            'genre': ', '.join(book.get('genres') or []) if isinstance(book.get('genres'), list) else (book.get('genres') or ''),
+                            'source': 'readarr',
+                            'has_azw3': False,
+                            'cover_url': None,
+                            'reading_status': 'not_started',
+                            'is_wishlist': 0,
+                            'monitored': bool(book.get('monitored', True)),
+                            'file_state': 'missing',
+                        })
+                except Exception as e:
+                    logging.warning("[manage_books] Failed to merge missing Readarr books: %s", e)
 
             merged.sort(key=lambda b: (b.get('title') or b['filename']).lower())
 
@@ -234,6 +437,8 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 config=CONFIG._config,
                 total_downloaded=len(merged),
                 root_folder=root_folder or '',
+                open_id=open_id,
+                source_home=source_home,
             )
         except Exception as e:
             logging.error(f"Error loading manage-books: {e}", exc_info=True)
@@ -377,6 +582,9 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @requires_auth
     def trending_media():
         try:
+            if not CONFIG.tmdb.enabled:
+                return redirect('/')
+
             # Support both legacy and new parameter formats
             media_type = request.args.get('type', 'all')
             category = request.args.get('category', 'trending')
@@ -415,6 +623,9 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     def api_trending():
         """API endpoint for dynamic trending data loading"""
         try:
+            if not CONFIG.tmdb.enabled:
+                return jsonify({'success': False, 'error': 'TMDB is not enabled'}), 503
+
             category = request.args.get('category', 'trending')
             subcategory = request.args.get('subcategory', 'week')
             content_type = request.args.get('media', 'movie')
@@ -443,6 +654,60 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         except Exception as e:
             logging.error(f"Error in API trending: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/home/trending')
+    @conditional_debug_log
+    @requires_auth
+    def api_home_trending():
+        try:
+            recent_cache_name = 'recent_home_trending'
+
+            if _cached_only_requested():
+                cached_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
+                return jsonify(cached_payload or {'items': [], 'type': 'movie', 'source': 'addarr'})
+
+            if not _refresh_requested():
+                cached_payload = _load_recent_payload(recent_cache_name, allow_stale=False)
+                if cached_payload is not None:
+                    return jsonify(cached_payload)
+
+            if not CONFIG.tmdb.enabled:
+                fallback_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
+                if fallback_payload is not None:
+                    return jsonify(fallback_payload)
+                return jsonify({'items': [], 'type': 'movie', 'source': 'addarr'})
+
+            data = utils.fetch_trending_optimized(
+                media_type='all',
+                category='trending',
+                subcategory='day',
+                content_type='movie'
+            )
+            movies = (data.get('movies') or [])[:10]
+            items = [
+                {
+                    'id': movie.get('id'),
+                    'tmdbId': movie.get('id'),
+                    'title': movie.get('title'),
+                    'poster': (
+                        f"/api/img?url={quote('https://image.tmdb.org/t/p/w342' + movie.get('poster_path'))}&w=150&h=225&t={quote(movie.get('title', ''))}"
+                        if movie.get('poster_path') else '/static/images/apple-touch-icon.png'
+                    ),
+                    'year': movie.get('release_date', '')[:4] if movie.get('release_date') else 'N/A',
+                    'rating': movie.get('vote_average', 'N/A'),
+                    'tmdbOnly': True,
+                }
+                for movie in movies
+            ]
+            payload = {'items': items, 'type': 'movie', 'source': 'addarr'}
+            _save_recent_payload(recent_cache_name, payload)
+            return jsonify(payload)
+        except Exception as e:
+            logging.error(f"Error in homepage trending: {str(e)}", exc_info=True)
+            fallback_payload = _load_recent_payload('recent_home_trending', allow_stale=True)
+            if fallback_payload is not None:
+                return jsonify(fallback_payload)
+            return jsonify({'items': [], 'type': 'movie', 'source': 'addarr'})
 
     @app.route('/logs')
     @conditional_debug_log
@@ -615,9 +880,20 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         # Extract optional quality/season parameters
         quality_profile_id = data.get('quality_profile_id')
         season_filter = data.get('season_filter', 'latest')
+        root_folder_path = data.get('root_folder_path')
+        minimum_availability = data.get('minimum_availability', 'announced')
+        search_for_movie = data.get('search_for_movie', True)
+        monitored = data.get('monitored', True)
 
         if media_type == 'movie':
-            success = utils.add_to_radarr(media_id, quality_profile_id)
+            success = utils.add_to_radarr(
+                media_id,
+                quality_profile_id=quality_profile_id,
+                root_folder_path=root_folder_path,
+                minimum_availability=minimum_availability,
+                search_for_movie=search_for_movie,
+                monitored=monitored
+            )
             return jsonify({'success': success})
         elif media_type == 'book':
             success, message = utils.add_to_readarr(media_id)
@@ -631,11 +907,25 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @requires_auth
     def manage_media():
         try:
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                movies_future = executor.submit(utils.get_radarr_movies)
-                series_future = executor.submit(utils.get_sonarr_series)
-                movies = movies_future.result()
-                series = series_future.result()
+            open_id = (request.args.get('open') or '').strip()
+            source_home = (request.args.get('source') or '').strip().lower() == 'home' and bool(open_id)
+            requested_view = (request.args.get('view') or '').strip().lower()
+            open_type = (request.args.get('type') or '').strip().lower()
+
+            if requested_view not in {'movie', 'tv'}:
+                if open_type in {'movie', 'tv'}:
+                    requested_view = open_type
+                elif CONFIG.radarr.enabled:
+                    requested_view = 'movie'
+                elif CONFIG.sonarr.enabled:
+                    requested_view = 'tv'
+                else:
+                    requested_view = 'movie'
+
+            if requested_view == 'movie' and not CONFIG.radarr.enabled and CONFIG.sonarr.enabled:
+                requested_view = 'tv'
+            elif requested_view == 'tv' and not CONFIG.sonarr.enabled and CONFIG.radarr.enabled:
+                requested_view = 'movie'
 
             def _poster_url(images):
                 """Return the first poster remoteUrl from an images list, or None."""
@@ -644,8 +934,32 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                         return img.get('remoteUrl') or img.get('url')
                 return None
 
+            def _format_size(num_bytes):
+                try:
+                    size = float(num_bytes or 0)
+                except (TypeError, ValueError):
+                    return None
+                if size <= 0:
+                    return None
+                units = ['B', 'KB', 'MB', 'GB', 'TB']
+                idx = 0
+                while size >= 1024 and idx < len(units) - 1:
+                    size /= 1024
+                    idx += 1
+                precision = 0 if size >= 100 or idx == 0 else 1
+                return f"{size:.{precision}f} {units[idx]}"
+
+            def _movie_quality_label(movie_file):
+                quality = (movie_file or {}).get('quality') or {}
+                quality_def = quality.get('quality') or {}
+                return quality_def.get('name') or quality.get('name')
+
+            def _series_status_label(series):
+                return (series.get('status') or '').replace('_', ' ').title()
+
             def _slim_movie(m):
                 poster = _poster_url(m.get('images', []))
+                movie_file = m.get('movieFile') or {}
                 return {
                     'id':            m.get('id'),
                     'tmdbId':        m.get('tmdbId'),
@@ -655,6 +969,10 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     'runtime':       m.get('runtime'),
                     'hasFile':       bool(m.get('hasFile', False)),
                     'monitored':     bool(m.get('monitored', False)),
+                    'remotePoster':  poster,
+                    'quality':       _movie_quality_label(movie_file),
+                    'sizeLabel':     _format_size(movie_file.get('size')),
+                    'status':        (m.get('status') or '').title(),
                     'images':        [{'coverType': 'poster', 'remoteUrl': poster}] if poster else [],
                     'media_type':    'movie',
                 }
@@ -669,6 +987,8 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     'year':          s.get('year'),
                     'certification': s.get('certification'),
                     'monitored':     bool(s.get('monitored', False)),
+                    'remotePoster':  poster,
+                    'status':        _series_status_label(s),
                     'statistics':    {
                         'seasonCount':      stats.get('seasonCount', 0),
                         'episodeCount':     stats.get('episodeCount', 0),
@@ -678,14 +998,28 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     'media_type':    'tv',
                 }
 
-            combined_media = [_slim_movie(m) for m in movies] + [_slim_show(s) for s in series]
-            combined_media.sort(key=lambda x: x.get('title', '').lower())
+            media = []
+            current_page = 'manage-movies' if requested_view == 'movie' else 'manage-tv'
+            view_label = 'Movies' if requested_view == 'movie' else 'TV Shows'
+
+            if requested_view == 'movie':
+                media = [_slim_movie(m) for m in utils.get_radarr_movies()]
+            else:
+                media = [_slim_show(s) for s in utils.get_sonarr_series()]
+
+            media.sort(key=lambda x: x.get('title', '').lower())
 
             return render_template(
                 'manage.html',
-                media=combined_media,
+                media=media,
+                current_page=current_page,
+                manage_view=requested_view,
+                view_label=view_label,
+                media_total=len(media),
                 config=CONFIG._config,
-                readarr_enabled=CONFIG.readarr.enabled
+                readarr_enabled=CONFIG.readarr.enabled,
+                open_id=open_id,
+                source_home=source_home,
             )
         except Exception as e:
             logging.error(f"Error fetching media: {str(e)}")
@@ -695,17 +1029,31 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @conditional_debug_log
     @requires_auth
     def get_media_details():
+        from utils import load_media_cache, save_media_cache
         media_type = request.args.get('type')
         media_id = request.args.get('id')
+        source = request.args.get('source')
 
         logging.info(f"Fetching details for {media_type} with ID: {media_id}")
 
+        if not media_type or not media_id:
+            return jsonify({'error': 'Missing type or id'}), 400
+
+        detail_source = source or ('tvdb' if media_type == 'tv' else 'default')
+        cache_key = f"details_{media_type}_{detail_source}_{media_id}"
+        cached_data, cached_ts = load_media_cache(cache_key)
+        if cached_data is not None and (time.time() - cached_ts) < STATUS_CACHE_TTL:
+            return jsonify(cached_data)
+
         if media_type == 'movie':
-            return jsonify(utils.get_radarr_details(media_id))
+            data = utils.get_radarr_details(media_id)
         elif media_type == 'book':
-            return jsonify(utils.get_readarr_details(media_id))
+            data = utils.get_readarr_details(media_id)
         else:
-            return jsonify(utils.get_sonarr_details(media_id))
+            data = utils.get_sonarr_details(media_id, source=detail_source)
+
+        save_media_cache(cache_key, data)
+        return jsonify(data)
 
     @app.route('/get_tmdb_details')
     @conditional_debug_log
@@ -863,6 +1211,37 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 return jsonify({'success': True, 'status': response.json()})
             return jsonify({'success': False, 'error': f'HTTP {response.status_code}'}), response.status_code
         except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/plex/test')
+    @conditional_debug_log
+    @requires_auth
+    def test_plex_connection():
+        """Test Plex connection"""
+        try:
+            plex_url = request.args.get('url', '').strip()
+            plex_token = request.args.get('token', '').strip()
+
+            if not plex_url or not plex_token:
+                return jsonify({'success': False, 'error': 'Missing url or token parameter'}), 400
+
+            # Normalize URL (remove trailing slash)
+            plex_url = plex_url.rstrip('/')
+
+            # Test connection by fetching library sections
+            url = f"{plex_url}/library/sections"
+            headers = {'X-Plex-Token': plex_token}
+            response = requests.get(url, headers=headers, timeout=10)
+
+            if response.status_code == 200:
+                return jsonify({'success': True, 'status': 'ok'})
+            return jsonify({'success': False, 'error': f'HTTP {response.status_code}'}), response.status_code
+        except requests.exceptions.Timeout:
+            return jsonify({'success': False, 'error': 'Connection timeout'}), 500
+        except requests.exceptions.ConnectionError:
+            return jsonify({'success': False, 'error': 'Connection failed'}), 500
+        except Exception as e:
+            logging.error(f"Error testing Plex connection: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/book/metadata-cache')
@@ -1671,9 +2050,29 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             logging.info(f'[img_proxy] MISS {label} — redirecting to source, caching in background')
 
             def _fetch_and_cache(fetch_url, dest, tw, th, name):
+                """Fetch image from source URL with Plex authentication support.
+
+                Detects Plex URLs and includes X-Plex-Token header for authenticated requests.
+                Other sources (TMDB, etc.) use only User-Agent header.
+                """
                 try:
-                    r = requests.get(fetch_url, timeout=15,
-                                     headers={'User-Agent': 'addarr/1.0'})
+                    # Build headers with User-Agent
+                    headers = {'User-Agent': 'addarr/1.0'}
+
+                    # Detect if URL is from Plex and add authentication token
+                    plex_base_url = CONFIG.plex.url.rstrip('/') if CONFIG.plex.url else ''
+                    is_plex_url = (
+                        'plex.tv' in fetch_url or
+                        '127.0.0.1:32400' in fetch_url or
+                        (plex_base_url and plex_base_url in fetch_url)
+                    )
+
+                    if is_plex_url and CONFIG.plex.token:
+                        headers['X-Plex-Token'] = CONFIG.plex.token
+                        logging.debug(f'[img_proxy] Plex URL detected, adding X-Plex-Token header')
+
+                    r = requests.get(fetch_url, timeout=15, headers=headers)
+
                     if r.status_code != 200:
                         logging.warning(f'[img_proxy] Fetch failed {name!r}: HTTP {r.status_code}')
                         return
@@ -1732,6 +2131,14 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     def links_page():
         """Service links dashboard"""
         try:
+            if not any([
+                CONFIG.radarr.enabled and CONFIG.radarr.url,
+                CONFIG.sonarr.enabled and CONFIG.sonarr.url,
+                CONFIG.readarr.enabled and CONFIG.readarr.url,
+                CONFIG.prowlarr.enabled and CONFIG.prowlarr.url,
+                CONFIG.qbit.enabled and CONFIG.qbit.url,
+            ]):
+                return redirect('/')
             return render_template('links.html', config=CONFIG._config)
         except Exception as e:
             logging.error(f"Error loading links page: {str(e)}")
@@ -1789,31 +2196,40 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     'name': 'Radarr',
                     'icon': 'fas fa-film',
                     'color': '#6ab759',
-                    'configured': bool(CONFIG.radarr.url),
+                    'configured': bool(CONFIG.radarr.enabled and CONFIG.radarr.url),
                     **make_urls(CONFIG.radarr.url)
                 },
                 {
                     'name': 'Sonarr',
                     'icon': 'fas fa-tv',
                     'color': '#35c5f4',
-                    'configured': bool(CONFIG.sonarr.url),
+                    'configured': bool(CONFIG.sonarr.enabled and CONFIG.sonarr.url),
                     **make_urls(CONFIG.sonarr.url)
                 },
                 {
                     'name': 'Readarr',
                     'icon': 'fas fa-book',
                     'color': '#c0392b',
-                    'configured': bool(CONFIG.readarr.url),
+                    'configured': bool(CONFIG.readarr.enabled and CONFIG.readarr.url),
                     **make_urls(CONFIG.readarr.url)
                 },
                 {
                     'name': 'Prowlarr',
                     'icon': 'fas fa-search',
                     'color': '#ff6b35',
-                    'configured': bool(CONFIG.prowlarr.url),
+                    'configured': bool(CONFIG.prowlarr.enabled and CONFIG.prowlarr.url),
                     **make_urls(CONFIG.prowlarr.url)
                 },
+                {
+                    'name': 'qBittorrent',
+                    'icon': 'fas fa-download',
+                    'color': '#8e44ad',
+                    'configured': bool(CONFIG.qbit.enabled and CONFIG.qbit.url),
+                    **make_urls(CONFIG.qbit.url)
+                },
             ]
+
+            services = [service for service in services if service['configured']]
 
             return jsonify({
                 'services': services,
@@ -1989,11 +2405,100 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             if r.status_code != 200:
                 return jsonify({'error': r.text[:400] or 'interactive search failed'}), r.status_code
 
-            releases = r.json() if isinstance(r.json(), list) else []
+            response_data = r.json()
+            releases = response_data if isinstance(response_data, list) else []
             return jsonify({'success': True, 'results': releases})
         except Exception as e:
             logging.error("[interactive_search] %s %s failed: %s", media_type, internal_id, e, exc_info=True)
             return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/tv/search-online', methods=['POST'])
+    @requires_auth
+    def search_tv_online():
+        if not CONFIG.sonarr.enabled:
+            return jsonify({'error': 'Sonarr not configured'}), 503
+
+        data = request.get_json(silent=True) or {}
+        title = (data.get('title') or '').strip()
+        year = data.get('year')
+        if not title:
+            return jsonify({'error': 'title is required'}), 400
+
+        matches = _find_sonarr_library_matches(title, year)
+        return jsonify({'success': True, 'results': matches})
+
+    @app.route('/api/tv/rebind-plex', methods=['POST'])
+    @requires_auth
+    def rebind_plex_tv():
+        from utils import load_media_cache, save_media_cache
+        data = request.get_json(silent=True) or {}
+        plex_id = str(data.get('plex_id') or '').strip()
+        title = (data.get('title') or '').strip()
+        year = data.get('year')
+        tvdb_id = data.get('tvdb_id')
+        sonarr_id = data.get('sonarr_id')
+
+        if not plex_id or not title or not tvdb_id:
+            return jsonify({'error': 'plex_id, title and tvdb_id are required'}), 400
+
+        mapping, _ = load_media_cache('plex_tv_map')
+        mapping = mapping if isinstance(mapping, dict) else {}
+
+        current = mapping.get(plex_id, {})
+        mapping[plex_id] = {
+            **current,
+            'title': title,
+            'year': year,
+            'tvdbId': tvdb_id,
+            'sonarrId': sonarr_id or current.get('sonarrId'),
+            'updatedAt': time.time(),
+            'reason': 'manual-rebind'
+        }
+        save_media_cache('plex_tv_map', mapping)
+        return jsonify({'success': True})
+
+    @app.route('/api/movie/search-online', methods=['POST'])
+    @requires_auth
+    def search_movie_online():
+        if not CONFIG.radarr.enabled:
+            return jsonify({'error': 'Radarr not configured'}), 503
+
+        data = request.get_json(silent=True) or {}
+        title = (data.get('title') or '').strip()
+        year = data.get('year')
+        if not title:
+            return jsonify({'error': 'title is required'}), 400
+
+        matches = _find_radarr_library_matches(title, year)
+        return jsonify({'success': True, 'results': matches})
+
+    @app.route('/api/movie/rebind-plex', methods=['POST'])
+    @requires_auth
+    def rebind_plex_movie():
+        from utils import load_media_cache, save_media_cache
+        data = request.get_json(silent=True) or {}
+        plex_id = str(data.get('plex_id') or '').strip()
+        title = (data.get('title') or '').strip()
+        year = data.get('year')
+        tmdb_id = data.get('tmdb_id')
+
+        if not plex_id or not title or not tmdb_id:
+            return jsonify({'error': 'plex_id, title and tmdb_id are required'}), 400
+
+        mapping, _ = load_media_cache('plex_movie_map')
+        mapping = mapping if isinstance(mapping, dict) else {}
+
+        current = mapping.get(plex_id, {})
+        mapping[plex_id] = {
+            **current,
+            'title': title,
+            'year': year,
+            'tmdbId': tmdb_id,
+            'updatedAt': time.time(),
+            'reason': 'manual-relink'
+        }
+        save_media_cache('plex_movie_map', mapping)
+        return jsonify({'success': True})
 
     @app.route('/api/<string:media_type>/<int:internal_id>/grab-release', methods=['POST'])
     @requires_auth
@@ -2122,6 +2627,580 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         except Exception as e:
             logging.error("[episode_delete] %s failed: %s", episode_id, e, exc_info=True)
             return jsonify({'error': str(e)}), 500
+
+    # ── Recently Downloaded API ────────────────────────────────────────────────────
+
+    @app.route('/api/recently-downloaded/movies')
+    @requires_auth
+    def get_recently_downloaded_movies():
+        """Fetch recently downloaded movies from Plex first, fallback to Radarr"""
+        logging.info("[recently_downloaded_movies] ========== START REQUEST ==========")
+        from utils import load_media_cache, save_media_cache
+        recent_cache_name = 'recent_movies'
+
+        if _cached_only_requested():
+            cached_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
+            return jsonify(cached_payload or {'items': [], 'type': 'movie', 'source': 'cache'})
+
+        if not _refresh_requested():
+            cached_payload = _load_recent_payload(recent_cache_name, allow_stale=False)
+            if cached_payload is not None:
+                return jsonify(cached_payload)
+
+        def _normalize_movie_title(value):
+            if not value:
+                return ''
+            return re.sub(r'[^a-z0-9]+', '', value.lower())
+
+        def _load_plex_movie_map():
+            mapping, _ = load_media_cache('plex_movie_map')
+            return mapping if isinstance(mapping, dict) else {}
+
+        def _save_plex_movie_map(mapping):
+            save_media_cache('plex_movie_map', mapping)
+
+        def _cache_plex_movie(mapping, item, tmdb_id=None, reason='match'):
+            plex_key = str(item.get('id') or '').strip()
+            if not plex_key:
+                return False
+            current = mapping.get(plex_key, {})
+            updated = {
+                **current,
+                'title': item.get('title'),
+                'year': item.get('year'),
+                'tmdbId': tmdb_id or current.get('tmdbId'),
+                'updatedAt': time.time(),
+                'reason': reason,
+            }
+            changed = updated != current
+            mapping[plex_key] = updated
+            return changed
+
+        def _apply_cached_movie(mapping, item):
+            plex_key = str(item.get('id') or '').strip()
+            cached = mapping.get(plex_key) if plex_key else None
+            if not cached:
+                return False
+            cached_title = _normalize_movie_title(cached.get('title'))
+            current_title = _normalize_movie_title(item.get('title'))
+            cached_year = str(cached.get('year') or '').strip()
+            current_year = str(item.get('year') or '').strip()
+            if cached_title and cached_title == current_title and (not cached_year or not current_year or cached_year == current_year):
+                item['tmdbId'] = cached.get('tmdbId')
+                return bool(item.get('tmdbId'))
+            return False
+
+        plex_movie_map = _load_plex_movie_map()
+        plex_movie_map_dirty = False
+
+        # Try Plex first (PRIMARY SOURCE)
+        if CONFIG.plex.enabled:
+            logging.info("[recently_downloaded_movies] Plex is ENABLED. Attempting Plex call...")
+            logging.info("[recently_downloaded_movies] Plex URL: %s", CONFIG.plex.url)
+            logging.info("[recently_downloaded_movies] Plex token present: %s", bool(CONFIG.plex.token))
+
+            try:
+                plex_base_url = CONFIG.plex.url.rstrip('/')
+                plex_url = f"{plex_base_url}/library/recentlyAdded"
+                logging.info("[recently_downloaded_movies] Attempting Plex call to: %s", plex_url)
+
+                headers = {'X-Plex-Token': CONFIG.plex.token}
+                params = {'type': 1, 'limit': 50}  # type=1 for movies, limit to 50 (will be sliced to 20 items)
+
+                logging.info("[recently_downloaded_movies] Plex headers: %s", {'X-Plex-Token': '***REDACTED***'})
+                logging.info("[recently_downloaded_movies] Plex params: %s", params)
+
+                # Build the EXACT URL string that will be sent
+                from urllib.parse import urlencode
+                exact_url = f"{plex_url}?{urlencode(params)}"
+                logging.info("[recently_downloaded_movies] EXACT URL BEING SENT: %s", exact_url)
+
+                resp = requests.get(
+                    plex_url,
+                    headers=headers,
+                    params=params,
+                    timeout=15
+                )
+
+                # Log the actual URL that requests resolved
+                logging.info("[recently_downloaded_movies] ACTUAL REQUEST URL: %s", resp.request.url)
+
+                logging.info("[recently_downloaded_movies] Plex response status code: %s", resp.status_code)
+                logging.info("[recently_downloaded_movies] Plex response content-type: %s", resp.headers.get('Content-Type', 'unknown'))
+                logging.info("[recently_downloaded_movies] Plex response length: %d bytes", len(resp.content))
+
+                if resp.status_code == 200:
+                    try:
+                        xml_root = resp.content
+                        import xml.etree.ElementTree as ET
+                        root = ET.fromstring(xml_root)
+                        logging.info("[recently_downloaded_movies] XML parsed successfully. Root tag: %s", root.tag)
+
+                        video_elements = root.findall('.//Video')
+                        logging.info("[recently_downloaded_movies] Found %d Video elements in XML", len(video_elements))
+
+                        items = []
+                        plex_base_url = CONFIG.plex.url.rstrip('/')
+                        for idx, video in enumerate(video_elements):
+                            thumb = video.get('thumb', '')
+                            title = video.get('title', 'Unknown')
+                            poster_url = f"{plex_base_url}{thumb}?X-Plex-Token={CONFIG.plex.token}" if thumb else ''
+                            item = {
+                                'id': video.get('ratingKey'),
+                                'tmdbId': None,
+                                'title': title,
+                                'poster': f"/api/img?url={quote(poster_url)}&w=150&h=225&t={quote(title)}" if poster_url else '/static/images/apple-touch-icon.png',
+                                'hasFile': True,
+                                'year': video.get('year', ''),
+                                'rating': video.get('rating', 'N/A')
+                            }
+                            items.append(item)
+                            plex_movie_map_dirty = _cache_plex_movie(plex_movie_map, item, reason='plex-feed') or plex_movie_map_dirty
+                            _apply_cached_movie(plex_movie_map, item)
+                            if idx < 3:  # Log first 3 items for debugging
+                                logging.info("[recently_downloaded_movies] Plex item #%d: '%s' (ratingKey=%s, thumb=%s)",
+                                           idx + 1, title, video.get('ratingKey'), thumb)
+
+                        items = items[:20]
+
+                        # Plex success - enrich with TMDB IDs from Radarr before returning
+                        if items:
+                            logging.info("[recently_downloaded_movies] Plex: found %d items. Looking up TMDB IDs in Radarr...", len(items))
+
+                            # Get all Radarr movies to match against Plex items by title/year
+                            if CONFIG.radarr.enabled:
+                                try:
+                                    radarr_movies = get_cached_library('movie') or []
+                                    if radarr_movies:
+                                        logging.info("[recently_downloaded_movies] Radarr has %d movies for enrichment lookup", len(radarr_movies))
+
+                                        # Enrich Plex items with TMDB IDs from the known Radarr library
+                                        for item in items:
+                                            if item.get('tmdbId'):
+                                                continue
+                                            plex_year = str(item['year']).strip() if item['year'] else ''
+                                            best_match = _best_cached_library_match('movie', item.get('title'), plex_year)
+
+                                            if best_match and best_match.get('tmdbId'):
+                                                item['tmdbId'] = best_match.get('tmdbId')
+                                                plex_movie_map_dirty = _cache_plex_movie(
+                                                    plex_movie_map, item, item['tmdbId'], reason='radarr-list'
+                                                ) or plex_movie_map_dirty
+                                                logging.info("[recently_downloaded_movies] Plex '%s' (%s) MATCHED Radarr -> TMDB %s",
+                                                             item['title'], plex_year, item['tmdbId'])
+                                            else:
+                                                logging.warning("[recently_downloaded_movies] Plex '%s' (%s) NOT FOUND in Radarr - no TMDB ID",
+                                                                item['title'], plex_year)
+                                    else:
+                                        logging.warning("[recently_downloaded_movies] Radarr library cache was empty during enrichment")
+                                except Exception as e:
+                                    logging.error("[recently_downloaded_movies] Failed to enrich Plex items with TMDB IDs: %s", e, exc_info=True)
+                            else:
+                                logging.info("[recently_downloaded_movies] Radarr is DISABLED. Skipping Radarr enrichment of Plex items.")
+
+                            if plex_movie_map_dirty:
+                                _save_plex_movie_map(plex_movie_map)
+
+                            logging.info("[recently_downloaded_movies] Plex: returning %d items (source=plex). SUCCESS - not checking Radarr.", len(items))
+                            payload = {'items': items, 'type': 'movie', 'source': 'plex'}
+                            _save_recent_payload(recent_cache_name, payload)
+                            return jsonify(payload)
+                        else:
+                            logging.info("[recently_downloaded_movies] Plex returned 0 items. Proceeding to Radarr fallback.")
+
+                    except ET.ParseError as e:
+                        logging.error("[recently_downloaded_movies] XML parsing error: %s | Response preview: %s",
+                                    e, resp.content[:500])
+                        logging.info("[recently_downloaded_movies] Plex XML parse failed. Proceeding to Radarr fallback.")
+                else:
+                    logging.warning("[recently_downloaded_movies] Plex returned non-200 status: %s. Response: %s",
+                                  resp.status_code, resp.text[:200])
+                    logging.info("[recently_downloaded_movies] Plex request failed. Proceeding to Radarr fallback.")
+
+            except Exception as e:
+                logging.error("[recently_downloaded_movies] Plex error: %s", e, exc_info=True)
+                logging.info("[recently_downloaded_movies] Plex exception occurred. Proceeding to Radarr fallback.")
+        else:
+            logging.info("[recently_downloaded_movies] Plex is DISABLED. Skipping to Radarr fallback.")
+
+        # Fallback to Radarr (SECONDARY SOURCE)
+        logging.info("[recently_downloaded_movies] ========== RADARR/SONARR FALLBACK ==========")
+        if CONFIG.radarr.enabled:
+            logging.info("[recently_downloaded_movies] Radarr is ENABLED. Attempting Radarr call...")
+            try:
+                logging.info("[recently_downloaded_movies] Radarr URL: %s", CONFIG.radarr.url)
+                resp = requests.get(
+                    f"{CONFIG.radarr.url}/api/v3/movie",
+                    params={'apikey': CONFIG.radarr.api_key, 'sortKey': 'added', 'sortDirection': 'descending'},
+                    timeout=15
+                )
+                logging.info("[recently_downloaded_movies] Radarr response code: %s", resp.status_code)
+
+                if resp.status_code == 200:
+                    movies = resp.json()
+                    logging.info("[recently_downloaded_movies] Radarr returned %d total movies", len(movies))
+
+                    items = [
+                        {
+                            'id': m.get('id'),
+                            'tmdbId': m.get('tmdbId'),
+                            'title': m.get('title'),
+                            'poster': f"/api/img?url={quote(m.get('remotePoster', ''))}&w=150&h=225&t={quote(m.get('title', ''))}" if m.get('remotePoster') else '/static/images/apple-touch-icon.png',
+                            'hasFile': m.get('hasFile', False),
+                            'year': m.get('year'),
+                            'rating': m.get('ratings', {}).get('value', 'N/A')
+                        }
+                        for m in movies if m.get('hasFile')
+                    ][:20]
+                    logging.info("[recently_downloaded_movies] Radarr: filtered to %d movies with files. Returning from Radarr.", len(items))
+                    payload = {'items': items, 'type': 'movie', 'source': 'radarr'}
+                    _save_recent_payload(recent_cache_name, payload)
+                    return jsonify(payload)
+                else:
+                    logging.warning("[recently_downloaded_movies] Radarr returned non-200 status: %s", resp.status_code)
+            except Exception as e:
+                logging.warning("[recently_downloaded_movies] Radarr error: %s", e, exc_info=True)
+        else:
+            logging.info("[recently_downloaded_movies] Radarr is DISABLED. Skipping Radarr.")
+
+        logging.info("[recently_downloaded_movies] No data from Plex or Radarr. Returning empty list.")
+        fallback_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
+        if fallback_payload is not None:
+            return jsonify(fallback_payload)
+        return jsonify({'items': []})
+
+    @app.route('/api/recently-downloaded/tv')
+    @requires_auth
+    def get_recently_downloaded_tv():
+        """Fetch recently downloaded TV shows from Plex first, fallback to Sonarr"""
+        logging.info("[recently_downloaded_tv] ========== START REQUEST ==========")
+        from utils import load_media_cache, save_media_cache
+        recent_cache_name = 'recent_tv'
+
+        if _cached_only_requested():
+            cached_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
+            return jsonify(cached_payload or {'items': [], 'type': 'tv', 'source': 'cache'})
+
+        if not _refresh_requested():
+            cached_payload = _load_recent_payload(recent_cache_name, allow_stale=False)
+            if cached_payload is not None:
+                return jsonify(cached_payload)
+
+        def _normalize_series_title(value):
+            return _normalize_media_title(value)
+
+        def _load_plex_tv_map():
+            mapping, _ = load_media_cache('plex_tv_map')
+            return mapping if isinstance(mapping, dict) else {}
+
+        def _save_plex_tv_map(mapping):
+            save_media_cache('plex_tv_map', mapping)
+
+        def _cache_plex_match(mapping, item, tvdb_id=None, sonarr_id=None, reason='match'):
+            plex_key = str(item.get('id') or '').strip()
+            if not plex_key:
+                return False
+            current = mapping.get(plex_key, {})
+            updated = {
+                **current,
+                'title': item.get('title'),
+                'year': item.get('year'),
+                'tvdbId': tvdb_id or current.get('tvdbId'),
+                'sonarrId': sonarr_id or current.get('sonarrId'),
+                'updatedAt': time.time(),
+                'reason': reason,
+            }
+            changed = updated != current
+            mapping[plex_key] = updated
+            return changed
+
+        def _apply_cached_plex_match(mapping, item):
+            plex_key = str(item.get('id') or '').strip()
+            cached = mapping.get(plex_key) if plex_key else None
+            if not cached:
+                return False
+
+            cached_title = _normalize_series_title(cached.get('title'))
+            current_title = _normalize_series_title(item.get('title'))
+            cached_year = cached.get('year')
+            current_year = item.get('year')
+            title_matches = cached_title and cached_title == current_title
+            year_matches = _year_within_tolerance(cached_year, current_year, tolerance=1)
+
+            if title_matches and year_matches:
+                item['tvdbId'] = cached.get('tvdbId')
+                item['sonarrId'] = cached.get('sonarrId')
+                if item.get('tvdbId') or item.get('sonarrId'):
+                    logging.info("[recently_downloaded_tv] Plex '%s' restored from local cache -> TVDB %s / Sonarr %s",
+                                 item.get('title'), item.get('tvdbId'), item.get('sonarrId'))
+                    return True
+            return False
+
+        def _extract_plex_series_entries(root):
+            video_elements = [
+                video for video in root.findall('./Video')
+                if video.get('grandparentTitle') or video.get('type') == 'episode'
+            ]
+            directory_elements = root.findall('./Directory')
+            raw_entries = video_elements if video_elements else directory_elements
+            logging.info("[recently_downloaded_tv] Found %d %s elements in XML",
+                         len(raw_entries),
+                         'Video' if video_elements else 'Directory')
+
+            deduped = []
+            seen = set()
+            plex_base_url = CONFIG.plex.url.rstrip('/')
+
+            for raw in raw_entries:
+                show_title = (
+                    raw.get('grandparentTitle')
+                    or raw.get('parentTitle')
+                    or raw.get('originalTitle')
+                    or raw.get('title')
+                    or 'Unknown'
+                )
+                year = (
+                    raw.get('grandparentYear')
+                    or raw.get('parentYear')
+                    or raw.get('year')
+                    or ''
+                )
+                poster_ref = raw.get('grandparentThumb') or raw.get('parentThumb') or raw.get('thumb', '')
+                poster_url = f"{plex_base_url}{poster_ref}?X-Plex-Token={CONFIG.plex.token}" if poster_ref else ''
+                plex_key = (
+                    raw.get('grandparentRatingKey')
+                    or raw.get('parentRatingKey')
+                    or raw.get('ratingKey')
+                )
+                dedupe_key = (str(plex_key or ''), _normalize_series_title(show_title), str(year).strip())
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+
+                deduped.append({
+                    'id': plex_key,
+                    'sonarrId': None,
+                    'tvdbId': None,
+                    'title': show_title,
+                    'poster': f"/api/img?url={quote(poster_url)}&w=150&h=225&t={quote(show_title)}" if poster_url else '/static/images/apple-touch-icon.png',
+                    'year': year,
+                    'seasons': 0,
+                    'episodes': 0,
+                    'rating': raw.get('rating', 'N/A')
+                })
+
+            return deduped
+
+        plex_tv_map = _load_plex_tv_map()
+        plex_tv_map_dirty = False
+
+        # Try Plex first (PRIMARY SOURCE)
+        if CONFIG.plex.enabled:
+            logging.info("[recently_downloaded_tv] Plex is ENABLED. Attempting Plex call...")
+            logging.info("[recently_downloaded_tv] Plex URL: %s", CONFIG.plex.url)
+            logging.info("[recently_downloaded_tv] Plex token present: %s", bool(CONFIG.plex.token))
+
+            try:
+                plex_base_url = CONFIG.plex.url.rstrip('/')
+                plex_url = f"{plex_base_url}/library/recentlyAdded"
+                logging.info("[recently_downloaded_tv] Attempting Plex call to: %s", plex_url)
+
+                headers = {'X-Plex-Token': CONFIG.plex.token}
+                params = {'type': 2, 'limit': 50}  # type=2 for TV shows, limit to 50 (will be sliced to 20 items)
+
+                logging.info("[recently_downloaded_tv] Plex headers: %s", {'X-Plex-Token': '***REDACTED***'})
+                logging.info("[recently_downloaded_tv] Plex params: %s", params)
+
+                # Build the EXACT URL string that will be sent
+                from urllib.parse import urlencode
+                exact_url = f"{plex_url}?{urlencode(params)}"
+                logging.info("[recently_downloaded_tv] EXACT URL BEING SENT: %s", exact_url)
+
+                resp = requests.get(
+                    plex_url,
+                    headers=headers,
+                    params=params,
+                    timeout=15
+                )
+
+                # Log the actual URL that requests resolved
+                logging.info("[recently_downloaded_tv] ACTUAL REQUEST URL: %s", resp.request.url)
+                logging.info("[recently_downloaded_tv] Plex response status code: %s", resp.status_code)
+                logging.info("[recently_downloaded_tv] Plex response content-type: %s", resp.headers.get('Content-Type', 'unknown'))
+                logging.info("[recently_downloaded_tv] Plex response length: %d bytes", len(resp.content))
+
+                if resp.status_code == 200:
+                    try:
+                        import xml.etree.ElementTree as ET
+                        root = ET.fromstring(resp.content)
+                        logging.info("[recently_downloaded_tv] XML parsed successfully. Root tag: %s", root.tag)
+
+                        items = _extract_plex_series_entries(root)[:20]
+                        for idx, item in enumerate(items[:3]):
+                            plex_tv_map_dirty = _cache_plex_match(plex_tv_map, item, reason='plex-feed') or plex_tv_map_dirty
+                            _apply_cached_plex_match(plex_tv_map, item)
+                            logging.info("[recently_downloaded_tv] Plex item #%d: '%s' (ratingKey=%s, year=%s)",
+                                         idx + 1, item['title'], item.get('id'), item.get('year'))
+
+                        for item in items[3:]:
+                            plex_tv_map_dirty = _cache_plex_match(plex_tv_map, item, reason='plex-feed') or plex_tv_map_dirty
+                            _apply_cached_plex_match(plex_tv_map, item)
+
+                        # Plex success - enrich with TVDB IDs from Sonarr before returning
+                        if items:
+                            logging.info("[recently_downloaded_tv] Plex: found %d items. Looking up TVDB IDs in Sonarr...", len(items))
+
+                            # Get cached/current Sonarr series to match against Plex items by title/year
+                            if CONFIG.sonarr.enabled:
+                                try:
+                                    sonarr_series = get_cached_library('tv') or []
+                                    if sonarr_series:
+                                        logging.info("[recently_downloaded_tv] Sonarr has %d series for enrichment lookup", len(sonarr_series))
+
+                                        # Enrich Plex items with TVDB IDs from the known Sonarr library
+                                        for item in items:
+                                            if item.get('tvdbId') or item.get('sonarrId'):
+                                                continue
+                                            plex_year = item.get('year')
+                                            best_match = _best_cached_library_match('tv', item.get('title'), plex_year)
+
+                                            if best_match and (best_match.get('tvdbId') or best_match.get('id')):
+                                                item['tvdbId'] = best_match.get('tvdbId')
+                                                item['sonarrId'] = best_match.get('id')
+                                                plex_tv_map_dirty = _cache_plex_match(
+                                                    plex_tv_map, item, item.get('tvdbId'), item.get('sonarrId'), reason='series-list'
+                                                ) or plex_tv_map_dirty
+                                                logging.info("[recently_downloaded_tv] Plex '%s' (%s) MATCHED Sonarr -> TVDB %s / Sonarr %s",
+                                                             item['title'], plex_year, item.get('tvdbId'), item.get('sonarrId'))
+                                            else:
+                                                logging.warning("[recently_downloaded_tv] Plex '%s' (%s) NOT FOUND in Sonarr library cache - no TVDB ID",
+                                                                item['title'], plex_year)
+                                    else:
+                                        logging.warning("[recently_downloaded_tv] Sonarr cache/library list was empty during enrichment")
+                                except Exception as e:
+                                    logging.error("[recently_downloaded_tv] Failed to enrich Plex items with TVDB IDs: %s", e, exc_info=True)
+                            else:
+                                logging.info("[recently_downloaded_tv] Sonarr is DISABLED. Skipping Sonarr enrichment of Plex items.")
+
+                            if plex_tv_map_dirty:
+                                _save_plex_tv_map(plex_tv_map)
+
+                            logging.info("[recently_downloaded_tv] Plex: returning %d items (source=plex). SUCCESS - not checking Sonarr.", len(items))
+                            payload = {'items': items, 'type': 'tv', 'source': 'plex'}
+                            _save_recent_payload(recent_cache_name, payload)
+                            return jsonify(payload)
+                        else:
+                            logging.info("[recently_downloaded_tv] Plex returned 0 items. Proceeding to Sonarr fallback.")
+
+                    except ET.ParseError as e:
+                        logging.error("[recently_downloaded_tv] XML parsing error: %s | Response preview: %s",
+                                    e, resp.content[:500])
+                        logging.info("[recently_downloaded_tv] Plex XML parse failed. Proceeding to Sonarr fallback.")
+                else:
+                    logging.warning("[recently_downloaded_tv] Plex returned non-200 status: %s. Response: %s",
+                                  resp.status_code, resp.text[:200])
+                    logging.info("[recently_downloaded_tv] Plex request failed. Proceeding to Sonarr fallback.")
+
+            except Exception as e:
+                logging.error("[recently_downloaded_tv] Plex error: %s", e, exc_info=True)
+                logging.info("[recently_downloaded_tv] Plex exception occurred. Proceeding to Sonarr fallback.")
+        else:
+            logging.info("[recently_downloaded_tv] Plex is DISABLED. Skipping to Sonarr fallback.")
+
+        # Fallback to Sonarr (SECONDARY SOURCE)
+        logging.info("[recently_downloaded_tv] ========== RADARR/SONARR FALLBACK ==========")
+        if CONFIG.sonarr.enabled:
+            logging.info("[recently_downloaded_tv] Sonarr is ENABLED. Attempting Sonarr call...")
+            try:
+                logging.info("[recently_downloaded_tv] Sonarr URL: %s", CONFIG.sonarr.url)
+                resp = requests.get(
+                    f"{CONFIG.sonarr.url}/api/v3/series",
+                    params={'apikey': CONFIG.sonarr.api_key, 'sortKey': 'added', 'sortDirection': 'descending'},
+                    timeout=15
+                )
+                logging.info("[recently_downloaded_tv] Sonarr response code: %s", resp.status_code)
+
+                if resp.status_code == 200:
+                    series = resp.json()
+                    logging.info("[recently_downloaded_tv] Sonarr returned %d total series", len(series))
+
+                    items = [
+                        {
+                            'id': s.get('id'),
+                            'sonarrId': s.get('id'),
+                            'tvdbId': s.get('tvdbId'),
+                            'title': s.get('title'),
+                            'poster': f"/api/img?url={quote(s.get('remotePoster', ''))}&w=150&h=225&t={quote(s.get('title', ''))}" if s.get('remotePoster') else '/static/images/apple-touch-icon.png',
+                            'year': s.get('year'),
+                            'seasons': s.get('statistics', {}).get('seasonCount', 0),
+                            'episodes': s.get('statistics', {}).get('episodeFileCount', 0),
+                            'rating': s.get('ratings', {}).get('value', 'N/A')
+                        }
+                        for s in series if s.get('statistics', {}).get('episodeFileCount', 0) > 0
+                    ][:20]
+                    logging.info("[recently_downloaded_tv] Sonarr: filtered to %d series with episodes. Returning from Sonarr.", len(items))
+                    payload = {'items': items, 'type': 'tv', 'source': 'sonarr'}
+                    _save_recent_payload(recent_cache_name, payload)
+                    return jsonify(payload)
+                else:
+                    logging.warning("[recently_downloaded_tv] Sonarr returned non-200 status: %s", resp.status_code)
+            except Exception as e:
+                logging.warning("[recently_downloaded_tv] Sonarr error: %s", e, exc_info=True)
+        else:
+            logging.info("[recently_downloaded_tv] Sonarr is DISABLED. Skipping Sonarr.")
+
+        logging.info("[recently_downloaded_tv] No data from Plex or Sonarr. Returning empty list.")
+        fallback_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
+        if fallback_payload is not None:
+            return jsonify(fallback_payload)
+        return jsonify({'items': []})
+
+    @app.route('/api/recently-downloaded/books')
+    @requires_auth
+    def get_recently_downloaded_books():
+        """Fetch recently downloaded books from Readarr (Plex not supported for books)"""
+        recent_cache_name = 'recent_books'
+
+        if _cached_only_requested():
+            cached_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
+            return jsonify(cached_payload or {'items': [], 'type': 'book', 'source': 'cache'})
+
+        if not _refresh_requested():
+            cached_payload = _load_recent_payload(recent_cache_name, allow_stale=False)
+            if cached_payload is not None:
+                return jsonify(cached_payload)
+
+        if not CONFIG.readarr.enabled:
+            fallback_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
+            if fallback_payload is not None:
+                return jsonify(fallback_payload)
+            return jsonify({'items': []})
+
+        try:
+            books = get_cached_library('book') or []
+            # Return only books with files, limit to 20
+            items = [
+                {
+                    'id': b.get('id'),
+                    'foreignBookId': b.get('foreignBookId'),
+                    'title': b.get('title'),
+                    'author': b.get('authorTitle'),
+                    'poster': f"/api/book/cover/{b.get('id')}?w=150&h=225" if b.get('id') else '/static/images/apple-touch-icon.png',
+                    'year': b.get('releaseDate', '')[:4] if b.get('releaseDate') else 'N/A',
+                    'pages': b.get('pageCount', 0)
+                }
+                for b in books if b.get('statistics', {}).get('bookFileCount', 0) > 0
+            ][:20]
+
+            payload = {'items': items, 'type': 'book', 'source': 'readarr'}
+            _save_recent_payload(recent_cache_name, payload)
+            return jsonify(payload)
+        except Exception as e:
+            logging.error("[recently_downloaded_books] %s", e, exc_info=True)
+            fallback_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
+            if fallback_payload is not None:
+                return jsonify(fallback_payload)
+            return jsonify({'items': []})
 
     # ── Server Management API ──────────────────────────────────────────────────────
 

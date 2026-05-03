@@ -485,17 +485,26 @@ class SharedUtils:
             logging.error(f"[Sonarr] search error: {str(e)}", exc_info=True)
             return []
 
-    def add_to_radarr(self, tmdb_id, quality_profile_id=None):
+    def add_to_radarr(
+        self,
+        tmdb_id,
+        quality_profile_id=None,
+        root_folder_path=None,
+        minimum_availability='announced',
+        search_for_movie=True,
+        monitored=True
+    ):
         url = f"{self.config.radarr.url}/api/v3/movie"
         headers = {'Content-Type': 'application/json'}
-        # Use provided quality_profile_id or default from config
         qp_id = quality_profile_id if quality_profile_id is not None else self.config.radarr.quality_profile_id
+        root_folder = root_folder_path or self.config.radarr.root_folder
         payload = {
             'tmdbId': tmdb_id,
-            'monitored': True,
-            'rootFolderPath': self.config.radarr.root_folder,
+            'monitored': bool(monitored),
+            'rootFolderPath': root_folder,
             'qualityProfileId': qp_id,
-            'addOptions': {'searchForMovie': True}
+            'minimumAvailability': minimum_availability or 'announced',
+            'addOptions': {'searchForMovie': bool(search_for_movie)}
         }
         response = requests.post(
             url,
@@ -626,17 +635,21 @@ class SharedUtils:
             'monitored': False
         }
     
-    def get_sonarr_details(self, tvdb_id):
+    def get_sonarr_details(self, series_id, source='tvdb'):
         existing_url = f"{self.config.sonarr.url}/api/v3/series"
         existing = requests.get(existing_url, params={'apikey': self.config.sonarr.api_key}).json()
-        
-        source = "tmdb"
+
+        lookup_source = 'tmdb' if source == 'tmdb' else ('sonarr' if source == 'sonarr' else 'tvdb')
         for series in existing:
-            if str(series.get('tvdbId')) == str(tvdb_id):
-                source = "tvdb"
+            series_matches = (
+                str(series.get('tvdbId')) == str(series_id) or
+                (lookup_source == 'tmdb' and str(series.get('tmdbId')) == str(series_id)) or
+                (lookup_source == 'sonarr' and str(series.get('id')) == str(series_id))
+            )
+            if series_matches:
                 status_url = f"{self.config.sonarr.url}/api/v3/series/{series['id']}"
                 details = requests.get(status_url, params={'apikey': self.config.sonarr.api_key}).json()
-                
+
                 return {
                     'status': 'existing',
                     'data': details,
@@ -648,10 +661,12 @@ class SharedUtils:
                 }
         
         lookup_url = f"{self.config.sonarr.url}/api/v3/series/lookup"
-        lookup = requests.get(lookup_url, params={
-            'term': f'{source}:{tvdb_id}',
-            'apikey': self.config.sonarr.api_key
-        }).json()
+        lookup = []
+        if lookup_source != 'sonarr':
+            lookup = requests.get(lookup_url, params={
+                'term': f'{lookup_source}:{series_id}',
+                'apikey': self.config.sonarr.api_key
+            }).json()
         
         if lookup:
             return {
@@ -683,6 +698,7 @@ class SharedUtils:
             'backdrop_path': data.get('backdrop_path'),
             'vote_average': data.get('vote_average'),
             'genres': [g['name'] for g in data.get('genres', [])],
+            'belongs_to_collection': data.get('belongs_to_collection'),
             'first_air_date': data.get('first_air_date'),
             'last_air_date': data.get('last_air_date'),
             'status': data.get('status'),

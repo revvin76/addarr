@@ -16,150 +16,12 @@
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-    <style>
-        .filter-tabs {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            margin-bottom: 1rem;
-        }
-
-        .filter-tabs .btn {
-            font-size: 0.85rem;
-            padding: 0.4rem 0.8rem;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-        }
-
-        .filter-tabs .btn-outline-secondary {
-            color: #6c757d;
-            border-color: #6c757d;
-        }
-
-        .filter-tabs .btn-outline-secondary:hover {
-            background-color: #6c757d;
-            color: white;
-        }
-
-        .filter-tabs .btn.active {
-            background-color: #0d6efd;
-            color: white;
-            border-color: #0d6efd;
-        }
-
-        /* Disabled button styling */
-        .filter-tabs .btn:disabled,
-        .subcategory-buttons .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            background-color: #6c757d;
-            color: #999;
-            border-color: #6c757d;
-        }
-
-        .filter-tabs .btn:disabled:hover,
-        .subcategory-buttons .btn:disabled:hover {
-            background-color: #6c757d;
-            color: #999;
-        }
-
-        .subcategory-buttons {
-            display: none;
-            margin-bottom: 1rem;
-        }
-
-        .subcategory-buttons.show {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .media-toggle-group {
-            display: flex;
-            gap: 0;
-            margin-bottom: 1rem;
-        }
-
-        .media-toggle-group .btn {
-            border-radius: 4px;
-            font-size: 0.9rem;
-            padding: 0.5rem 1rem;
-        }
-
-        .media-toggle-group .btn-outline-secondary {
-            margin-right: 0.5rem;
-        }
-
-        .filter-section {
-            background-color: rgba(255, 255, 255, 0.03);
-            border-radius: 6px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-            transition: max-height 0.3s ease, opacity 0.3s ease;
-        }
-
-        .filter-section.collapsed {
-            max-height: 50px;
-            overflow: hidden;
-            opacity: 0.7;
-        }
-
-        .filter-section.expanded {
-            max-height: none;
-            opacity: 1;
-        }
-
-        .filter-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .filter-header-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: #adb5bd;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .filter-toggle-btn {
-            background: none;
-            border: none;
-            color: #6c757d;
-            cursor: pointer;
-            padding: 0.25rem 0.5rem;
-            transition: color 0.2s ease;
-            font-size: 1rem;
-        }
-
-        .filter-toggle-btn:hover {
-            color: #0d6efd;
-        }
-
-        .filter-content {
-            display: block;
-            transition: max-height 0.3s ease, opacity 0.3s ease;
-            overflow: hidden;
-        }
-
-        .filter-section.collapsed .filter-content {
-            max-height: 0;
-            opacity: 0;
-        }
-
-        .filter-label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #adb5bd;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 0.5rem;
-        }
-    </style>
-
     <script>
+    const trendingModuleAvailability = {
+        radarr: {{ 'true' if config.radarr.enabled else 'false' }},
+        sonarr: {{ 'true' if config.sonarr.enabled else 'false' }}
+    };
+
         if (typeof showDetails === 'undefined') {
             window.showDetails = function(mediaType, mediaId, tmdbOnly = false) {
                 console.warn('showDetails not yet loaded from main.js');
@@ -218,7 +80,7 @@
                 <!-- Main Category Tabs -->
                 <div class="mb-3">
                     <div class="filter-label">Main Category</div>
-                    <div class="filter-tabs" id="categoryTabs">
+                    <div class="filter-tabs trending-filter-tabs" id="categoryTabs">
                         <button class="btn btn-outline-secondary active" data-category="trending" title="Trending content">
                             <i class="fas fa-fire me-2"></i>Trending
                         </button>
@@ -269,75 +131,61 @@
             <p class="text-muted mt-2">Loading content...</p>
         </div>
 
-        <div class="row" id="mediaGrid">
+        <section class="results-list trending-results-list" id="mediaGrid">
             <!-- Movies -->
             {% if content_type in ['movie', 'all'] and trending_data.movies %}
                 {% for movie in trending_data.movies %}
-                <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="movie">
-                    <div class="search-result-card h-100 movie-card"
+                <article class="result-item results-listing results-listing--movie"
                          data-media-type="movie"
                          data-media-id="{{ movie.id }}"
                          onclick="showDetails('movie', {{ movie.id }})">
-                        <div class="search-result-thumbnail-container">
+                        <div class="results-listing__poster-wrap search-result-thumbnail-container">
                             <img src="{% if movie.poster_path %}{{ ('https://image.tmdb.org/t/p/w342' + movie.poster_path) | imgproxy(174, 261, movie.title) }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
-                                class="search-result-thumbnail" alt="{{ movie.title }}"
+                                class="results-listing__poster search-result-thumbnail" alt="{{ movie.title }}"
                                 onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                            <div class="fade-overlay"></div>
                         </div>
-                        <div class="search-result-content">
-                            <h6 class="text-white truncate">{{ movie.title }}</h6>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-xs text-muted">{{ movie.release_date[:4] if movie.release_date else 'N/A' }}</span>
-                                <span class="badge bg-warning text-dark">
+                        <div class="results-listing__body">
+                            <h2 class="results-listing__title">{{ movie.title }}</h2>
+                            <div class="results-listing__meta">
+                                <span class="results-listing__year">{{ movie.release_date[:4] if movie.release_date else 'N/A' }}</span>
+                                <span class="status-badge results-listing__status">Checking...</span>
+                                <span class="results-listing__rating">
                                     <i class="fas fa-star me-1"></i>{{ "%.1f"|format(movie.vote_average) }}
                                 </span>
                             </div>
-                            <div class="media-status-section d-flex justify-content-between align-items-center mt-2 gap-2">
-                                <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
-                                <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
+                            <p class="results-listing__overview">{{ movie.overview or 'No overview available.' }}</p>
                         </div>
-                    </div>
-                </div>
+                </article>
                 {% endfor %}
             {% endif %}
 
             <!-- TV Shows -->
             {% if content_type in ['tv', 'all'] and trending_data.tv_shows %}
                 {% for show in trending_data.tv_shows %}
-                <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="tv">
-                    <div class="search-result-card h-100 tv-card"
+                <article class="result-item results-listing results-listing--tv"
                          data-media-type="tv"
                          data-media-id="{{ show.id }}"
                          onclick="showDetails('tv', {{ show.id }}, true)">
-                        <div class="search-result-thumbnail-container">
+                        <div class="results-listing__poster-wrap search-result-thumbnail-container">
                             <img src="{% if show.poster_path %}{{ ('https://image.tmdb.org/t/p/w342' + show.poster_path) | imgproxy(174, 261, show.name) }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
-                                class="search-result-thumbnail" alt="{{ show.name }}"
+                                class="results-listing__poster search-result-thumbnail" alt="{{ show.name }}"
                                 onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                            <div class="fade-overlay"></div>
                         </div>
-                        <div class="search-result-content">
-                            <h6 class="text-white truncate">{{ show.name }}</h6>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-xs text-muted">{{ show.first_air_date[:4] if show.first_air_date else 'N/A' }}</span>
-                                <span class="badge bg-warning text-dark">
+                        <div class="results-listing__body">
+                            <h2 class="results-listing__title">{{ show.name }}</h2>
+                            <div class="results-listing__meta">
+                                <span class="results-listing__year">{{ show.first_air_date[:4] if show.first_air_date else 'N/A' }}</span>
+                                <span class="status-badge results-listing__status">Checking...</span>
+                                <span class="results-listing__rating">
                                     <i class="fas fa-star me-1"></i>{{ "%.1f"|format(show.vote_average) }}
                                 </span>
                             </div>
-                            <div class="media-status-section d-flex justify-content-between align-items-center mt-2 gap-2">
-                                <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
-                                <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
+                            <p class="results-listing__overview">{{ show.overview or 'No overview available.' }}</p>
                         </div>
-                    </div>
-                </div>
+                </article>
                 {% endfor %}
             {% endif %}
-        </div>
+        </section>
 
         {% if not (trending_data.movies or trending_data.tv_shows) %}
         <div class="alert alert-info text-center mt-4">
@@ -533,16 +381,27 @@
         const deleteBtn = card.querySelector('.delete-btn');
         if (!badge) return;
 
+        if ((mediaType === 'movie' && !trendingModuleAvailability.radarr) ||
+            (mediaType === 'tv' && !trendingModuleAvailability.sonarr)) {
+            badge.textContent = mediaType === 'movie' ? 'Radarr Off' : 'Sonarr Off';
+            badge.className = 'status-badge results-listing__status is-available';
+            card.dataset.libraryState = 'disabled';
+            if (deleteBtn) deleteBtn.style.display = 'none';
+            return;
+        }
+
         if (info && info.in_library) {
             const stats    = info.statistics || {};
             const isOnDisk = mediaType === 'movie' ? (info.hasFile || false) : (stats.episodeFileCount || 0) > 0;
             if (isOnDisk) {
                 badge.textContent = mediaType === 'tv'
                     ? `[${stats.episodeFileCount}/${stats.episodeCount} eps]` : 'On Disk';
-                badge.className = 'status-badge text-xs badge text-bg-success';
+                badge.className = 'status-badge results-listing__status is-library';
+                card.dataset.libraryState = 'in_library';
             } else {
                 badge.textContent = 'Missing';
-                badge.className   = 'status-badge text-xs badge text-bg-danger';
+                badge.className   = 'status-badge results-listing__status is-missing';
+                card.dataset.libraryState = 'missing';
             }
             if (deleteBtn) {
                 deleteBtn.style.display     = 'block';
@@ -552,7 +411,8 @@
             }
         } else {
             badge.textContent = 'Not Added';
-            badge.className   = 'status-badge text-xs badge bg-secondary';
+            badge.className   = 'status-badge results-listing__status is-available';
+            card.dataset.libraryState = 'not_added';
             if (deleteBtn) deleteBtn.style.display = 'none';
         }
     }
@@ -563,16 +423,25 @@
         function showStatusBar(msg) { statusBar.style.setProperty('display', 'flex', 'important'); statusMsg.textContent = msg; }
         function hideStatusBar()    { statusBar.style.setProperty('display', 'none', 'important'); }
 
-        const cards    = [...document.querySelectorAll('.search-result-card')];
+        const cards    = [...document.querySelectorAll('#mediaGrid .result-item')];
         const movieIds = [], tvIds = [];
 
         cards.forEach(card => {
             const mt = card.dataset.mediaType, id = card.dataset.mediaId;
             if (!mt || !id) return;
-            if (mt === 'movie') movieIds.push(id);
-            else if (mt === 'tv') tvIds.push(id);
+            if (mt === 'movie') {
+                if (trendingModuleAvailability.radarr) movieIds.push(id);
+                else applyCardStatus(card, mt, null);
+            } else if (mt === 'tv') {
+                if (trendingModuleAvailability.sonarr) tvIds.push(id);
+                else applyCardStatus(card, mt, null);
+            }
         });
-        if (!movieIds.length && !tvIds.length) return;
+        if (!movieIds.length && !tvIds.length) {
+            applyFilters();
+            hideStatusBar();
+            return;
+        }
 
         showStatusBar(`Checking library status for ${movieIds.length + tvIds.length} titles…`);
         const params = new URLSearchParams();
@@ -638,33 +507,26 @@
                 const imageUrl = posterPath ? `/api/img?url=https://image.tmdb.org/t/p/w342${posterPath}&w=174&h=261&t=${encodeURIComponent(title)}` : '/static/images/apple-touch-icon.png';
 
                 return `
-                    <div class="col-6 col-md-4 col-lg-12 mb-3 result-item" data-media-type="${currentState.media}">
-                        <div class="search-result-card h-100 ${isMovie ? 'movie-card' : 'tv-card'}"
+                    <article class="result-item results-listing results-listing--${isMovie ? 'movie' : 'tv'}"
                              data-media-type="${currentState.media}"
                              data-media-id="${item.id}"
                              onclick="showDetails('${currentState.media}', ${item.id}${!isMovie ? ', true' : ''})">
-                            <div class="search-result-thumbnail-container">
-                                <img src="${imageUrl}" class="search-result-thumbnail" alt="${title}"
-                                    onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                                <div class="fade-overlay"></div>
-                            </div>
-                            <div class="search-result-content">
-                                <h6 class="text-white truncate">${title}</h6>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-xs text-muted">${year}</span>
-                                    <span class="badge bg-warning text-dark">
-                                        <i class="fas fa-star me-1"></i>${(item.vote_average || 0).toFixed(1)}
-                                    </span>
-                                </div>
-                                <div class="media-status-section d-flex justify-content-between align-items-center mt-2 gap-2">
-                                    <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
-                                    <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
+                        <div class="results-listing__poster-wrap search-result-thumbnail-container">
+                            <img src="${imageUrl}" class="results-listing__poster search-result-thumbnail" alt="${title}"
+                                onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
                         </div>
-                    </div>
+                        <div class="results-listing__body">
+                            <h2 class="results-listing__title">${title}</h2>
+                            <div class="results-listing__meta">
+                                <span class="results-listing__year">${year}</span>
+                                <span class="status-badge results-listing__status">Checking...</span>
+                                <span class="results-listing__rating">
+                                    <i class="fas fa-star me-1"></i>${(item.vote_average || 0).toFixed(1)}
+                                </span>
+                            </div>
+                            <p class="results-listing__overview">${item.overview || 'No overview available.'}</p>
+                        </div>
+                    </article>
                 `;
             }).join('');
 
@@ -690,9 +552,8 @@
                 if (text === 'Checking...') {
                     statusOk = true;
                 } else {
-                    const inLib = badge &&
-                        (badge.classList.contains('text-bg-success') ||
-                         badge.classList.contains('text-bg-danger'));
+                    const state = item.dataset.libraryState || 'checking';
+                    const inLib = state === 'in_library' || state === 'missing';
                     statusOk = statusVal === 'status_in_library' ? inLib : !inLib;
                 }
             }

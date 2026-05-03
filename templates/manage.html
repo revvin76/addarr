@@ -3,53 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Media - Addarr</title>
+    <title>Manage {{ view_label }} - Addarr</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/styles.css" rel="stylesheet">
-    <link href="/static/css/manage-page.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        /* ── A-Z navigation ── */
-        #azLetters { display: none; flex-wrap: wrap; gap: 4px; }
-        #azLetters.open { display: flex; }
-        .az-btn {
-            background: #2a2a2a; border: 1px solid #3a3a3a; color: #bbb;
-            border-radius: 4px; padding: 3px 7px; font-size: 0.7rem;
-            cursor: pointer; line-height: 1.4;
-        }
-        .az-btn:hover:not([disabled]) { background: #3a3a3a; color: #fff; border-color: #555; }
-        .az-btn[disabled] { opacity: 0.22; cursor: default; }
-        #azToggle.az-active { border-color: #6ab759; color: #6ab759; }
-    </style>
     <script>
-    // Sequential batch image loader — 20 at a time.
     function startProgressiveLoading() {
         const items = [...document.querySelectorAll('.media-item')];
         if (!items.length) return;
         let batchStart = 0;
-        const BATCH = 20;
+        const BATCH = 16;
+
         function loadBatch() {
             const slice = items.slice(batchStart, batchStart + BATCH);
             if (!slice.length) return;
             batchStart += BATCH;
-            const promises = slice.map(item => {
-                const img = item.querySelector('.search-result-thumbnail');
-                if (!img) return Promise.resolve();
-                const src = img.getAttribute('data-src');
-                if (!src) return Promise.resolve();
-                if (img.src && img.src.endsWith(src)) return Promise.resolve();
-                return new Promise(resolve => {
-                    img.onload  = resolve;
-                    img.onerror = resolve;
-                    img.src = src;
-                });
-            });
+
+            const promises = slice.flatMap(item =>
+                [...item.querySelectorAll('img[data-src]')].map(img => {
+                    const src = img.getAttribute('data-src');
+                    if (!src || img.dataset.loaded === 'true') return Promise.resolve();
+                    return new Promise(resolve => {
+                        img.onload = () => {
+                            img.dataset.loaded = 'true';
+                            resolve();
+                        };
+                        img.onerror = () => {
+                            img.dataset.loaded = 'true';
+                            resolve();
+                        };
+                        img.src = src;
+                    });
+                })
+            );
+
             Promise.all(promises).then(loadBatch);
         }
+
         loadBatch();
     }
 
-    // ── A-Z quick navigation ─────────────────────────────────────────────────
     function buildAzNav() {
         const letters = document.getElementById('azLetters');
         if (!letters) return;
@@ -62,7 +55,7 @@
         });
         const chars = ['0', ...'abcdefghijklmnopqrstuvwxyz'];
         letters.innerHTML = chars.map(c => {
-            const label  = c === '0' ? '0–9' : c.toUpperCase();
+            const label = c === '0' ? '0-9' : c.toUpperCase();
             const active = used.has(c);
             return `<button class="az-btn" ${active ? `onclick="scrollToMediaLetter('${c}')"` : 'disabled'}>${label}</button>`;
         }).join('');
@@ -89,55 +82,39 @@
     }
     </script>
 </head>
-
-{% set current_page = 'manage' %}
-<body>
+<body class="manage-library-page{% if source_home and open_id %} manage-library-page--home-launch{% endif %}" data-manage-view="{{ manage_view }}" data-home-launch="{{ 'true' if source_home and open_id else 'false' }}">
     {% include 'partials/navbar.html' %}
 
-    <!-- ── Sticky controls header ── -->
-    <div class="page-sticky-controls" id="stickyControls">
-        <div class="container py-2">
-            <!-- Filter + Search row -->
-            <div class="row g-2 mb-2">
-                <div class="col-6">
-                    <div class="input-group input-group-sm">
-                        <button class="btn btn-primary btn-sm" type="button">
-                            <i class="fas fa-filter me-1"></i>
-                        </button>
-                        <select id="mediaFilter" class="form-select form-select-sm">
-                            <option value="all">All Media</option>
-                            <option value="movie">Movies Only</option>
-                            <option value="tv">TV Shows Only</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="input-group input-group-sm">
-                        <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Search media...">
-                        <button type="button" class="btn btn-outline-danger btn-sm" id="clearSearch" disabled>
-                            <i class="fas fa-times"></i>
-                        </button>
-                        <button class="btn btn-primary btn-sm" id="searchButton">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                </div>
+    <div class="page-sticky-controls manage-library-controls" id="stickyControls">
+        <div class="container manage-library-controls__inner">
+            <input type="hidden" id="mediaFilter" value="{{ manage_view }}">
+
+            <div class="manage-library-tabs" role="tablist" aria-label="{{ view_label }} filters">
+                <button class="manage-library-tab is-active" type="button" data-manage-filter="all">All</button>
+                <button class="manage-library-tab" type="button" data-manage-filter="missing">Missing</button>
+                <button class="manage-library-tab" type="button" data-manage-filter="available">
+                    {% if manage_view == 'movie' %}Available{% else %}Complete{% endif %}
+                </button>
+                <button class="manage-library-tab" type="button" data-manage-filter="unmonitored">Unmonitored</button>
             </div>
-            <!-- A-Z nav + back-to-top -->
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-sm btn-outline-secondary flex-shrink-0" id="azToggle" onclick="toggleAzNav()">
-                    <i class="fas fa-sort-alpha-down me-1"></i>A–Z
+
+            <div class="manage-library-searchbar">
+                <span class="manage-library-searchbar__icon"><i class="fas fa-magnifying-glass"></i></span>
+                <input type="text"
+                       id="searchInput"
+                       class="manage-library-searchbar__input"
+                       placeholder="Search the {{ media_total }} {{ 'movies' if manage_view == 'movie' else 'shows' }} in your library">
+                <button type="button" class="manage-library-searchbar__clear" id="clearSearch" disabled aria-label="Clear search">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="manage-library-toolbar">
+                <button class="btn btn-outline-secondary btn-sm flex-shrink-0" id="azToggle" type="button" onclick="toggleAzNav()">
+                    <i class="fas fa-arrow-down-a-z me-1"></i>A-Z
                 </button>
                 <div id="azLetters" class="flex-grow-1"></div>
-                <div class="input-group input-group-sm flex-shrink-0" style="max-width:220px;">
-                    <span class="input-group-text"><i class="fas fa-triangle-exclamation"></i></span>
-                    <select id="availabilityFilter" class="form-select form-select-sm">
-                        <option value="all">All Availability</option>
-                        <option value="movie_missing_file">Movies Missing Files</option>
-                        <option value="tv_missing_episodes">TV Missing Episodes</option>
-                    </select>
-                </div>
-                <button id="backToTop" class="btn btn-sm btn-outline-secondary btn-back-to-top"
+                <button id="backToTop" class="btn btn-outline-secondary btn-sm btn-back-to-top" type="button"
                         title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
                     <i class="fas fa-chevron-up"></i>
                 </button>
@@ -145,70 +122,108 @@
         </div>
     </div>
 
-    <!-- ── Media Grid ── -->
-    <div class="container mt-3">
-        <div class="row" id="mediaGrid">
-            {% for item in media %}
-                {% if item.media_type == 'movie' %}
-                    {% set item_id = item.tmdbId %}
-                {% elif item.media_type == 'book' %}
-                    {% set item_id = item.foreignBookId %}
-                {% else %}
-                    {% set item_id = item.tvdbId %}
-                {% endif %}
-                {% if item.media_type == 'tv' %}
-                    {% set ep_total = item.statistics.episodeCount or 0 %}
-                    {% set ep_got   = item.statistics.episodeFileCount or 0 %}
-                    {% set missing_ep = 'true' if ep_got < ep_total else 'false' %}
-                {% else %}
-                    {% set ep_total = 0 %}
-                    {% set ep_got   = 0 %}
-                    {% set missing_ep = 'false' %}
-                {% endif %}
-                <div class="col-6 col-md-4 col-lg-12 mb-3 media-item {{ item.media_type }}-item"
-                    data-title="{{ item.title|lower }}"
-                    data-id="{{ item_id }}"
-                    data-media-type="{{ item.media_type }}"
-                    data-missing-files="{{ 'true' if item.media_type == 'movie' and not item.hasFile else 'false' }}"
-                    data-missing-episodes="{{ missing_ep }}"
-                    onclick="showManageDetails('{{ item.media_type }}', '{{ item_id }}', {{ item.id }})">
+    <main class="manage-library-main">
+        <div class="container manage-library-shell">
+            <section class="manage-library-list" id="mediaGrid" aria-label="{{ view_label }} library">
+                {% for item in media %}
+                    {% if item.media_type == 'movie' %}
+                        {% set external_id = item.tmdbId %}
+                        {% set file_state = 'available' if item.hasFile else 'missing' %}
+                        {% set meta_secondary = item.quality or item.certification or item.status or 'Library' %}
+                        {% set runtime_label = (item.runtime ~ 'm') if item.runtime else '' %}
+                    {% else %}
+                        {% set external_id = item.tvdbId %}
+                        {% set ep_total = item.statistics.episodeCount or 0 %}
+                        {% set ep_got = item.statistics.episodeFileCount or 0 %}
+                        {% set file_state = 'available' if ep_total > 0 and ep_got >= ep_total else 'missing' %}
+                        {% set meta_secondary = item.status or ((item.statistics.seasonCount or 0) ~ ' seasons') %}
+                        {% set runtime_label = (ep_got ~ '/' ~ ep_total ~ ' eps') if ep_total else ((item.statistics.seasonCount or 0) ~ ' seasons') %}
+                    {% endif %}
 
-                    <div class="search-result-card manage-result-card h-100 {{ item.media_type }}-card">
-                        <!-- Poster -->
-                        <div class="search-result-thumbnail-container">
-                            <img data-src="{% if item.images and item.images[0].remoteUrl %}{{ item.images[0].remoteUrl | imgproxy(174, 261, item.title) }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
-                                 src="/static/images/placeholder.png"
-                                 class="search-result-thumbnail"
-                                 alt="{{ item.title }}"
-                                 onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                            <div class="fade-overlay"></div>
-                        </div>
+                    <article class="media-item {{ item.media_type }}-item"
+                             data-title="{{ item.title|lower }}"
+                             data-id="{{ external_id }}"
+                             data-internal-id="{{ item.id }}"
+                             data-media-type="{{ item.media_type }}"
+                             data-missing-files="{{ 'true' if item.media_type == 'movie' and not item.hasFile else 'false' }}"
+                             data-missing-episodes="{{ 'true' if item.media_type == 'tv' and file_state == 'missing' else 'false' }}"
+                             data-filter-state="{{ file_state }}"
+                             data-monitored="{{ 'true' if item.monitored else 'false' }}"
+                             onclick="showManageDetails('{{ item.media_type }}', '{{ external_id }}', {{ item.id }})">
 
-                        <!-- Card content: title, year, runtime/seasons + episode count -->
-                        <div class="search-result-content">
-                            <h6 class="text-white truncate">{{ item.title }}</h6>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-xs text-muted">{{ item.year }}</span>
-                                <span class="text-xs text-muted">
-                                    {% if item.media_type == 'movie' %}
-                                        {% if item.runtime %}{{ item.runtime }} min{% endif %}
-                                    {% else %}
-                                        {% if ep_total > 0 %}
-                                            [{{ ep_got }}/{{ ep_total }}]
-                                        {% else %}
-                                            {{ item.statistics.seasonCount }} seasons
+                        <div class="manage-library-card {{ item.media_type }}-card">
+                            <div class="manage-library-card__poster">
+                                <img data-src="{% if item.remotePoster %}{{ item.remotePoster | imgproxy(220, 330, item.title) }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
+                                     src="/static/images/placeholder.png"
+                                     class="manage-result-thumbnail manage-library-card__poster-img"
+                                     alt="{{ item.title }}"
+                                     onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
+                            </div>
+
+                            <div class="manage-library-card__body">
+                                <img data-src="{% if item.remotePoster %}{{ item.remotePoster | imgproxy(800, 450, item.title) }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
+                                     src="/static/images/placeholder.png"
+                                     class="manage-library-card__backdrop"
+                                     alt=""
+                                     aria-hidden="true"
+                                     onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
+                                <div class="manage-library-card__scrim"></div>
+
+                                <div class="manage-library-card__content">
+                                    <div class="manage-library-card__head">
+                                        <div class="manage-library-card__head-main">
+                                            <h2 class="manage-library-card__title">{{ item.title }}</h2>
+                                            <div class="manage-library-card__meta">
+                                                <span>{{ item.year or 'Unknown' }}</span>
+                                                <span>&bull;</span>
+                                                <span>{{ meta_secondary }}</span>
+                                                {% if item.certification %}
+                                                <span>&bull;</span>
+                                                <span>{{ item.certification }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <button class="manage-library-card__menu" type="button" aria-label="Open {{ item.title }} details"
+                                                onclick="event.stopPropagation(); showManageDetails('{{ item.media_type }}', '{{ external_id }}', {{ item.id }})">
+                                            <i class="fas fa-ellipsis-vertical"></i>
+                                        </button>
+                                    </div>
+
+                                    <div class="manage-library-card__stats">
+                                        <div class="manage-library-card__badges">
+                                            <span class="manage-library-stat">
+                                                <i class="fas fa-bookmark"></i>
+                                                <span>{{ 'Monitored' if item.monitored else 'Unmonitored' }}</span>
+                                            </span>
+                                            <span class="manage-library-stat">
+                                                <i class="fas {% if item.media_type == 'movie' %}fa-hard-drive{% else %}fa-clapperboard{% endif %}"></i>
+                                                <span>
+                                                    {% if item.media_type == 'movie' %}
+                                                        {{ item.sizeLabel or 'Missing file' }}
+                                                    {% else %}
+                                                        {{ (item.statistics.episodeFileCount or 0) ~ '/' ~ (item.statistics.episodeCount or 0) ~ ' episodes' }}
+                                                    {% endif %}
+                                                </span>
+                                            </span>
+                                            <span class="manage-library-stat manage-library-stat--ok">
+                                                <i class="fas fa-circle-check"></i>
+                                                <span>{{ 'Available' if file_state == 'available' else 'Missing' }}</span>
+                                            </span>
+                                        </div>
+
+                                        {% if runtime_label %}
+                                        <div class="manage-library-card__runtime">{{ runtime_label }}</div>
                                         {% endif %}
-                                    {% endif %}
-                                </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            {% endfor %}
+                    </article>
+                {% endfor %}
+            </section>
         </div>
-    </div>
+    </main>
 
-    <!-- Modal for confirmation -->
     <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -227,7 +242,6 @@
         </div>
     </div>
 
-    <!-- Modal for details -->
     <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -236,7 +250,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="detailsContent">
-                Loading...
+                    Loading...
                 </div>
             </div>
         </div>
@@ -245,10 +259,9 @@
     <div id="overlay-backdrop" class="overlay-backdrop"></div>
     <div id="modal-overlay-backdrop" class="overlay-backdrop modal-overlay-backdrop"></div>
 
-    <!-- Global Loading Spinner -->
     <div id="globalLoadingSpinner" class="loading-spinner">
         <div class="spinner-container">
-            <button id="forceCloseSpinner" class="btn-close btn-close-white mt-3" style="display: none;"></button>
+            <button id="forceCloseSpinner" class="btn-close btn-close-white force-close-spinner-hidden"></button>
             <div class="spinner-border spinner-radarr" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
@@ -257,7 +270,6 @@
     </div>
 
     <script>
-    // Register service worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/static/sw.js')
@@ -267,50 +279,67 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        // No initializeManageGrid() — library status is fetched when a detail modal opens
-        initializeClearSearch();
-        buildAzNav();
-        startProgressiveLoading();
+        const params = new URLSearchParams(window.location.search);
+        const openId = params.get('open');
+        const launchSource = params.get('source');
+        const openSource = params.get('openSource') || '';
+        const homeContext = {
+            plexId: params.get('plexId') || '',
+            plexTitle: params.get('plexTitle') || '',
+            plexYear: params.get('plexYear') || ''
+        };
+        const openType = params.get('view') || params.get('type') || '{{ manage_view }}';
+        const isHomeLaunch = launchSource === 'home' && !!openId;
 
-        const mediaFilter  = document.getElementById('mediaFilter');
-        const availabilityFilter = document.getElementById('availabilityFilter');
-        const searchButton = document.getElementById('searchButton');
-        if (mediaFilter)   mediaFilter.addEventListener('change', updateMediaDisplay);
-        if (availabilityFilter) availabilityFilter.addEventListener('change', updateMediaDisplay);
-        if (searchButton)  searchButton.addEventListener('click',  updateMediaDisplay);
+        if (!isHomeLaunch) {
+            // Normal manage page behavior
+            initializeClearSearch();
+            buildAzNav();
+            startProgressiveLoading();
 
-        updateMediaDisplay();
+            document.querySelectorAll('[data-manage-filter]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('[data-manage-filter]').forEach(tab => tab.classList.remove('is-active'));
+                    this.classList.add('is-active');
+                    updateMediaDisplay();
+                });
+            });
 
-        // Back-to-top visibility
+            updateMediaDisplay();
+        }
+
         window.addEventListener('scroll', function() {
-            document.getElementById('backToTop')
-                    .classList.toggle('show', window.pageYOffset > 200);
+            const backToTop = document.getElementById('backToTop');
+            if (backToTop) {
+                backToTop.classList.toggle('show', window.pageYOffset > 200);
+            }
         });
 
-        // ── Deep-link: /manage?open=<id>&type=<movie|tv> ─────────────────────
-        // Used by the "View in Library" button on trending/search detail modals.
-        const params   = new URLSearchParams(window.location.search);
-        const openId   = params.get('open');
-        const openType = params.get('type') || 'movie';
-        if (openId) {
-            const card = document.querySelector(`.media-item[data-id="${openId}"]`);
+        if (isHomeLaunch) {
+            const card = document.querySelector(`.media-item[data-id="${openId}"]`)
+                || (openSource === 'sonarr' ? document.querySelector(`.media-item[data-internal-id="${openId}"]`) : null);
+            const modalEl = document.getElementById('detailsModal');
+            if (modalEl) {
+                modalEl.addEventListener('hidden.bs.modal', function onHomeLaunchClose() {
+                    modalEl.removeEventListener('hidden.bs.modal', onHomeLaunchClose);
+                    window.location.href = '/';
+                });
+            }
+
             setTimeout(() => {
                 if (card) {
-                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     const mtype = card.dataset.mediaType || openType;
-                    const iid   = card.dataset.internalId || card.dataset.dbId || '';
-                    showManageDetails(mtype, openId, parseInt(iid) || iid);
+                    const iid = card.dataset.internalId || card.dataset.dbId || '';
+                    showManageDetails(mtype, openId, parseInt(iid) || iid, openSource, homeContext);
                 } else {
-                    showManageDetails(openType, openId, openId);
+                    showManageDetails(openType, openId, openId, openSource, homeContext);
                 }
-            }, 400);
+            }, 100);
         }
     });
     </script>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
 </body>
 </html>

@@ -78,7 +78,61 @@ document.addEventListener('DOMContentLoaded', () => {
         detailsModal.addEventListener('shown.bs.modal', _lockDetailsModalScroll);
         detailsModal.addEventListener('hidden.bs.modal', _unlockDetailsModalScroll);
     }
+
+    initAutoHideHeader();
 });
+
+function initAutoHideHeader() {
+    const topbar = document.getElementById('appTopbar');
+    if (!topbar) return;
+
+    let lastY = window.scrollY || 0;
+    let ticking = false;
+
+    const setHeaderHidden = (hidden) => {
+        document.body.classList.toggle('app-header-hidden', hidden);
+    };
+
+    const shouldKeepVisible = () => {
+        return (
+            (window.scrollY || 0) < 24 ||
+            document.body.classList.contains('settings-drawer-open') ||
+            document.body.classList.contains('restart-pending') ||
+            document.body.classList.contains('spinner-active')
+        );
+    };
+
+    const onScroll = () => {
+        const currentY = window.scrollY || 0;
+        const delta = currentY - lastY;
+        lastY = currentY;
+
+        if (shouldKeepVisible()) {
+            setHeaderHidden(false);
+            return;
+        }
+
+        if (Math.abs(delta) < 8) return;
+
+        if (delta > 0) {
+            setHeaderHidden(true);
+        } else {
+            setHeaderHidden(false);
+        }
+    };
+
+    window.addEventListener('scroll', () => {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                onScroll();
+                ticking = false;
+            });
+            ticking = true;
+        }
+    }, { passive: true });
+
+    setHeaderHidden(false);
+}
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -108,8 +162,15 @@ window.addEventListener('appinstalled', () => {
 // Global cache for quality profiles and selection state
 const _addItemCache = {
     qualityProfiles: null,
+    rootFolders: null,
     selectedQuality: {},
-    selectedSeason: {}
+    selectedSeason: {},
+    movieAddPrefs: {}
+};
+
+const _detailCache = {
+    manage: {},
+    tmdb: {}
 };
 
 function addItem(mediaType, mediaId) {
@@ -438,7 +499,7 @@ function showFullImage(src) {
                 <div class="modal-content bg-transparent border-0">
                     <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-2" 
                             data-bs-dismiss="modal" aria-label="Close"></button>
-                    <img src="${src}" class="img-fluid mx-auto d-block" alt="Full size" style="max-height: 90vh;">
+                    <img src="${src}" class="img-fluid mx-auto d-block full-image-preview" alt="Full size">
                 </div>
             </div>
         </div>`;
@@ -465,7 +526,7 @@ function showFullImage(src) {
     }, { once: true });
 }
 
-function showManageDetails(mediaType, externalId, internalId) {
+function showManageDetails(mediaType, externalId, internalId, lookupSource = '', homeContext = null) {
     _pauseBackgroundFetches();
     console.log('Showing details for:', mediaType, externalId, internalId);
     
@@ -473,18 +534,13 @@ function showManageDetails(mediaType, externalId, internalId) {
     const modal = new bootstrap.Modal(modalEl);
     const modalTitle = document.getElementById('detailsModalLabel');
     const overlay = document.getElementById('overlay-backdrop');
+    modalEl._homeLaunchContext = homeContext || modalEl._homeLaunchContext || null;
     
     // Show overlay
     overlay.style.display = 'block';
     
-    // Show loading spinner
-    document.getElementById('detailsContent').innerHTML = `
-        <div class="text-center my-4">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p>Loading details...</p>
-        </div>`;
+    setDetailsModalVariant(mediaType);
+    document.getElementById('detailsContent').innerHTML = renderDetailLoadingSkeleton(mediaType);
     
     // Set modal title based on media type
     const typeLabel = mediaType === 'tv' ? 'TV Show' : mediaType === 'book' ? 'Book' : 'Movie';
@@ -500,18 +556,44 @@ function showManageDetails(mediaType, externalId, internalId) {
     
     // Show the modal
     modal.show();
+
+    const cacheKey = `${mediaType}:${lookupSource || 'default'}:${externalId}`;
+    const cachedDetail = _detailCache.manage[cacheKey];
+    const tmdbCacheKey = mediaType === 'movie' ? `movie:${externalId}` : '';
+    const cachedTmdb = tmdbCacheKey ? _detailCache.tmdb[tmdbCacheKey] : null;
+
+    if (cachedDetail) {
+        populateManageModalDetails(cachedDetail, mediaType, internalId, cachedTmdb || null);
+    }
     
     // Fetch details from your backend
-    fetch(`/get_media_details?type=${mediaType}&id=${externalId}`)
+    const lookupQuery = lookupSource ? `&source=${encodeURIComponent(lookupSource)}` : '';
+    fetch(`/get_media_details?type=${mediaType}&id=${externalId}${lookupQuery}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
             return response.json();
         })
-        .then(data => {
-            // Populate the modal with the retrieved data
-            populateManageModalDetails(data, mediaType, internalId);
+        .then(async data => {
+            let tmdbData = null;
+            if (mediaType === 'movie' && externalId) {
+                try {
+                    if (cachedTmdb) {
+                        tmdbData = cachedTmdb;
+                    } else {
+                        const tmdbResponse = await fetch(`/get_tmdb_details?type=movie&id=${externalId}`);
+                        if (tmdbResponse.ok) {
+                            tmdbData = await tmdbResponse.json();
+                            _detailCache.tmdb[tmdbCacheKey] = tmdbData;
+                        }
+                    }
+                } catch (tmdbError) {
+                    console.warn('TMDB details unavailable for movie modal:', tmdbError);
+                }
+            }
+            _detailCache.manage[cacheKey] = data;
+            populateManageModalDetails(data, mediaType, internalId, tmdbData);
         })
         .catch(error => {
             console.error('Error fetching details:', error);
@@ -522,27 +604,115 @@ function showManageDetails(mediaType, externalId, internalId) {
         });
 }
 
+function renderDetailLoadingSkeleton(mediaType) {
+    const title = mediaType === 'tv' ? 'TV Show' : mediaType === 'book' ? 'Book' : 'Movie';
+    return `
+        <section class="movie-detail movie-detail--loading" aria-label="Loading ${title} details">
+            <div class="movie-detail__hero">
+                <div class="movie-detail__hero-bg movie-detail__skeleton-block"></div>
+                <div class="movie-detail__hero-overlay"></div>
+            </div>
+
+            <div class="movie-detail__sheet">
+                <div class="movie-detail__summary">
+                    <div class="movie-detail__poster-wrap">
+                        <div class="movie-detail__poster movie-detail__skeleton-block"></div>
+                    </div>
+                    <div class="movie-detail__headline">
+                        <div class="movie-detail__skeleton-line movie-detail__skeleton-line--sm"></div>
+                        <div class="movie-detail__skeleton-line movie-detail__skeleton-line--title"></div>
+                        <div class="movie-detail__meta-row movie-detail__meta-row--loading">
+                            <span class="movie-detail__skeleton-pill"></span>
+                            <span class="movie-detail__skeleton-pill"></span>
+                            <span class="movie-detail__skeleton-pill"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="movie-detail__actions movie-detail__actions--loading">
+                    <div class="movie-detail__action movie-detail__skeleton-block"></div>
+                    <div class="movie-detail__action movie-detail__skeleton-block"></div>
+                    <div class="movie-detail__action movie-detail__skeleton-block"></div>
+                </div>
+
+                <div class="movie-detail__divider"></div>
+
+                <div class="movie-detail__file-card movie-detail__skeleton-block movie-detail__skeleton-card"></div>
+
+                <div class="movie-detail__overview movie-detail__overview--loading">
+                    <div class="movie-detail__skeleton-line"></div>
+                    <div class="movie-detail__skeleton-line"></div>
+                    <div class="movie-detail__skeleton-line movie-detail__skeleton-line--lg"></div>
+                </div>
+            </div>
+        </section>`;
+}
+
+async function parseApiResponse(response) {
+    const text = await response.text();
+    let data = {};
+
+    try {
+        data = text ? JSON.parse(text) : {};
+    } catch (error) {
+        const snippet = text ? text.slice(0, 120).replace(/\s+/g, ' ').trim() : `HTTP ${response.status}`;
+        throw new Error(`Unexpected response from server (${response.status}): ${snippet}`);
+    }
+
+    return { ok: response.ok, data };
+}
+
 // Function to populate modal with details for manage page
-function populateManageModalDetails(data, mediaType, internalId) {
+function setDetailsModalVariant(variant) {
+    const modalEl = document.getElementById('detailsModal');
+    if (!modalEl) return;
+    modalEl.classList.remove('details-modal--movie');
+    if (variant) {
+        modalEl.classList.add('details-modal--movie');
+    }
+}
+
+function populateManageModalDetails(data, mediaType, internalId, tmdbData = null) {
     const detailsContent = document.getElementById('detailsContent');
 
     // Extract the actual media data
     const mediaData = data.data || data;
 
     if (mediaType === 'movie') {
-        renderMovieDetails(mediaData, data, mediaType, internalId);
+        setDetailsModalVariant('movie');
+        renderMovieDetails(mediaData, data, mediaType, internalId, tmdbData);
     } else if (mediaType === 'book') {
+        setDetailsModalVariant('book');
         renderBookDetails(mediaData, data, mediaType, internalId);
     } else {
-        renderTVDetails(mediaData, data, mediaType, internalId);
+        setDetailsModalVariant('tv');
+        renderTVDetails(mediaData, data, mediaType, internalId, tmdbData);
     }
+}
+
+function buildDetailTrailerSection(trailerKey, title) {
+    if (!trailerKey) return '';
+    return `
+        <section class="movie-detail__section">
+            <h3 class="movie-detail__section-title">Trailer</h3>
+            <div class="movie-detail__embed ratio ratio-16x9">
+                <iframe src="https://www.youtube.com/embed/${trailerKey}?rel=0&modestbranding=1"
+                        title="${title} trailer"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen>
+                </iframe>
+            </div>
+        </section>`;
 }
 
 function renderBookDetails(mediaData, fullData, mediaType, internalId) {
     const detailsContent = document.getElementById('detailsContent');
 
     const posterImage = mediaData.images?.find(img => img.coverType === 'poster' || img.coverType === 'cover');
-    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 300, 450, mediaData.title);
+    const posterSource = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
+    const posterUrl = imgProxy(posterSource, 300, 450, mediaData.title);
+    const backdropUrl = imgProxy(posterSource || '/static/images/apple-touch-icon.png', 1280, 720, mediaData.title);
 
     const author = mediaData.author?.authorName || 'Unknown Author';
     const releaseYear = mediaData.releaseDate ? mediaData.releaseDate.substring(0, 4) : 'N/A';
@@ -553,6 +723,10 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
         : 'N/A';
     const onDisk = fullData.on_disk || false;
     const monitored = fullData.monitored || false;
+    const pathLabel = mediaData.path || 'N/A';
+    const addedDate = mediaData.added ? formatReadableDate(mediaData.added) : 'Unknown';
+    const formatLabel = mediaData.format || mediaData.fileType || 'Library';
+    const hasMetadataEditor = typeof window.triggerImport === 'function';
 
     // Bookmark info from localStorage (key matches epub reader's BM_KEY)
     const bmId   = internalId || mediaData.id;
@@ -567,9 +741,8 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
             ? (() => { const [pg, total] = bmPage.split('/'); return `Bookmarked at page ${pg} of ${total} — click to remove`; })()
             : 'Bookmarked — click to remove';
         bmBadge = `<button id="bmRemoveBtn"
-            class="badge border-0 me-1"
+            class="badge border-0 me-1 bookmark-remove-btn"
             data-bm-id="${bmId}"
-            style="background:#f39c12;color:#000;cursor:pointer;"
             title="${bmTitle}"
             onclick="(function(){
                 localStorage.removeItem('epub_bm_${bmId}');
@@ -582,484 +755,718 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
     }
 
     const html = `
-        <div class="row mb-3">
-            <div class="col-4 pe-0">
-                <img src="${posterUrl}"
-                     class="img-fluid rounded w-100"
+        <section class="movie-detail movie-detail--book">
+            <div class="movie-detail__hero">
+                <img src="${backdropUrl}"
+                     class="movie-detail__hero-bg"
                      alt="${mediaData.title}"
-                     onerror="this.src='/static/images/favicon.png'"
-                     style="max-width: 120px;">
+                     onerror="this.src='${posterUrl}'">
+                <div class="movie-detail__hero-overlay"></div>
+                <button type="button" class="movie-detail__back" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
             </div>
-            <div class="col-8 ps-2">
-                <h4 class="mb-1">${mediaData.title || 'Unknown Title'}</h4>
-                <div class="text-muted mb-1" style="font-size:0.9rem;">${author}</div>
-                <div class="d-flex align-items-center flex-wrap mb-2">
-                    <span class="me-2">${releaseYear}</span>
-                    ${pageCount ? `<span>${pageCount}</span>` : ''}
+
+            <div class="movie-detail__sheet">
+                <div class="movie-detail__summary">
+                    <div class="movie-detail__poster-wrap">
+                        <img src="${posterUrl}"
+                             class="movie-detail__poster"
+                             alt="${mediaData.title}"
+                             onerror="this.src='/static/images/favicon.png'">
+                    </div>
+                    <div class="movie-detail__headline">
+                        <div class="movie-detail__subtitle">${author}</div>
+                        <h2 class="movie-detail__title">${mediaData.title || 'Unknown Title'}</h2>
+                        <div class="movie-detail__meta-row">
+                            <span>${releaseYear}</span>
+                            ${pageCount ? `<span>${pageCount}</span>` : ''}
+                            <span>${onDisk ? 'Downloaded' : 'Missing'}</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="d-flex flex-wrap gap-1 mb-2">
-                    <span class="badge ${onDisk ? 'bg-success' : 'bg-warning'}">
-                        ${onDisk ? 'Downloaded' : 'Missing'}
-                    </span>
-                    <span class="badge ${monitored ? 'bg-success' : 'bg-secondary'}">
-                        ${monitored ? 'Monitored' : 'Not Monitored'}
-                    </span>
-                    ${bmBadge}
-                </div>
-            </div>
-        </div>
 
-        <div class="card bg-dark border-secondary mb-3">
-            <div class="card-header"><h6 class="mb-0">BOOK DETAILS</h6></div>
-            <div class="card-body p-2">
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Author</strong></div>
-                    <div class="col-8">${author}</div>
-                </div>
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Published</strong></div>
-                    <div class="col-8">${mediaData.releaseDate ? mediaData.releaseDate.substring(0, 10) : 'N/A'}</div>
-                </div>
-                ${pageCount ? `
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Pages</strong></div>
-                    <div class="col-8">${mediaData.pageCount}</div>
-                </div>` : ''}
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Size on Disk</strong></div>
-                    <div class="col-8">${sizeOnDisk}</div>
-                </div>
-                ${mediaData.path ? `
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Path</strong></div>
-                    <div class="col-8"><code class="text-wrap d-block" style="font-size:0.8rem;">${mediaData.path}</code></div>
-                </div>` : ''}
-            </div>
-        </div>
-
-        ${overview ? `
-        <div class="card bg-dark border-secondary mb-3">
-            <div class="card-header"><h6 class="mb-0">OVERVIEW</h6></div>
-            <div class="card-body p-2">
-                <p class="mb-0" style="font-size:0.9rem;">${overview}</p>
-            </div>
-        </div>` : ''}
-
-        ${onDisk && mediaData.id ? `
-        <a href="/read/${mediaData.id}" class="btn btn-success w-100 mb-2" target="_blank">
-            <i class="fas fa-book-open me-2"></i>Read Now
-        </a>` : ''}
-    `;
-
-    detailsContent.innerHTML = html;
-}
-
-
-function renderMovieDetails(mediaData, fullData, mediaType, internalId) {
-    const detailsContent = document.getElementById('detailsContent');
-
-    // Get poster image
-    const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
-    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 300, 450, mediaData.title);
-
-    // Format runtime
-    const runtime = mediaData.runtime ? `${Math.floor(mediaData.runtime / 60)}h ${mediaData.runtime % 60}m` : 'N/A';
-    
-    // Format file size
-    const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
-    
-    // Get quality information
-    const quality = mediaData.movieFile?.quality?.quality?.name || 'Unknown';
-    
-    // Get file information
-    const movieFile = mediaData.movieFile;
-    const relativePath = movieFile?.relativePath || 'No file downloaded';
-    
-    const html = `
-        <!-- Poster and Basic Info Row -->
-        <div class="row mb-3">
-            <!-- Poster Column - Fixed Width -->
-            <div class="col-4 pe-0">
-                <img src="${posterUrl}" 
-                     class="img-fluid rounded w-100" 
-                     alt="${mediaData.title}"
-                     onerror="this.src='/static/images/favicon.png'"
-                     style="max-width: 120px;">
-            </div>
-            
-            <!-- Title and Details Column -->
-            <div class="col-8 ps-2">
-                <h4 class="mb-1">${mediaData.title || 'Unknown Title'}</h4>
-                <div class="d-flex align-items-center flex-wrap mb-2">
-                    ${mediaData.certification ? `<span class="badge bg-dark me-1">${mediaData.certification}</span>` : ''}
-                    <span class="me-1">${mediaData.year || ''}</span>
-                    <span class="">${runtime}</span>
-                </div>
-                
-                <!-- Status Badges -->
-                <div class="d-flex flex-wrap gap-1 mb-2">
-                    <span class="badge ${fullData.on_disk ? 'bg-success' : 'bg-warning'}">
-                        ${fullData.on_disk ? 'Downloaded' : 'Missing'}
-                    </span>
-                    <span class="badge ${fullData.monitored ? 'bg-success' : 'bg-secondary'}">
-                        ${fullData.monitored ? 'Monitored' : 'Not Monitored'}
-                    </span>
-                    ${mediaData.status ? `<span class="badge bg-info">${mediaData.status}</span>` : ''}
-                </div>
-            </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="row mb-3">
-            <div class="col-12">
-                <div class="d-grid gap-2 d-flex flex-wrap">
-                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle"
-                            data-type="${mediaType}"
-                            data-id="${internalId}"
-                            data-monitored="${fullData.monitored}"
-                            data-has-missing="${!fullData.on_disk}">
-                        ${fullData.monitored ? 'Unmonitor' : 'Monitor'}
-                    </button>
-                    ${fullData.monitored && !fullData.on_disk ? `
-                    <button class="btn btn-primary flex-fill search-btn"
-                            data-type="${mediaType}"
-                            data-id="${internalId}">
-                        <i class="fas fa-bolt me-1"></i> Auto Search
-                    </button>
-                    <button class="btn btn-outline-info flex-fill interactive-search-btn"
-                            data-type="${mediaType}"
-                            data-id="${internalId}">
-                        <i class="fas fa-list me-1"></i> Choose Source
+                <div class="movie-detail__actions movie-detail__actions--book">
+                    ${onDisk && mediaData.id ? `
+                    <a href="/read/local/${mediaData.id}" target="_blank" class="movie-detail__action movie-detail__action--button" style="flex-grow: 1;" title="Read this book (${monitored ? 'Monitored' : 'Unmonitored'})">
+                        <i class="fas fa-book-open me-2"></i>Read Now
+                        ${pageCount ? `<br><small style="font-size: 0.85rem; opacity: 0.8;">${pageCount}${formatLabel ? ' · ' + formatLabel : ''} · ${monitored ? 'Monitored' : 'Unmonitored'}</small>` : ''}
+                    </a>` : `
+                    <div class="movie-detail__action movie-detail__action--stat" style="flex-grow: 1; text-align: center;" title="Status: ${monitored ? 'Monitored' : 'Unmonitored'}">
+                        <i class="fas ${onDisk ? 'fa-check-circle' : 'fa-exclamation-circle'} me-2"></i>
+                        ${onDisk ? 'Ready to Read' : 'Not Downloaded'}
+                        ${pageCount ? `<br><small style="font-size: 0.85rem; opacity: 0.7;">${pageCount}${formatLabel ? ' · ' + formatLabel : ''} · ${monitored ? 'Monitored' : 'Unmonitored'}</small>` : ''}
+                    </div>`}
+                    ${hasMetadataEditor ? `
+                    <button type="button" class="movie-detail__action movie-detail__action--button" onclick="openBookMetadataEditorFromDetails()">
+                        <i class="fas fa-pen-to-square me-2"></i>Edit Metadata
                     </button>` : ''}
-                    <button class="btn btn-danger flex-fill delete-btn"
-                            data-type="${mediaType}"
-                            data-id="${internalId}">
-                        <i class="fas fa-trash me-1"></i> Delete
-                    </button>
                 </div>
-            </div>
-        </div>
 
-        <div id="interactiveSearchContainer" class="card bg-dark border-secondary mb-3" style="display:none;">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">RELEASES</h6>
-                <button class="btn btn-sm btn-outline-secondary" type="button"
-                        onclick="hideInteractiveSearchResults()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="card-body p-2" id="interactiveSearchResults">
-                <div class="text-center text-muted py-3">Loading releases...</div>
-            </div>
-        </div>
+                ${bmBadge ? `<div class="movie-detail__bookmark-row">${bmBadge}</div>` : ''}
 
-        <!-- Movie Details Card -->
-        <div class="card bg-dark border-secondary mb-3">
-            <div class="card-header">
-                <h6 class="mb-0">MOVIE DETAILS</h6>
-            </div>
-            <div class="card-body p-2">
-                <!-- Path -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Path</strong></div>
-                    <div class="col-8">
-                        <code class="text-wrap d-block" style="font-size: 0.8rem;">${mediaData.path || 'N/A'}</code>
-                    </div>
-                </div>
-                
-                <!-- Status -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Status</strong></div>
-                    <div class="col-8">${fullData.on_disk ? 'Downloaded' : 'Missing'}</div>
-                </div>
-                
-                <!-- Quality Profile -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Quality Profile</strong></div>
-                    <div class="col-8">${quality}</div>
-                </div>
-                
-                <!-- Size -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Size</strong></div>
-                    <div class="col-8">${fileSize}</div>
-                </div>
-                
-                <!-- Genres -->
-                ${mediaData.genres && mediaData.genres.length > 0 ? `
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Genres</strong></div>
-                    <div class="col-8">
-                        ${mediaData.genres.map(genre => `<span class="badge bg-secondary me-1 mb-1">${genre}</span>`).join('')}
-                    </div>
-                </div>
-                ` : ''}
-                
-                <!-- Rating -->
-                ${mediaData.ratings?.value ? `
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Rating</strong></div>
-                    <div class="col-8">
-                        <span class="badge bg-primary">${mediaData.ratings.value}/10</span>
-                        ${mediaData.ratings.votes ? `<small class="text-muted ms-1">(${mediaData.ratings.votes} votes)</small>` : ''}
-                    </div>
-                </div>
-                ` : ''}
-            </div>
-        </div>
+                <div class="movie-detail__divider"></div>
 
-        <!-- Files Section -->
-        <div class="card bg-dark border-secondary mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">FILES</h6>
-                <button class="btn btn-sm btn-outline-warning refresh-files-btn" 
-                        data-type="${mediaType}" 
-                        data-id="${internalId}">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th class="border-0 ps-2">Relative Path</th>
-                                <th class="border-0 text-end pe-2">Size</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="text-wrap ps-2" style="font-size: 0.8rem;">
-                                    <code>${relativePath}</code>
-                                </td>
-                                <td class="text-end pe-2">${fileSize}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Overview Section -->
-        ${mediaData.overview ? `
-        <div class="card bg-dark border-secondary">
-            <div class="card-header">
-                <h6 class="mb-0">OVERVIEW</h6>
-            </div>
-            <div class="card-body">
-                <p class="mb-0" style="font-size: 0.9rem; line-height: 1.4;">${mediaData.overview}</p>
-            </div>
-        </div>
-        ` : ''}
-    `;
-    
-    detailsContent.innerHTML = html;
-    
-    // Add event listeners to the new buttons
-    attachButtonEventListeners();
-}
-
-function renderTVDetails(mediaData, fullData, mediaType, internalId) {
-    const detailsContent = document.getElementById('detailsContent');
-    
-    // Get poster image
-    const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
-    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 300, 450, mediaData.title);
-
-    // Format file size
-    const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
-    
-    // Get quality information
-    const quality = mediaData.seriesType || 'Standard';
-    
-    // Get seasons data
-    const seasons = mediaData.seasons || [];
-    
-    // Get statistics
-    const stats = mediaData.statistics || {};
-    const totalEpisodes = stats.episodeCount || 0;
-    const downloadedEpisodes = stats.episodeFileCount || 0;
-    const completionPercent = stats.percentOfEpisodes || 0;
-    
-    const html = `
-        <!-- Poster and Basic Info Row -->
-        <div class="row mb-3">
-            <!-- Poster Column - Fixed Width -->
-            <div class="col-4 pe-0">
-                <img src="${posterUrl}" 
-                     class="img-fluid rounded w-100" 
-                     alt="${mediaData.title}"
-                     onerror="this.src='/static/images/favicon.png'"
-                     style="max-width: 120px;">
-            </div>
-            
-            <!-- Title and Details Column -->
-            <div class="col-8 ps-2">
-                <h4 class="mb-1">${mediaData.title || 'Unknown Title'}</h4>
-                <div class="d-flex align-items-center flex-wrap mb-2">
-                    ${mediaData.certification ? `<span class="badge bg-dark me-1">${mediaData.certification}</span>` : ''}
-                    <span class="me-1">${mediaData.year || ''}</span>
-                    <span class="">${mediaData.network || ''}</span>
-                </div>
-                
-                <!-- Status Badges -->
-                <div class="d-flex flex-wrap gap-1 mb-2">
-                    <span class="badge ${fullData.on_disk ? 'bg-success' : 'bg-warning'}">
-                        ${fullData.on_disk ? 'Downloaded' : 'Missing'}
-                    </span>
-                    <span class="badge ${fullData.monitored ? 'bg-success' : 'bg-secondary'}">
-                        ${fullData.monitored ? 'Monitored' : 'Not Monitored'}
-                    </span>
-                    ${mediaData.status ? `<span class="badge bg-info">${mediaData.status}</span>` : ''}
-                </div>
-            </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="row mb-3">
-            <div class="col-12">
-                <div class="d-grid gap-2 d-flex flex-wrap">
-                    <button class="btn ${fullData.monitored ? 'btn-warning' : 'btn-success'} flex-fill monitor-toggle"
-                            data-type="${mediaType}"
-                            data-id="${internalId}"
-                            data-monitored="${fullData.monitored}"
-                            data-has-missing="${downloadedEpisodes < totalEpisodes}">
-                        ${fullData.monitored ? 'Unmonitor' : 'Monitor'}
-                    </button>
-                    ${fullData.monitored && downloadedEpisodes < totalEpisodes ? `
-                    <button class="btn btn-primary flex-fill search-btn"
-                            data-type="${mediaType}"
-                            data-id="${internalId}">
-                        <i class="fas fa-bolt me-1"></i> Auto Search
-                    </button>
-                    <button class="btn btn-outline-info flex-fill interactive-search-btn"
-                            data-type="${mediaType}"
-                            data-id="${internalId}">
-                        <i class="fas fa-list me-1"></i> Choose Source
-                    </button>` : ''}
-                    <button class="btn btn-danger flex-fill delete-btn"
-                            data-type="${mediaType}"
-                            data-id="${internalId}">
-                        <i class="fas fa-trash me-1"></i> Delete
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div id="interactiveSearchContainer" class="card bg-dark border-secondary mb-3" style="display:none;">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">RELEASES</h6>
-                <button class="btn btn-sm btn-outline-secondary" type="button"
-                        onclick="hideInteractiveSearchResults()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="card-body p-2" id="interactiveSearchResults">
-                <div class="text-center text-muted py-3">Loading releases...</div>
-            </div>
-        </div>
-
-        <!-- TV Show Details Card -->
-        <div class="card bg-dark border-secondary mb-3">
-            <div class="card-header">
-                <h6 class="mb-0">TV SHOW DETAILS</h6>
-            </div>
-            <div class="card-body p-2">
-                <!-- Path -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Path</strong></div>
-                    <div class="col-8">
-                        <code class="text-wrap d-block" style="font-size: 0.8rem;">${mediaData.path || 'N/A'}</code>
-                    </div>
-                </div>
-                
-                <!-- Status -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Status</strong></div>
-                    <div class="col-8">${fullData.on_disk ? 'Downloaded' : 'Missing'}</div>
-                </div>
-                
-                <!-- Quality Profile -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Quality Profile</strong></div>
-                    <div class="col-8">${quality}</div>
-                </div>
-                
-                <!-- Size -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Size</strong></div>
-                    <div class="col-8">${fileSize}</div>
-                </div>
-                
-                <!-- Episodes Progress -->
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Episodes</strong></div>
-                    <div class="col-8">
-                        ${downloadedEpisodes}/${totalEpisodes} (${completionPercent}% complete)
-                        <div class="progress mt-1" style="height: 6px;">
-                            <div class="progress-bar" role="progressbar" 
-                                 style="width: ${completionPercent}%;" 
-                                 aria-valuenow="${completionPercent}" 
-                                 aria-valuemin="0" aria-valuemax="100">
+                <div class="movie-detail__file-card">
+                    <div class="movie-detail__file-row">
+                        <div class="movie-detail__file-status ${onDisk ? 'is-present' : 'is-missing'}">
+                            <i class="fas ${onDisk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+                        </div>
+                        <div class="movie-detail__file-main">
+                            <div class="movie-detail__file-name">${pathLabel}</div>
+                            <div class="movie-detail__file-meta">
+                                <span class="movie-detail__file-size">${sizeOnDisk}</span>
+                                ${mediaData.releaseDate ? `<span>${mediaData.releaseDate.substring(0, 10)}</span>` : ''}
+                                <span>${addedDate}</span>
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Genres -->
-                ${mediaData.genres && mediaData.genres.length > 0 ? `
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Genres</strong></div>
-                    <div class="col-8">
-                        ${mediaData.genres.map(genre => `<span class="badge bg-secondary me-1 mb-1">${genre}</span>`).join('')}
+
+                <p class="movie-detail__overview">${overview}</p>
+
+                <div class="movie-detail__info-grid">
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Author</span>
+                        <strong class="movie-detail__info-value">${author}</strong>
+                    </div>
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Published</span>
+                        <strong class="movie-detail__info-value">${mediaData.releaseDate ? mediaData.releaseDate.substring(0, 10) : 'Unknown'}</strong>
+                    </div>
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Pages</span>
+                        <strong class="movie-detail__info-value">${mediaData.pageCount || 'Unknown'}</strong>
+                    </div>
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Added</span>
+                        <strong class="movie-detail__info-value">${addedDate}</strong>
+                    </div>
+                    <div class="movie-detail__info-item movie-detail__info-item--full">
+                        <span class="movie-detail__info-label">Path</span>
+                        <strong class="movie-detail__info-value movie-detail__info-value--code">${pathLabel}</strong>
                     </div>
                 </div>
-                ` : ''}
-                
-                <!-- Rating -->
-                ${mediaData.ratings?.value ? `
-                <div class="row mb-2">
-                    <div class="col-4"><strong>Rating</strong></div>
-                    <div class="col-8">
-                        <span class="badge bg-primary">${mediaData.ratings.value}/10</span>
-                        ${mediaData.ratings.votes ? `<small class="text-muted ms-1">(${mediaData.ratings.votes} votes)</small>` : ''}
+            </div>
+        </section>
+    `;
+
+    detailsContent.innerHTML = html;
+}
+
+function openBookMetadataEditorFromDetails() {
+    if (typeof window.triggerImport !== 'function') return;
+
+    const modalEl = document.getElementById('detailsModal');
+    const card = modalEl ? modalEl._bookCard : null;
+    if (!card) return;
+
+    const filePath = card.dataset.filePath;
+    const dbId = card.dataset.dbId || null;
+    if (!filePath) return;
+
+    window.triggerImport(filePath, dbId);
+}
+
+function getDefaultMovieAddPrefs(mediaId) {
+    const key = String(mediaId);
+    if (!_addItemCache.movieAddPrefs[key]) {
+        _addItemCache.movieAddPrefs[key] = {
+            monitored: true,
+            qualityProfileId: null,
+            minimumAvailability: 'announced',
+            rootFolderPath: '',
+            collectionEnabled: false
+        };
+    }
+    return _addItemCache.movieAddPrefs[key];
+}
+
+function fetchMovieAddOptions() {
+    const qualityPromise = _addItemCache.qualityProfiles
+        ? Promise.resolve(_addItemCache.qualityProfiles)
+        : fetch('/api/radarr/qualityprofile')
+            .then(res => res.json())
+            .then(profiles => {
+                _addItemCache.qualityProfiles = profiles;
+                return profiles;
+            });
+
+    const rootFolderPromise = _addItemCache.rootFolders
+        ? Promise.resolve(_addItemCache.rootFolders)
+        : fetch('/api/radarr/rootfolders')
+            .then(res => res.json())
+            .then(folders => {
+                _addItemCache.rootFolders = folders;
+                return folders;
+            });
+
+    return Promise.all([qualityPromise, rootFolderPromise]);
+}
+
+function syncMovieAddPrefsFromUI(mediaId) {
+    const prefs = getDefaultMovieAddPrefs(mediaId);
+    const monitoredInput = document.getElementById(`movieAddMonitored_${mediaId}`);
+    const qualitySelect = document.getElementById(`movieAddQuality_${mediaId}`);
+    const availabilitySelect = document.getElementById(`movieAddAvailability_${mediaId}`);
+    const rootFolderSelect = document.getElementById(`movieAddRootFolder_${mediaId}`);
+    const collectionCheckbox = document.getElementById(`movieAddCollection_${mediaId}`);
+
+    if (monitoredInput) prefs.monitored = monitoredInput.classList.contains('is-active');
+    if (qualitySelect) prefs.qualityProfileId = qualitySelect.value ? parseInt(qualitySelect.value, 10) : null;
+    if (availabilitySelect) prefs.minimumAvailability = availabilitySelect.value || 'announced';
+    if (rootFolderSelect) prefs.rootFolderPath = rootFolderSelect.value || '';
+    if (collectionCheckbox) prefs.collectionEnabled = collectionCheckbox.checked;
+
+    return prefs;
+}
+
+function toggleMovieAddMonitor(mediaId, button) {
+    button.classList.toggle('is-active');
+    syncMovieAddPrefsFromUI(mediaId);
+}
+
+function initializeMovieAddOptions(mediaId, collectionName = '') {
+    fetchMovieAddOptions()
+        .then(([profiles, rootFolders]) => {
+            const prefs = getDefaultMovieAddPrefs(mediaId);
+            const qualitySelect = document.getElementById(`movieAddQuality_${mediaId}`);
+            const availabilitySelect = document.getElementById(`movieAddAvailability_${mediaId}`);
+            const rootFolderSelect = document.getElementById(`movieAddRootFolder_${mediaId}`);
+            const collectionLabel = document.getElementById(`movieAddCollectionLabel_${mediaId}`);
+            const collectionCheckbox = document.getElementById(`movieAddCollection_${mediaId}`);
+
+            if (qualitySelect) {
+                const defaultProfile = profiles.find(p => p.name === 'Any') || profiles.find(p => p.name === 'Default') || profiles[0];
+                if (!prefs.qualityProfileId) prefs.qualityProfileId = defaultProfile?.id || null;
+                qualitySelect.innerHTML = profiles.map(profile => `
+                    <option value="${profile.id}" ${String(profile.id) === String(prefs.qualityProfileId) ? 'selected' : ''}>
+                        ${profile.name}
+                    </option>`).join('');
+            }
+
+            if (availabilitySelect) {
+                availabilitySelect.value = prefs.minimumAvailability || 'announced';
+            }
+
+            if (rootFolderSelect) {
+                const defaultFolder = rootFolders.find(folder => folder.path === prefs.rootFolderPath) || rootFolders[0];
+                if (!prefs.rootFolderPath) prefs.rootFolderPath = defaultFolder?.path || '';
+                rootFolderSelect.innerHTML = rootFolders.map(folder => {
+                    const freeLabel = folder.freeSpace ? `(${formatFileSize(folder.freeSpace)} free)` : '';
+                    return `<option value="${folder.path}" ${folder.path === prefs.rootFolderPath ? 'selected' : ''}>
+                        ${folder.path} ${freeLabel}
+                    </option>`;
+                }).join('');
+            }
+
+            if (collectionLabel) {
+                collectionLabel.textContent = collectionName
+                    ? `Add the rest of the ${collectionName}?`
+                    : 'Collection support coming soon';
+            }
+
+            if (collectionCheckbox) {
+                collectionCheckbox.disabled = !collectionName;
+                collectionCheckbox.checked = !!(collectionName && prefs.collectionEnabled);
+            }
+
+            syncMovieAddPrefsFromUI(mediaId);
+        })
+        .catch(error => {
+            console.error('Failed to load movie add options:', error);
+            const qualitySelect = document.getElementById(`movieAddQuality_${mediaId}`);
+            const rootFolderSelect = document.getElementById(`movieAddRootFolder_${mediaId}`);
+            if (qualitySelect) qualitySelect.innerHTML = '<option value="">Unavailable</option>';
+            if (rootFolderSelect) rootFolderSelect.innerHTML = '<option value="">Unavailable</option>';
+        });
+}
+
+function performConfiguredMovieAdd(mediaId, triggerSearch) {
+    const prefs = syncMovieAddPrefsFromUI(mediaId);
+    performAddFromModal('movie', mediaId, prefs.qualityProfileId, 'latest', {
+        buttonId: triggerSearch ? 'modalSearchAddButton' : 'modalAddButton',
+        rootFolderPath: prefs.rootFolderPath,
+        minimumAvailability: prefs.minimumAvailability,
+        monitored: prefs.monitored,
+        searchForMovie: !!triggerSearch
+    });
+}
+
+
+function renderMovieDetails(mediaData, fullData, mediaType, internalId, tmdbData = null) {
+    const detailsContent = document.getElementById('detailsContent');
+    const modalEl = document.getElementById('detailsModal');
+    const homeContext = modalEl ? modalEl._homeLaunchContext : null;
+    const modules = window.appModuleAvailability || {};
+    const radarrAvailable = !!modules.radarr;
+    const resolvedInternalId = internalId || mediaData.id || fullData.internal_id;
+
+    const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
+    const backdropImage = mediaData.images?.find(img => img.coverType === 'fanart' || img.coverType === 'backdrop');
+    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 320, 480, mediaData.title);
+    const fallbackBackdrop = backdropImage?.remoteUrl || backdropImage?.url || '';
+    const tmdbBackdrop = tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/original${tmdbData.backdrop_path}` : '';
+    const backdropUrl = imgProxy(tmdbBackdrop || fallbackBackdrop || posterImage?.remoteUrl || posterImage?.url || '/static/images/apple-touch-icon.png', 1280, 720, mediaData.title);
+
+    const runtime = mediaData.runtime ? `${Math.floor(mediaData.runtime / 60)}h ${mediaData.runtime % 60}m` : 'N/A';
+    const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
+    const quality = mediaData.movieFile?.quality?.quality?.name || 'Unknown';
+    const movieFile = mediaData.movieFile || {};
+    const relativePath = movieFile.relativePath || 'No file downloaded';
+    const ratingValue = mediaData.ratings?.value || tmdbData?.vote_average || null;
+    const ratingLabel = ratingValue ? Number(ratingValue).toFixed(1) : null;
+    const certification = mediaData.certification || mediaData.minimumAvailability || '';
+    const imdbUrl = mediaData.imdbId ? `https://www.imdb.com/title/${mediaData.imdbId}/` : '';
+    const studio = mediaData.studio || mediaData.originalStudio || 'Unknown';
+    const overview = mediaData.overview || tmdbData?.overview || 'No overview available.';
+    const genres = mediaData.genres || tmdbData?.genres || [];
+    const addedDate = mediaData.added ? formatReadableDate(mediaData.added) : 'Unknown';
+    const inCinemas = mediaData.inCinemas ? formatReadableDate(mediaData.inCinemas) : 'Unknown';
+    const digitalRelease = mediaData.digitalRelease ? formatReadableDate(mediaData.digitalRelease) : 'Unknown';
+    const physicalRelease = mediaData.physicalRelease ? formatReadableDate(mediaData.physicalRelease) : 'Unknown';
+    const trailerKey = tmdbData?.trailer?.key || mediaData.youTubeTrailerId || null;
+    const secondaryActionsId = `movieDetailActions_${resolvedInternalId || 'temp'}`;
+    const hasMissing = !fullData.on_disk;
+    const showSearchButtons = radarrAvailable && fullData.monitored && hasMissing;
+
+    const html = `
+        <section class="movie-detail">
+            <div class="movie-detail__hero">
+                <img src="${backdropUrl}"
+                     class="movie-detail__hero-bg"
+                     alt="${mediaData.title}"
+                     onerror="this.src='${posterUrl}'">
+                <div class="movie-detail__hero-overlay"></div>
+                <button type="button" class="movie-detail__back" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+            </div>
+
+            <div class="movie-detail__sheet">
+                <div class="movie-detail__summary">
+                    <div class="movie-detail__poster-wrap">
+                        <img src="${posterUrl}"
+                             class="movie-detail__poster"
+                             alt="${mediaData.title}"
+                             onerror="this.src='/static/images/favicon.png'">
+                    </div>
+                    <div class="movie-detail__headline">
+                        ${certification ? `<span class="movie-detail__cert">${certification}</span>` : ''}
+                        <h2 class="movie-detail__title">${mediaData.title || 'Unknown Title'}</h2>
+                        <div class="movie-detail__meta-row">
+                            ${ratingLabel ? `<span class="movie-detail__score">${ratingLabel} <i class="fas fa-star"></i></span>` : ''}
+                            <span>${mediaData.year || 'N/A'}</span>
+                            <span>${runtime}</span>
+                        </div>
                     </div>
                 </div>
-                ` : ''}
-            </div>
-        </div>
 
-        <!-- Seasons Section -->
-        <div class="seasons-container mb-3">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0">SEASONS</h6>
-            </div>
-            <div id="seasonsList">
-                <div class="text-center text-muted p-4">
-                    <div class="spinner-border spinner-border-sm mb-2" role="status"></div>
-                    <p class="mb-0">Loading episodes...</p>
+                <div class="movie-detail__actions">
+                    <button class="movie-detail__action movie-detail__action--icon monitor-toggle"
+                            data-type="${mediaType}"
+                            data-id="${resolvedInternalId}"
+                            data-monitored="${fullData.monitored}"
+                            data-has-missing="${hasMissing}"
+                            title="${fullData.monitored ? 'Unmonitor' : 'Monitor'}">
+                        <i class="fas fa-bookmark"></i>
+                    </button>
+                    <div class="movie-detail__action movie-detail__action--stat">${quality}</div>
+                    ${showSearchButtons ? `
+                    <button class="movie-detail__action movie-detail__action--button search-btn"
+                            data-type="${mediaType}"
+                            data-id="${resolvedInternalId}">
+                        Search
+                    </button>` : `
+                    <div class="movie-detail__action movie-detail__action--stat">${fullData.on_disk ? 'Downloaded' : (mediaData.status || 'Missing')}</div>`}
+                    ${imdbUrl ? `
+                    <a class="movie-detail__action movie-detail__action--button"
+                       href="${imdbUrl}"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                        IMDb
+                    </a>` : `
+                    <div class="movie-detail__action movie-detail__action--stat">Library</div>`}
+                    <button class="movie-detail__action movie-detail__action--icon"
+                            type="button"
+                            aria-expanded="false"
+                            aria-controls="${secondaryActionsId}"
+                            onclick="toggleMovieDetailActions('${secondaryActionsId}', this)">
+                        <i class="fas fa-ellipsis-vertical"></i>
+                    </button>
                 </div>
-            </div>
-        </div>
 
-        <!-- Overview Section -->
-        ${mediaData.overview ? `
-        <div class="card bg-dark border-secondary">
-            <div class="card-header">
-                <h6 class="mb-0">OVERVIEW</h6>
+                <div class="movie-detail__secondary-actions" id="${secondaryActionsId}" hidden>
+                    ${showSearchButtons ? `
+                    <button class="btn btn-outline-info interactive-search-btn"
+                            data-type="${mediaType}"
+                            data-id="${internalId}">
+                        <i class="fas fa-list me-2"></i>Choose Source
+                    </button>` : ''}
+                    ${homeContext && homeContext.plexId ? `
+                    <button class="btn btn-outline-secondary"
+                            type="button"
+                            onclick="refreshMovieOnlineMatches()">
+                        <i class="fas fa-link me-2"></i>Re-link Movie
+                    </button>` : ''}
+                    <button class="btn btn-outline-warning refresh-files-btn"
+                            data-type="${mediaType}"
+                            data-id="${internalId}">
+                        <i class="fas fa-rotate me-2"></i>Refresh Files
+                    </button>
+                    <button class="btn btn-danger delete-btn"
+                            data-type="${mediaType}"
+                            data-id="${internalId}">
+                        <i class="fas fa-trash me-2"></i>Delete
+                    </button>
+                </div>
+
+                <div id="interactiveSearchContainer" class="card bg-dark border-secondary my-3 interactive-search-container">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">RELEASES</h6>
+                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                onclick="hideInteractiveSearchResults()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-2" id="interactiveSearchResults">
+                        <div class="text-center text-muted py-3">Loading releases...</div>
+                    </div>
+                </div>
+
+                <div id="movieOnlineMatchContainer" class="card bg-dark border-secondary my-3 interactive-search-container movie-online-match-container-hidden">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">MATCH MOVIE</h6>
+                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                onclick="hideMovieOnlineMatches()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-2" id="movieOnlineMatchResults">
+                        <div class="text-center text-muted py-3">Loading matches...</div>
+                    </div>
+                </div>
+
+                <div class="movie-detail__divider"></div>
+
+                <div class="movie-detail__file-card">
+                    <div class="movie-detail__file-row">
+                        <div class="movie-detail__file-status ${fullData.on_disk ? 'is-present' : 'is-missing'}">
+                            <i class="fas ${fullData.on_disk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+                        </div>
+                        <div class="movie-detail__file-main">
+                            <div class="movie-detail__file-name">${relativePath}</div>
+                            <div class="movie-detail__file-meta">
+                                <span class="movie-detail__file-size">${fileSize}</span>
+                                <span class="movie-detail__file-quality">${quality}</span>
+                                <span>${addedDate}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="movie-detail__release-grid">
+                    <div>
+                        <span class="movie-detail__release-label">Cinemas Release</span>
+                        <strong class="movie-detail__release-value">${inCinemas}</strong>
+                    </div>
+                    <div>
+                        <span class="movie-detail__release-label">Digital Release</span>
+                        <strong class="movie-detail__release-value">${digitalRelease}</strong>
+                    </div>
+                    <div>
+                        <span class="movie-detail__release-label">Physical Release</span>
+                        <strong class="movie-detail__release-value">${physicalRelease}</strong>
+                    </div>
+                </div>
+
+                <p class="movie-detail__overview">${overview}</p>
+
+                ${genres.length ? `
+                <div class="movie-detail__genres">
+                    ${genres.map(genre => `<span class="movie-detail__genre-chip">${typeof genre === 'string' ? genre : genre.name}</span>`).join('')}
+                </div>` : ''}
+
+                <div class="movie-detail__info-grid">
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Studio</span>
+                        <strong class="movie-detail__info-value">${studio}</strong>
+                    </div>
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Added</span>
+                        <strong class="movie-detail__info-value">${addedDate}</strong>
+                    </div>
+                    <div class="movie-detail__info-item movie-detail__info-item--full">
+                        <span class="movie-detail__info-label">Path</span>
+                        <strong class="movie-detail__info-value movie-detail__info-value--code">${mediaData.path || 'N/A'}</strong>
+                    </div>
+                </div>
+
+                ${buildDetailTrailerSection(trailerKey, mediaData.title || 'Movie')}
             </div>
-            <div class="card-body">
-                <p class="mb-0" style="font-size: 0.9rem; line-height: 1.4;">${mediaData.overview}</p>
+        </section>
+    `;
+    
+    detailsContent.innerHTML = html;
+    
+    // Add event listeners to the new buttons
+    attachButtonEventListeners();
+}
+
+function formatReadableDate(value) {
+    if (!value) return 'Unknown';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'Unknown';
+    return parsed.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+}
+
+function toggleMovieDetailActions(targetId, button) {
+    const panel = document.getElementById(targetId);
+    if (!panel) return;
+    const willOpen = panel.hasAttribute('hidden');
+    panel.toggleAttribute('hidden', !willOpen);
+    if (button) {
+        button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    }
+}
+
+function renderTVDetails(mediaData, fullData, mediaType, internalId, tmdbData = null) {
+    const detailsContent = document.getElementById('detailsContent');
+    const modalEl = document.getElementById('detailsModal');
+    const homeContext = modalEl ? modalEl._homeLaunchContext : null;
+    const modules = window.appModuleAvailability || {};
+    const sonarrAvailable = !!modules.sonarr;
+    const resolvedInternalId = internalId || mediaData.id || fullData.internal_id;
+    
+    const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
+    const backdropImage = mediaData.images?.find(img => img.coverType === 'fanart' || img.coverType === 'backdrop');
+    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 300, 450, mediaData.title);
+    const tmdbBackdrop = tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/original${tmdbData.backdrop_path}` : '';
+    const backdropUrl = imgProxy(tmdbBackdrop || backdropImage?.remoteUrl || backdropImage?.url || posterImage?.remoteUrl || posterImage?.url || '/static/images/apple-touch-icon.png', 1280, 720, mediaData.title);
+    const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
+    const quality = mediaData.seriesType || 'Standard';
+    const stats = mediaData.statistics || {};
+    const totalEpisodes = stats.episodeCount || 0;
+    const downloadedEpisodes = stats.episodeFileCount || 0;
+    const completionPercent = stats.percentOfEpisodes || 0;
+    const ratingValue = mediaData.ratings?.value || tmdbData?.vote_average || null;
+    const ratingLabel = ratingValue ? Number(ratingValue).toFixed(1) : null;
+    const backdropTitle = mediaData.title || 'TV Show';
+    const trailerKey = tmdbData?.trailer?.key || mediaData.youTubeTrailerId || null;
+    const secondaryActionsId = `tvDetailActions_${resolvedInternalId || 'temp'}`;
+    const network = mediaData.network || tmdbData?.networks?.[0]?.name || 'TV';
+    const statusLabel = mediaData.status || tmdbData?.status || (downloadedEpisodes < totalEpisodes ? 'Missing' : 'Current');
+    const hasMissing = downloadedEpisodes < totalEpisodes;
+    const firstAired = mediaData.firstAired ? formatReadableDate(mediaData.firstAired) : 'Unknown';
+    const lastInfo = mediaData.previousAiring ? formatReadableDate(mediaData.previousAiring) : (mediaData.added ? formatReadableDate(mediaData.added) : 'Unknown');
+    const seasonsCount = stats.seasonCount || mediaData.seasons?.filter(season => season.seasonNumber > 0).length || 0;
+    const overview = mediaData.overview || tmdbData?.overview || 'No overview available.';
+    const genres = (tmdbData?.genres || mediaData.genres || []).map(genre => typeof genre === 'string' ? genre : genre.name);
+    
+    const html = `
+        <section class="movie-detail movie-detail--tv">
+            <div class="movie-detail__hero">
+                <img src="${backdropUrl}"
+                     class="movie-detail__hero-bg"
+                     alt="${backdropTitle}"
+                     onerror="this.src='${posterUrl}'">
+                <div class="movie-detail__hero-overlay"></div>
+                <button type="button" class="movie-detail__back" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
             </div>
-        </div>
-        ` : ''}
+
+            <div class="movie-detail__sheet">
+                <div class="movie-detail__summary">
+                    <div class="movie-detail__poster-wrap">
+                        <img src="${posterUrl}"
+                             class="movie-detail__poster"
+                             alt="${backdropTitle}"
+                             onerror="this.src='/static/images/favicon.png'">
+                    </div>
+                    <div class="movie-detail__headline">
+                        ${mediaData.certification ? `<span class="movie-detail__cert">${mediaData.certification}</span>` : ''}
+                        <h2 class="movie-detail__title">${backdropTitle}</h2>
+                        <div class="movie-detail__subtitle">${network}</div>
+                        <div class="movie-detail__meta-row">
+                            ${ratingLabel ? `<span class="movie-detail__score">${ratingLabel} <i class="fas fa-star"></i></span>` : ''}
+                            <span>${mediaData.year || 'N/A'}</span>
+                            <span>${seasonsCount} season${seasonsCount === 1 ? '' : 's'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="movie-detail__actions movie-detail__actions--tv">
+                    <button class="movie-detail__action movie-detail__action--icon monitor-toggle"
+                            data-type="${mediaType}"
+                            data-id="${resolvedInternalId}"
+                            data-monitored="${fullData.monitored}"
+                            data-has-missing="${hasMissing}"
+                            title="${fullData.monitored ? 'Unmonitor' : 'Monitor'}">
+                        <i class="fas fa-bookmark"></i>
+                    </button>
+                    <div class="movie-detail__action movie-detail__action--stat">${quality}</div>
+                    ${sonarrAvailable && fullData.monitored && hasMissing ? `
+                    <button class="movie-detail__action movie-detail__action--button search-btn"
+                            data-type="${mediaType}"
+                            data-id="${resolvedInternalId}">
+                        Search
+                    </button>` : `
+                    <div class="movie-detail__action movie-detail__action--stat">${fullData.on_disk ? 'Downloaded' : statusLabel}</div>`}
+                    <div class="movie-detail__action movie-detail__action--stat">${downloadedEpisodes}/${totalEpisodes} eps</div>
+                    <button class="movie-detail__action movie-detail__action--icon"
+                            type="button"
+                            aria-expanded="false"
+                            aria-controls="${secondaryActionsId}"
+                            onclick="toggleMovieDetailActions('${secondaryActionsId}', this)">
+                        <i class="fas fa-ellipsis-vertical"></i>
+                    </button>
+                </div>
+
+                <div class="movie-detail__secondary-actions" id="${secondaryActionsId}" hidden>
+                    ${sonarrAvailable && fullData.monitored && hasMissing ? `
+                    <button class="btn btn-outline-info interactive-search-btn"
+                            data-type="${mediaType}"
+                            data-id="${resolvedInternalId}">
+                        <i class="fas fa-list me-2"></i>Choose Source
+                    </button>` : ''}
+                    ${homeContext && homeContext.plexId ? `
+                    <button class="btn btn-outline-secondary"
+                            type="button"
+                            onclick="refreshTvOnlineMatches()">
+                        <i class="fas fa-link me-2"></i>Re-link Show
+                    </button>` : ''}
+                    <button class="btn btn-outline-warning refresh-files-btn"
+                            data-type="${mediaType}"
+                            data-id="${resolvedInternalId}">
+                        <i class="fas fa-rotate me-2"></i>Refresh Files
+                    </button>
+                    <button class="btn btn-danger delete-btn"
+                            data-type="${mediaType}"
+                            data-id="${resolvedInternalId}">
+                        <i class="fas fa-trash me-2"></i>Delete
+                    </button>
+                </div>
+
+                <div id="interactiveSearchContainer" class="card bg-dark border-secondary my-3 interactive-search-container">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">RELEASES</h6>
+                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                onclick="hideInteractiveSearchResults()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-2" id="interactiveSearchResults">
+                        <div class="text-center text-muted py-3">Loading releases...</div>
+                    </div>
+                </div>
+
+                <div id="tvOnlineMatchContainer" class="card bg-dark border-secondary my-3 interactive-search-container tv-online-match-container-hidden">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">MATCH SHOW</h6>
+                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                onclick="hideTvOnlineMatches()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-2" id="tvOnlineMatchResults">
+                        <div class="text-center text-muted py-3">Loading matches...</div>
+                    </div>
+                </div>
+
+                <div class="movie-detail__divider"></div>
+
+                <div class="movie-detail__file-card">
+                    <div class="movie-detail__file-row">
+                        <div class="movie-detail__file-status ${fullData.on_disk ? 'is-present' : 'is-missing'}">
+                            <i class="fas ${fullData.on_disk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+                        </div>
+                        <div class="movie-detail__file-main">
+                            <div class="movie-detail__file-name">${mediaData.path || 'No library path available'}</div>
+                            <div class="movie-detail__file-meta">
+                                <span class="movie-detail__file-size">${fileSize}</span>
+                                <span>${downloadedEpisodes}/${totalEpisodes} episodes</span>
+                                <span>${completionPercent}% complete</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="movie-detail__release-grid">
+                    <div>
+                        <span class="movie-detail__release-label">First Aired</span>
+                        <strong class="movie-detail__release-value">${firstAired}</strong>
+                    </div>
+                    <div>
+                        <span class="movie-detail__release-label">Last Update</span>
+                        <strong class="movie-detail__release-value">${lastInfo}</strong>
+                    </div>
+                    <div>
+                        <span class="movie-detail__release-label">Status</span>
+                        <strong class="movie-detail__release-value">${statusLabel}</strong>
+                    </div>
+                </div>
+
+                <p class="movie-detail__overview">${overview}</p>
+
+                ${genres.length ? `
+                <div class="movie-detail__genres">
+                    ${genres.map(genre => `<span class="movie-detail__genre-chip">${genre}</span>`).join('')}
+                </div>` : ''}
+
+                <div class="movie-detail__info-grid">
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Network</span>
+                        <strong class="movie-detail__info-value">${network}</strong>
+                    </div>
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Series Type</span>
+                        <strong class="movie-detail__info-value">${quality}</strong>
+                    </div>
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Episodes</span>
+                        <strong class="movie-detail__info-value">${downloadedEpisodes}/${totalEpisodes}</strong>
+                    </div>
+                    <div class="movie-detail__info-item">
+                        <span class="movie-detail__info-label">Monitored</span>
+                        <strong class="movie-detail__info-value">${fullData.monitored ? 'Yes' : 'No'}</strong>
+                    </div>
+                    <div class="movie-detail__info-item movie-detail__info-item--full">
+                        <span class="movie-detail__info-label">Path</span>
+                        <strong class="movie-detail__info-value movie-detail__info-value--code">${mediaData.path || 'N/A'}</strong>
+                    </div>
+                </div>
+
+                <section class="movie-detail__section">
+                    <h3 class="movie-detail__section-title">Seasons</h3>
+                    <div class="seasons-container">
+                        <div id="seasonsList">
+                            <div class="text-center text-muted p-4">
+                                <div class="spinner-border spinner-border-sm mb-2" role="status"></div>
+                                <p class="mb-0">Loading episodes...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                ${buildDetailTrailerSection(trailerKey, backdropTitle)}
+            </div>
+        </section>
     `;
     
     detailsContent.innerHTML = html;
 
+    detailsContent.querySelectorAll('.detail-progress-bar[data-progress]').forEach(bar => {
+        bar.style.width = `${bar.dataset.progress || 0}%`;
+    });
+
     // Add event listeners to the new buttons
     attachButtonEventListeners();
-    loadTVShowEpisodes(internalId);
+    loadTVShowEpisodes(resolvedInternalId);
 }
 
 // New function to load episodes for TV shows
@@ -1104,6 +1511,223 @@ function hideInteractiveSearchResults() {
     if (container) container.style.display = 'none';
 }
 
+function hideTvOnlineMatches() {
+    const container = document.getElementById('tvOnlineMatchContainer');
+    const results = document.getElementById('tvOnlineMatchResults');
+    if (results) results.innerHTML = '';
+    if (container) container.style.display = 'none';
+}
+
+function hideMovieOnlineMatches() {
+    const container = document.getElementById('movieOnlineMatchContainer');
+    const results = document.getElementById('movieOnlineMatchResults');
+    if (results) results.innerHTML = '';
+    if (container) container.style.display = 'none';
+}
+
+function renderTvOnlineMatches(results) {
+    const container = document.getElementById('tvOnlineMatchContainer');
+    const resultsEl = document.getElementById('tvOnlineMatchResults');
+    if (!container || !resultsEl) return;
+
+    if (!Array.isArray(results) || !results.length) {
+        resultsEl.innerHTML = '<div class="text-muted text-center py-3">No matching shows found.</div>';
+        container.style.display = 'block';
+        return;
+    }
+
+    resultsEl.innerHTML = results.map(result => `
+        <div class="border rounded p-2 mb-2">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="d-flex gap-2 flex-grow-1">
+                    <img src="${result.poster || '/static/images/apple-touch-icon.png'}"
+                         alt="${result.title || 'TV show'}"
+                         class="tv-online-match-poster"
+                         onerror="this.src='/static/images/apple-touch-icon.png'">
+                    <div class="flex-grow-1 interactive-release-copy">
+                        <div class="text-light fw-semibold">${result.title || 'Unknown show'}</div>
+                        <div class="text-muted small">${result.year || 'Unknown year'}${result.status ? ` • ${result.status}` : ''}</div>
+                        <div class="text-muted small">TVDB ${result.tvdbId}${result.sonarrId ? ` • Sonarr ${result.sonarrId}` : ''}</div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-primary flex-shrink-0"
+                        data-tvdb="${String(result.tvdbId || '').replace(/"/g, '&quot;')}"
+                        data-sonarr="${String(result.sonarrId || '').replace(/"/g, '&quot;')}"
+                        data-title="${String(result.title || '').replace(/"/g, '&quot;')}"
+                        data-year="${String(result.year || '').replace(/"/g, '&quot;')}"
+                        onclick="applyTvOnlineMatch(this)">
+                    Use Match
+                </button>
+            </div>
+        </div>
+    `).join('');
+    container.style.display = 'block';
+}
+
+function renderMovieOnlineMatches(results) {
+    const container = document.getElementById('movieOnlineMatchContainer');
+    const resultsEl = document.getElementById('movieOnlineMatchResults');
+    if (!container || !resultsEl) return;
+
+    if (!Array.isArray(results) || !results.length) {
+        resultsEl.innerHTML = '<div class="text-muted text-center py-3">No matching movies found.</div>';
+        container.style.display = 'block';
+        return;
+    }
+
+    resultsEl.innerHTML = results.map(result => `
+        <div class="border rounded p-2 mb-2 bg-dark-subtle">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="d-flex gap-2 flex-grow-1">
+                    <img src="${result.poster || '/static/images/apple-touch-icon.png'}"
+                         alt="${result.title || 'Movie'}"
+                         class="tv-online-match-poster"
+                         onerror="this.src='/static/images/apple-touch-icon.png'">
+                    <div class="flex-grow-1 interactive-release-copy">
+                        <div class="text-light fw-semibold">${result.title || 'Unknown movie'}</div>
+                        <div class="text-muted small">${result.year || 'Unknown year'}${result.status ? ` • ${result.status}` : ''}</div>
+                        <div class="text-muted small">TMDB ${result.tmdbId}${result.radarrId ? ` • Radarr ${result.radarrId}` : ''}</div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-primary flex-shrink-0"
+                        data-tmdb="${String(result.tmdbId || '').replace(/"/g, '&quot;')}"
+                        data-title="${String(result.title || '').replace(/"/g, '&quot;')}"
+                        data-year="${String(result.year || '').replace(/"/g, '&quot;')}"
+                        onclick="applyMovieOnlineMatch(this)">
+                    Use Match
+                </button>
+            </div>
+        </div>
+    `).join('');
+    container.style.display = 'block';
+}
+
+async function refreshTvOnlineMatches() {
+    const modalEl = document.getElementById('detailsModal');
+    const context = modalEl ? modalEl._homeLaunchContext : null;
+    const container = document.getElementById('tvOnlineMatchContainer');
+    const resultsEl = document.getElementById('tvOnlineMatchResults');
+    if (!context || !context.plexId || !container || !resultsEl) return;
+
+    resultsEl.innerHTML = '<div class="text-center text-muted py-3">Loading matches...</div>';
+    container.style.display = 'block';
+
+    try {
+        const response = await fetch('/api/tv/search-online', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plex_id: context.plexId,
+                title: context.plexTitle,
+                year: context.plexYear
+            })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to search library');
+        }
+        renderTvOnlineMatches(data.results || []);
+    } catch (error) {
+        resultsEl.innerHTML = `<div class="text-danger text-center py-3">${error.message}</div>`;
+        container.style.display = 'block';
+    }
+}
+
+async function refreshMovieOnlineMatches() {
+    const modalEl = document.getElementById('detailsModal');
+    const context = modalEl ? modalEl._homeLaunchContext : null;
+    const container = document.getElementById('movieOnlineMatchContainer');
+    const resultsEl = document.getElementById('movieOnlineMatchResults');
+    if (!context || !context.plexId || !container || !resultsEl) return;
+
+    resultsEl.innerHTML = '<div class="text-center text-muted py-3">Loading matches...</div>';
+    container.style.display = 'block';
+
+    try {
+        const response = await fetch('/api/movie/search-online', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plex_id: context.plexId,
+                title: context.plexTitle,
+                year: context.plexYear
+            })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to search library');
+        }
+        renderMovieOnlineMatches(data.results || []);
+    } catch (error) {
+        resultsEl.innerHTML = `<div class="text-danger text-center py-3">${error.message}</div>`;
+        container.style.display = 'block';
+    }
+}
+
+async function applyTvOnlineMatch(button) {
+    const modalEl = document.getElementById('detailsModal');
+    const context = modalEl ? modalEl._homeLaunchContext : null;
+    if (!button || !context || !context.plexId) return;
+
+    const tvdbId = button.dataset.tvdb;
+    const sonarrId = button.dataset.sonarr;
+    if (!tvdbId) return;
+
+    try {
+        const response = await fetch('/api/tv/rebind-plex', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plex_id: context.plexId,
+                title: context.plexTitle,
+                year: context.plexYear,
+                tvdb_id: tvdbId,
+                sonarr_id: sonarrId
+            })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to update linked show');
+        }
+
+        hideTvOnlineMatches();
+        showManageDetails('tv', sonarrId || tvdbId, sonarrId || tvdbId, sonarrId ? 'sonarr' : '', context);
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function applyMovieOnlineMatch(button) {
+    const modalEl = document.getElementById('detailsModal');
+    const context = modalEl ? modalEl._homeLaunchContext : null;
+    if (!button || !context || !context.plexId) return;
+
+    const tmdbId = button.dataset.tmdb;
+    if (!tmdbId) return;
+
+    try {
+        const response = await fetch('/api/movie/rebind-plex', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plex_id: context.plexId,
+                title: context.plexTitle,
+                year: context.plexYear,
+                tmdb_id: tmdbId
+            })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to update linked movie');
+        }
+
+        hideMovieOnlineMatches();
+        showManageDetails('movie', tmdbId, tmdbId, '', context);
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
 function renderInteractiveSearchResults(mediaType, internalId, releases) {
     const container = document.getElementById('interactiveSearchContainer');
     const resultsEl = document.getElementById('interactiveSearchResults');
@@ -1128,7 +1752,7 @@ function renderInteractiveSearchResults(mediaType, internalId, releases) {
         return `
             <div class="border rounded p-2 mb-2 bg-dark-subtle">
                 <div class="d-flex justify-content-between align-items-start gap-2">
-                    <div class="flex-grow-1" style="min-width:0;">
+                    <div class="flex-grow-1 interactive-release-copy">
                         <div class="text-light fw-semibold text-truncate" title="${title.replace(/"/g, '&quot;')}">${title}</div>
                         <div class="text-muted small">${indexer}</div>
                         <div class="text-muted small">${info}${score !== '' ? ` • score ${score}` : ''}</div>
@@ -1156,7 +1780,7 @@ function loadInteractiveSearchResults(mediaType, internalId, button) {
     resultsEl.innerHTML = '<div class="text-center text-muted py-3">Loading releases...</div>';
 
     fetch(`/api/${mediaType}/${internalId}/interactive-search`)
-        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(parseApiResponse)
         .then(({ ok, data }) => {
             if (!ok) throw new Error(data.error || 'Failed to load releases');
             renderInteractiveSearchResults(mediaType, internalId, data.results || []);
@@ -1185,7 +1809,7 @@ function grabInteractiveRelease(mediaType, internalId, idx, button) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ release })
     })
-    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+    .then(parseApiResponse)
     .then(({ ok, data }) => {
         if (!ok) throw new Error(data.error || 'Failed to grab release');
         button.classList.remove('btn-primary');
@@ -1240,9 +1864,8 @@ function renderSeasonCards(seasonsWithEpisodes) {
 
         return `
             <div class="card season-card mb-2">
-                <div class="card-header d-flex justify-content-between align-items-center"
+                <div class="card-header d-flex justify-content-between align-items-center season-card-toggle"
                      id="${headingId}"
-                     style="cursor:pointer;"
                      data-bs-toggle="collapse"
                      data-bs-target="#${collapseId}"
                      aria-expanded="false"
@@ -1458,8 +2081,136 @@ function redirectToSearch(name, year) {
     }
     window.location.href = `/search?q=${encodeURIComponent(query)}`;
 }
+
+function renderSearchMovieAddDetails(mediaId, movieData, internalDataObj = null, addTargetAvailable = true) {
+    const title = movieData.title || 'No Title';
+    const overview = movieData.overview || 'No overview available';
+    const year = movieData.year || 'N/A';
+    const rating = movieData.rating && movieData.rating !== 'N/A' ? movieData.rating : null;
+    const certification = movieData.certification || 'NR';
+    const posterUrl = movieData.posterUrl || '/static/images/logo.png';
+    const tmdbData = movieData.tmdbData || null;
+    const backdropUrl = tmdbData?.backdrop_path
+        ? imgProxy(`https://image.tmdb.org/t/p/original${tmdbData.backdrop_path}`, 1280, 720, title)
+        : posterUrl;
+    const trailerKey = tmdbData?.trailer?.key || null;
+    const collectionName = tmdbData?.belongs_to_collection?.name || '';
+    const monitoredDefault = true;
+    getDefaultMovieAddPrefs(mediaId).monitored = monitoredDefault;
+
+    return `
+        <section class="movie-detail movie-detail--add">
+            <div class="movie-detail__hero">
+                <img src="${backdropUrl}" class="movie-detail__hero-bg" alt="${title}">
+                <div class="movie-detail__hero-overlay"></div>
+                <button type="button" class="movie-detail__back" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+            </div>
+
+            <div class="movie-detail__sheet movie-detail__sheet--add">
+                <div class="movie-detail__summary movie-detail__summary--compact">
+                    <div class="movie-detail__poster-wrap">
+                        <img src="${posterUrl}" class="movie-detail__poster" alt="${title}">
+                    </div>
+                    <div class="movie-detail__headline">
+                        <span class="movie-detail__cert">${certification}</span>
+                        <h2 class="movie-detail__title">${title}</h2>
+                        <div class="movie-detail__meta-row">
+                            <span>${year}</span>
+                            ${rating ? `<span>${rating}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="movie-add-panel">
+                    <div class="movie-add-panel__grip" aria-hidden="true"></div>
+
+                    <div class="movie-add-panel__header">
+                        <div class="movie-add-panel__poster-wrap">
+                            <img src="${posterUrl}" class="movie-add-panel__poster" alt="${title}">
+                        </div>
+                        <div class="movie-add-panel__headline">
+                            <h3 class="movie-add-panel__title">${title}</h3>
+                            <div class="movie-add-panel__meta">
+                                <span>${year}</span>
+                                ${rating ? `<span>&bull;</span><span>${rating}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="movie-detail__divider"></div>
+
+                    <div class="movie-add-panel__controls">
+                        <button type="button"
+                                id="movieAddMonitored_${mediaId}"
+                                class="movie-add-control movie-add-control--icon is-active"
+                                onclick="toggleMovieAddMonitor('${mediaId}', this)"
+                                aria-label="Toggle monitoring">
+                            <i class="fas fa-bookmark"></i>
+                        </button>
+
+                        <div class="movie-add-control movie-add-control--select">
+                            <select id="movieAddQuality_${mediaId}" class="movie-add-control__select" onchange="syncMovieAddPrefsFromUI('${mediaId}')">
+                                <option>Loading...</option>
+                            </select>
+                        </div>
+
+                        <div class="movie-add-control movie-add-control--select">
+                            <select id="movieAddAvailability_${mediaId}" class="movie-add-control__select" onchange="syncMovieAddPrefsFromUI('${mediaId}')">
+                                <option value="announced">When announced</option>
+                                <option value="inCinemas">In cinemas</option>
+                                <option value="released">Released</option>
+                                <option value="preDB">PreDB</option>
+                            </select>
+                        </div>
+
+                        <div class="movie-add-control movie-add-control--icon movie-add-control--static">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+
+                    <label class="movie-add-panel__checkbox-row ${collectionName ? '' : 'is-disabled'}">
+                        <span id="movieAddCollectionLabel_${mediaId}">${collectionName ? `Add the rest of the ${collectionName}?` : 'Collection support coming soon'}</span>
+                        <input type="checkbox"
+                               id="movieAddCollection_${mediaId}"
+                               class="movie-add-panel__checkbox"
+                               ${collectionName ? '' : 'disabled'}
+                               onchange="syncMovieAddPrefsFromUI('${mediaId}')">
+                    </label>
+
+                    <div class="movie-add-panel__rootfolder">
+                        <select id="movieAddRootFolder_${mediaId}" class="movie-add-panel__rootfolder-select" onchange="syncMovieAddPrefsFromUI('${mediaId}')">
+                            <option>Loading folders...</option>
+                        </select>
+                    </div>
+
+                    <div class="movie-add-panel__actions">
+                        ${addTargetAvailable ? `
+                        <button type="button"
+                                class="btn movie-add-panel__button movie-add-panel__button--primary"
+                                id="modalAddButton"
+                                onclick="performConfiguredMovieAdd('${mediaId}', false)">
+                            Add to Radarr
+                        </button>
+                        <button type="button"
+                                class="btn movie-add-panel__button movie-add-panel__button--primary"
+                                id="modalSearchAddButton"
+                                onclick="performConfiguredMovieAdd('${mediaId}', true)">
+                            Add + Search
+                        </button>` : `
+                        <div class="alert alert-warning mb-0 w-100">Radarr is not available.</div>`}
+                    </div>
+                </div>
+
+                ${buildDetailTrailerSection(trailerKey, title)}
+            </div>
+        </section>`;
+}
+
 function showDetails(mediaType, mediaId, tmdb=false) {
     _pauseBackgroundFetches();
+    const modules = window.appModuleAvailability || {};
     const modalEl = document.getElementById('detailsModal');
     const modal = new bootstrap.Modal(modalEl);
     const modalTitle = document.getElementById('detailsModalLabel');
@@ -1486,20 +2237,16 @@ function showDetails(mediaType, mediaId, tmdb=false) {
     }, { once: true });
             
     modalEl.removeAttribute('aria-hidden');
+    setDetailsModalVariant(mediaType);
     modalTitle.textContent = `${mediaType === 'tv' ? 'TV Show' : mediaType === 'book' ? 'Book' : 'Movie'} Details`;
     
-    document.getElementById('detailsContent').innerHTML = `
-        <div class="text-center my-4">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>`;
+    document.getElementById('detailsContent').innerHTML = renderDetailLoadingSkeleton(mediaType);
     
     modal.show();
     
     // Only fetch internal data if NOT in TMDB-only mode
-    const internalPromise = tmdb === false 
-        ? fetch(`/get_media_details?type=${mediaType}&id=${mediaId}`)
+    const internalPromise = (tmdb === false || (tmdb === true && mediaType === 'tv'))
+        ? fetch(`/get_media_details?type=${mediaType}&id=${mediaId}${tmdb === true && mediaType === 'tv' ? '&source=tmdb' : ''}`)
             .then(response => response.json())
             .catch(error => {
                 console.error('Internal API error:', error);
@@ -1509,8 +2256,8 @@ function showDetails(mediaType, mediaId, tmdb=false) {
     
     // Books are handled above and return early; this only runs for movies and TV.
     // For TV shows fetch TMDB enrichment; movies rely on internal Radarr data.
-    const tmdbPromise = mediaType === 'tv'
-        ? fetch(`/get_tmdb_details?type=tv&id=${mediaId}`)
+    const tmdbPromise = (mediaType === 'tv' || mediaType === 'movie')
+        ? fetch(`/get_tmdb_details?type=${mediaType}&id=${mediaId}`)
             .then(response => response.json())
             .catch(error => {
                 console.error('TMDB API error:', error);
@@ -1524,7 +2271,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
             console.log('TMDB data:', tmdbData);
             
             const hasTmdbData = tmdbData && !tmdbData.error;
-            const hasInternalData = tmdb === false && internalData && !internalData.error;
+            const hasInternalData = internalData && !internalData.error;
 
             // Books: render dedicated view using Readarr data only
             if (mediaType === 'book') {
@@ -1550,11 +2297,12 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                     // Append Add button if not in library
                     if (!bookFullData || bookFullData.status !== 'existing') {
                         const addDiv = document.createElement('div');
-                        addDiv.className = 'mt-3';
+                        addDiv.className = 'movie-detail__section';
                         addDiv.innerHTML = `<button class="btn btn-primary w-100" onclick="addItemFromModal('book', ${mediaId})">
                             <i class="fas fa-book me-1"></i>Add to Readarr
                         </button>`;
-                        document.getElementById('detailsContent').appendChild(addDiv);
+                        const target = document.querySelector('#detailsContent .movie-detail__sheet');
+                        (target || document.getElementById('detailsContent')).appendChild(addDiv);
                     }
                 } else {
                     document.getElementById('detailsContent').innerHTML = '<div class="alert alert-warning">Book details not available. Check Readarr connection.</div>';
@@ -1563,7 +2311,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
             }
 
             // If in TMDB-only mode, use ONLY TMDB data
-            if (tmdb === true) {
+            if (tmdb === true && !hasInternalData) {
                 // TMDB-ONLY MODE: Use only TMDB data
                 const title = hasTmdbData ? tmdbData.title : 'No Title';
                 const overview = hasTmdbData ? tmdbData.overview : 'No overview available';
@@ -1584,10 +2332,9 @@ function showDetails(mediaType, mediaId, tmdb=false) {
 
                 const posterHtml = `
                     <img src="${posterUrl}"
-                        class="img-fluid h-100 object-fit-cover"
+                        class="img-fluid h-100 object-fit-cover tmdb-fallback-poster"
                         alt="${title} poster"
-                        onerror="this.onerror=null; this.src='/static/images/logo.png'"
-                        style="background-color: #2c3e50; background-image: url('/static/images/logo.png'); background-size: 60%; background-position: center; background-repeat: no-repeat;">`;
+                        onerror="this.onerror=null; this.src='/static/images/logo.png'">`;
 
                 // TRAILER: TMDB only
                 let trailerHtml = '';
@@ -1664,6 +2411,26 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                     </div>`;
                 }
 
+                const addTargetAvailable = mediaType === 'tv' ? !!modules.sonarr : mediaType === 'book' ? !!modules.readarr : !!modules.radarr;
+                const addTargetLabel = mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr';
+
+                if (mediaType === 'movie') {
+                    const movieTmdbOnlyData = {
+                        title,
+                        year,
+                        overview,
+                        rating,
+                        certification,
+                        posterUrl,
+                        tmdbData
+                    };
+                    document.getElementById('detailsContent').innerHTML = renderSearchMovieAddDetails(mediaId, movieTmdbOnlyData, null, addTargetAvailable);
+                    initializeMovieAddOptions(mediaId, tmdbData?.belongs_to_collection?.name || '');
+                    attachButtonEventListeners();
+                    modal.show();
+                    return;
+                }
+
                 // TMDB-ONLY HTML (no library status)
                 const html = `
                     <div class="g-0">
@@ -1700,14 +2467,14 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                                     `).join('')}
                                 </div>
                                 
-                                <p class="mb-3" style="line-height: 1.5;">${overview}</p>
+                                <p class="mb-3 detail-overview-text">${overview}</p>
 
                                 <div class="mt-3">
-                                    <button class="btn btn-primary w-100" 
+                                    ${addTargetAvailable ? `<button class="btn btn-primary w-100" 
                                             id="modalAddButton"
                                             onclick="addItemFromModal('${mediaType}', ${mediaId})">
-                                        Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}
-                                    </button>
+                                        Add to ${addTargetLabel}
+                                    </button>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -1754,10 +2521,9 @@ function showDetails(mediaType, mediaId, tmdb=false) {
 
                 const posterHtml = `
                     <img src="${posterUrl}"
-                        class="img-fluid h-100 object-fit-cover"
+                        class="img-fluid h-100 object-fit-cover tmdb-fallback-poster"
                         alt="${title} poster"
-                        onerror="this.onerror=null; this.src='/static/images/logo.png'"
-                        style="background-color: #2c3e50; background-image: url('/static/images/logo.png'); background-size: 60%; background-position: center; background-repeat: no-repeat;">`;
+                        onerror="this.onerror=null; this.src='/static/images/logo.png'">`;
                 
                 // TRAILER: TMDB first, then internal
                 let trailerHtml = '';
@@ -1857,6 +2623,37 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                 const onDisk = internalData.on_disk;
                 const monitored = internalData.monitored;
                 const seasonCount = internalDataObj.statistics?.seasonCount;
+                const addTargetAvailable = mediaType === 'tv' ? !!modules.sonarr : mediaType === 'book' ? !!modules.readarr : !!modules.radarr;
+                const addTargetLabel = mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr';
+
+                if (mediaType === 'movie' && alreadyAdded) {
+                    renderMovieDetails(internalDataObj, internalData, mediaType, internalDataObj.id || internalData.internal_id, tmdbData);
+                    modal.show();
+                    return;
+                }
+
+                if (mediaType === 'tv' && alreadyAdded) {
+                    renderTVDetails(internalDataObj, internalData, mediaType, internalDataObj.id || internalData.internal_id, tmdbData);
+                    modal.show();
+                    return;
+                }
+
+                if (mediaType === 'movie' && !alreadyAdded) {
+                    const movieData = {
+                        title,
+                        year,
+                        overview,
+                        rating,
+                        certification,
+                        posterUrl,
+                        tmdbData
+                    };
+                    document.getElementById('detailsContent').innerHTML = renderSearchMovieAddDetails(mediaId, movieData, internalDataObj, addTargetAvailable);
+                    initializeMovieAddOptions(mediaId, tmdbData?.belongs_to_collection?.name || '');
+                    attachButtonEventListeners();
+                    modal.show();
+                    return;
+                }
 
                 // NORMAL MODE HTML (with library status)
                 const html = `
@@ -1894,7 +2691,7 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                                     `).join('')}
                                 </div>
                                 
-                                <p class="mb-3" style="line-height: 1.5;">${overview}</p>
+                                <p class="mb-3 detail-overview-text">${overview}</p>
                                 
                                 <div class="d-flex flex-wrap gap-2 mb-3">
                                     ${seasonCount ? `
@@ -1916,10 +2713,10 @@ function showDetails(mediaType, mediaId, tmdb=false) {
                                                 href="/manage?open=${encodeURIComponent(internalData.internal_id || internalData.id || mediaId)}&type=${mediaType}">
                                                <i class="fas fa-external-link-alt me-1"></i>View in Library
                                            </a>`
-                                        : `<button class="btn btn-primary w-100" id="modalAddButton"
+                                        : addTargetAvailable ? `<button class="btn btn-primary w-100" id="modalAddButton"
                                                 onclick="addItemFromModal('${mediaType}', ${mediaId})">
-                                               Add to ${mediaType === 'tv' ? 'Sonarr' : mediaType === 'book' ? 'Readarr' : 'Radarr'}
-                                           </button>`
+                                               Add to ${addTargetLabel}
+                                           </button>` : ''
                                     }
                                 </div>
                             </div>
@@ -2084,6 +2881,7 @@ document.getElementById('searchAllMissingBtn')?.addEventListener('click', () => 
 });
 
 function attachButtonEventListeners() {
+  const modules = window.appModuleAvailability || {};
   document.querySelectorAll('.monitor-toggle').forEach(btn => {
     btn.onclick = function(e) {
       e.stopPropagation();
@@ -2112,8 +2910,9 @@ function attachButtonEventListeners() {
           // Remove existing search buttons
           btnRow.querySelectorAll('.search-btn, .interactive-search-btn').forEach(b => b.remove());
           // Inject if now monitored and content is missing
-          if (monitored && hasMissing) {
-            const mType = this.dataset.type;
+          const mType = this.dataset.type;
+          const serviceAvailable = (mType === 'movie' && modules.radarr) || (mType === 'tv' && modules.sonarr);
+          if (monitored && hasMissing && serviceAvailable) {
             const mId   = this.dataset.id;
             const deleteBtn = btnRow.querySelector('.delete-btn');
             const searchHtml =
@@ -2152,7 +2951,7 @@ function attachButtonEventListeners() {
       this.disabled = true;
       this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
       fetch(`/api/${mediaType}/${internalId}/search`, { method: 'POST' })
-        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(parseApiResponse)
         .then(({ ok, data }) => {
           if (!ok) throw new Error(data.error || 'Failed to initiate search');
           showNotification('Automatic search started', 'success');
@@ -2385,8 +3184,12 @@ function attachButtonEventListeners() {
         bootstrap.Modal.getInstance(modal).hide();
     }
 
-    function performAddFromModal(mediaType, mediaId, qualityProfileId=null, seasonFilter='latest') {
-        const btn = document.getElementById('modalAddButton');
+    function performAddFromModal(mediaType, mediaId, qualityProfileId=null, seasonFilter='latest', extraOptions={}) {
+        const btn = document.getElementById(extraOptions.buttonId || 'modalAddButton');
+        if (!btn) {
+            console.error('[performAddFromModal] target button not found');
+            return;
+        }
         const originalText = btn.innerHTML;
 
         btn.disabled = true;
@@ -2398,6 +3201,12 @@ function attachButtonEventListeners() {
         }
         if (seasonFilter && mediaType === 'tv') {
             payload.season_filter = seasonFilter;
+        }
+        if (mediaType === 'movie') {
+            payload.root_folder_path = extraOptions.rootFolderPath;
+            payload.minimum_availability = extraOptions.minimumAvailability || 'announced';
+            payload.monitored = extraOptions.monitored !== undefined ? extraOptions.monitored : true;
+            payload.search_for_movie = extraOptions.searchForMovie !== undefined ? extraOptions.searchForMovie : false;
         }
 
         fetch('/add', {
@@ -2412,6 +3221,10 @@ function attachButtonEventListeners() {
                 btn.innerHTML = '✓ Added Successfully';
                 btn.disabled = true;
                 updateStatusInCard(mediaType, mediaId);
+
+                if (mediaType === 'movie') {
+                    updateMovieAddButtonsAfterSuccess(mediaType, mediaId);
+                }
 
                 // Update button to "View in Library" after successful add
                 setTimeout(() => {
@@ -2475,6 +3288,15 @@ function attachButtonEventListeners() {
                     window.location.href = `/manage?type=${mediaType}`;
                 });
             });
+    }
+
+    function updateMovieAddButtonsAfterSuccess(mediaType, mediaId) {
+        const secondaryBtn = document.getElementById('modalSearchAddButton');
+        if (secondaryBtn) {
+            secondaryBtn.disabled = true;
+            secondaryBtn.textContent = 'Added';
+            secondaryBtn.classList.add('movie-add-panel__button--secondary');
+        }
     }
 
     function updateStatusInCard(mediaType, mediaId) {
@@ -2752,12 +3574,19 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function listDownloadedUpdates() {
-    let configPanel = document.getElementById('configModal');
     fetch('/api/update/list')
         .then(response => response.json())
         .then(data => {
-            configPanel.classList.remove('open');
-            configOverlay.classList.remove('open');
+            if (typeof closeConfigDrawer === 'function') {
+                closeConfigDrawer();
+            } else {
+                const configPanel = document.getElementById('configModal');
+                if (configPanel) {
+                    configPanel.dataset.open = 'false';
+                    configPanel.setAttribute('aria-hidden', 'true');
+                }
+                document.body.classList.remove('settings-drawer-open');
+            }
             showDownloadedUpdatesList(data.updates);
         })
         .catch(error => {
@@ -3600,7 +4429,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Handle media click - determines whether to show details or manage details
 function handleMediaClick(mediaType, mediaId, internalId) {
     if (internalId && internalId !== 'null') {
-        showManageDetails(mediaType, internalId);
+        showManageDetails(mediaType, mediaId, internalId);
     } else {
         showDetails(mediaType, mediaId);
     }
@@ -3971,7 +4800,7 @@ function showNotification(message, type) {
     const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
     const notification = document.createElement('div');
     notification.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
-    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.classList.add('notification-toast');
     notification.innerHTML = `
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -4031,15 +4860,20 @@ function updateMediaDisplay() {
     }
     
     const searchTerm = searchInput.value.toLowerCase();
-    const currentFilter = document.getElementById('mediaFilter').value;
+    const mediaFilterElement = document.getElementById('mediaFilter');
+    const currentFilter = mediaFilterElement ? mediaFilterElement.value : 'all';
     const availabilityFilter = document.getElementById('availabilityFilter');
     const availabilityValue = availabilityFilter ? availabilityFilter.value : 'all';
+    const activeManageFilter = document.querySelector('[data-manage-filter].is-active');
+    const manageFilterValue = activeManageFilter ? activeManageFilter.dataset.manageFilter : 'all';
     
     document.querySelectorAll('.media-item').forEach(item => {
         const title = item.dataset.title;
         const isMovie = item.classList.contains('movie-item');
         const isTV = item.classList.contains('tv-item');
         const isBook = item.classList.contains('book-item');
+        const filterState = item.dataset.filterState || 'all';
+        const isMonitored = item.dataset.monitored === 'true';
 
         const matchesSearch = searchTerm === '' || title.includes(searchTerm);
         const matchesFilter = currentFilter === 'all' ||
@@ -4049,8 +4883,12 @@ function updateMediaDisplay() {
         const matchesAvailability = availabilityValue === 'all' ||
                             (availabilityValue === 'movie_missing_file' && isMovie && item.dataset.missingFiles === 'true') ||
                             (availabilityValue === 'tv_missing_episodes' && isTV && item.dataset.missingEpisodes === 'true');
+        const matchesManageFilter = manageFilterValue === 'all' ||
+                            (manageFilterValue === 'missing' && filterState === 'missing') ||
+                            (manageFilterValue === 'available' && filterState === 'available') ||
+                            (manageFilterValue === 'unmonitored' && !isMonitored);
 
-        item.style.display = (matchesSearch && matchesFilter && matchesAvailability) ? 'block' : 'none';
+        item.style.display = (matchesSearch && matchesFilter && matchesAvailability && matchesManageFilter) ? '' : 'none';
     });
 }
 

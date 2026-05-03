@@ -16,11 +16,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a1a" />
     <script src="https://www.youtube.com/iframe_api"></script>
-
-    <!-- Load main.js early to ensure showDetails is available -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
-    <!-- Placeholder function - will be overridden by main.js -->
     <script>
         if (typeof showDetails === 'undefined') {
             window.showDetails = function(mediaType, mediaId, tmdbOnly = false) {
@@ -36,39 +32,37 @@
     </script>
 </head>
 {% set current_page = 'results' %}
-<body>
+<body class="results-page">
     {% include 'partials/navbar.html' %}
 
-    <!-- ── Sticky controls header ── -->
-    <div class="page-sticky-controls" id="stickyControls">
-        <div class="container py-2 text-xs">
-            <!-- Search form + filter row -->
-            <div class="row g-2 mb-2">
-                <div class="col-7 col-md-6">
-                    <form action="/search" method="POST" onsubmit="return validateForm()" class="d-flex gap-1">
-                        <input type="text" class="form-control form-control-sm me-1" id="searchInput"
-                            name="query" placeholder="Search movies, TV shows{% if readarr_enabled %} and books{% endif %}..."
-                            value="{{ query }}" required>
-                        <button type="button" class="btn btn-outline-danger btn-sm" id="clearSearch" disabled>
-                            <i class="fas fa-times"></i>
-                        </button>
-                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
-                    </form>
+    <div class="results-search-shell">
+        <div class="container results-search-shell__inner">
+            <form action="/search" method="POST" onsubmit="return validateForm()" class="results-searchbar">
+                <a href="/" class="results-searchbar__back" aria-label="Back to home">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <input type="text"
+                       class="results-searchbar__input"
+                       id="searchInput"
+                       name="query"
+                       placeholder="Search movies, TV shows{% if readarr_enabled %} and books{% endif %}..."
+                       value="{{ query }}"
+                       required>
+                <button type="button" class="results-searchbar__clear" id="clearSearch" disabled aria-label="Clear search">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </form>
+
+            <div class="results-filterbar">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                    <select id="mediaFilter" class="form-select form-select-sm">
+                        <option value="all">All ({{ all_results }})</option>
+                        <option value="movie">Movies ({{ movies }})</option>
+                        <option value="tv">TV ({{ tv_shows }})</option>
+                        {% if readarr_enabled %}<option value="book">Books ({{ books }})</option>{% endif %}
+                    </select>
                 </div>
-                <div class="col-5 col-md-6">
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text"><i class="fas fa-filter"></i></span>
-                        <select id="mediaFilter" class="form-select form-select-sm">
-                            <option value="all">All ({{ all_results }})</option>
-                            <option value="movie">Movies ({{ movies }})</option>
-                            <option value="tv">TV ({{ tv_shows }})</option>
-                            {% if readarr_enabled %}<option value="book">Books ({{ books }})</option>{% endif %}
-                        </select>
-                    </div>
-                </div>
-            </div>
-            <!-- Back-to-top row (right-aligned) -->
-            <div class="d-flex justify-content-end">
                 <button id="backToTop" class="btn btn-sm btn-outline-secondary btn-back-to-top"
                         title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
                     <i class="fas fa-chevron-up"></i>
@@ -77,63 +71,52 @@
         </div>
     </div>
 
-    <!-- ── Results Grid ── -->
-    <div class="container mt-3 text-xs">
-        {% if results %}
-            <div class="row" id="resultsGrid">
-                {% for result in results %}
-                {% if result.media_type == 'movie' %}
-                    {% set result_id = result.tmdbId %}
-                {% elif result.media_type == 'book' %}
-                    {% set result_id = result.foreignBookId %}
-                {% else %}
-                    {% set result_id = result.tvdbId %}
-                {% endif %}
-                <div class="col-6 col-xs-6 col-lg-12 mb-3 result-item"
-                     data-media-type="{{ result.media_type }}"
-                     data-media-id="{{ result_id }}"
-                     onclick="showDetails('{{ result.media_type }}', {{ result_id }})">
+    <main class="results-main">
+        <div class="container">
+            {% if results %}
+                <section class="results-list" id="resultsGrid" aria-label="Search results for {{ query }}">
+                    {% for result in results %}
+                    {% if result.media_type == 'movie' %}
+                        {% set result_id = result.tmdbId %}
+                    {% elif result.media_type == 'book' %}
+                        {% set result_id = result.foreignBookId %}
+                    {% else %}
+                        {% set result_id = result.tvdbId %}
+                    {% endif %}
+                    <article class="result-item results-listing results-listing--{{ result.media_type }}"
+                             data-media-type="{{ result.media_type }}"
+                             data-media-id="{{ result_id }}"
+                             onclick='showDetails("{{ result.media_type }}", {{ result_id | tojson }})'>
 
-                    <div class="search-result-card h-100 {% if result.media_type == 'movie' %}movie-card{% elif result.media_type == 'book' %}book-card{% else %}tv-card{% endif %}">
-                        <div class="search-result-thumbnail-container">
-                            <img src="{{ (result.remotePoster | imgproxy(174, 261, result.title)) if result.remotePoster else '/static/images/apple-touch-icon.png' }}"
-                                class="search-result-thumbnail"
-                                alt="{{ result.title }}"
-                                onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                            <div class="fade-overlay"></div>
+                        <div class="results-listing__poster-wrap">
+                            <img src="{{ (result.remotePoster | imgproxy(140, 210, result.title)) if result.remotePoster else '/static/images/apple-touch-icon.png' }}"
+                                 class="results-listing__poster"
+                                 alt="{{ result.title }}"
+                                 onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
                         </div>
 
-                        <div class="search-result-content">
-                            <div class="flex justify-between items-start mb-1">
-                                <h3 class="text-xs font-medium text-white truncate">
-                                    {{ result.title }}
-                                    <span class="text-gray-400 text-xs ml-2">
-                                        ({{ result.year or 'N/A' }})
-                                    </span>
-                                </h3>
-                                {% if result.media_type == 'book' and result.author %}
-                                <p class="text-xs" style="color:#a0a0a0; margin: 0 0 2px 0;">{{ result.author.authorName }}</p>
-                                {% endif %}
+                        <div class="results-listing__body">
+                            <h2 class="results-listing__title">{{ result.title }}</h2>
+                            <div class="results-listing__meta">
+                                <span class="results-listing__year">{{ result.year or 'N/A' }}</span>
+                                <span class="status-badge results-listing__status">Checking...</span>
                             </div>
-
-                            <!-- Status Badge with Delete Button -->
-                            <div class="media-status-section d-flex justify-content-between align-items-start mt-2 gap-2">
-                                <span class="status-badge text-xs badge bg-secondary flex-grow-1">Checking...</span>
-                                <button class="delete-btn btn btn-sm btn-outline-danger" style="display: none;" title="Delete from library">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
+                            {% if result.media_type == 'book' and result.author %}
+                            <div class="results-listing__author">{{ result.author.authorName }}</div>
+                            {% endif %}
+                            <p class="results-listing__overview">
+                                {{ result.overview or 'No overview available.' }}
+                            </p>
                         </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="alert alert-warning">No results found for "{{ query }}"</div>
-        {% endif %}
-    </div>
+                    </article>
+                    {% endfor %}
+                </section>
+            {% else %}
+                <div class="alert alert-warning">No results found for "{{ query }}"</div>
+            {% endif %}
+        </div>
+    </main>
 
-    <!-- Modal for details -->
     <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-modal="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -150,14 +133,10 @@
 
     <div id="overlay-backdrop" class="overlay-backdrop"></div>
     <div id="modal-overlay-backdrop" class="overlay-backdrop modal-overlay-backdrop"></div>
-    <div class="spinner-border spinner-radarr" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
 
-    <!-- Global Loading Spinner -->
     <div id="globalLoadingSpinner" class="loading-spinner">
         <div class="spinner-container">
-            <button id="forceCloseSpinner" class="btn-close btn-close-white mt-3" style="display: none;"></button>
+            <button id="forceCloseSpinner" class="btn-close btn-close-white force-close-spinner-hidden"></button>
             <div class="spinner-border spinner-radarr" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
@@ -165,10 +144,8 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Book data cache -->
     <script>
     window.bookCache = new Map();
     {% for result in results %}{% if result.media_type == 'book' %}
@@ -178,36 +155,105 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Media type filter
         const mediaFilter = document.getElementById('mediaFilter');
-        mediaFilter.addEventListener('change', function() {
-            const filter = this.value;
-            document.querySelectorAll('.result-item').forEach(item => {
-                item.style.display = (filter === 'all' || item.getAttribute('data-media-type') === filter)
-                    ? 'block' : 'none';
+        if (mediaFilter) {
+            mediaFilter.addEventListener('change', function() {
+                const filter = this.value;
+                document.querySelectorAll('.result-item').forEach(item => {
+                    item.style.display = (filter === 'all' || item.getAttribute('data-media-type') === filter)
+                        ? '' : 'none';
+                });
             });
-        });
+        }
 
-        // Check library status for all items
-        document.querySelectorAll('.result-item').forEach(resultItem => {
-            checkLibraryStatus(resultItem.dataset.mediaType, resultItem.dataset.mediaId,
-                resultItem.querySelector('.search-result-card'));
-        });
-
-        initializeMediaGrid();
+        initializeResultsStatuses();
         initializeClearSearch();
 
-        // Back-to-top visibility
         window.addEventListener('scroll', function() {
             document.getElementById('backToTop')
                     .classList.toggle('show', window.pageYOffset > 200);
         });
     });
 
+    function initializeResultsStatuses() {
+        const resultItems = Array.from(document.querySelectorAll('.result-item'));
+        if (!resultItems.length) return;
+
+        const movieIds = [];
+        const tvIds = [];
+
+        resultItems.forEach((item) => {
+            const mediaType = item.dataset.mediaType;
+            const mediaId = item.dataset.mediaId;
+
+            if (!mediaId) {
+                updateStatusBadge(item, 'Unavailable', 'is-error');
+                return;
+            }
+
+            if (mediaType === 'movie') movieIds.push(mediaId);
+            else if (mediaType === 'tv') tvIds.push(mediaId);
+            else checkBookLibraryStatus(item, mediaId);
+        });
+
+        if (!movieIds.length && !tvIds.length) return;
+
+        const params = new URLSearchParams();
+        if (movieIds.length) params.set('movie_ids', movieIds.join(','));
+        if (tvIds.length) params.set('tv_ids', tvIds.join(','));
+
+        fetch(`/api/library/batch-status?${params.toString()}`)
+            .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+            .then(batch => {
+                resultItems.forEach((item) => {
+                    const mediaType = item.dataset.mediaType;
+                    const mediaId = item.dataset.mediaId;
+                    if (mediaType !== 'movie' && mediaType !== 'tv') return;
+
+                    const info = (batch[mediaType] || {})[mediaId];
+                    if (!info || !info.in_library) {
+                        updateStatusBadge(item, 'Not Added', 'is-available');
+                        return;
+                    }
+
+                    const isOnDisk = mediaType === 'movie'
+                        ? !!info.hasFile
+                        : (info.statistics?.episodeFileCount || 0) > 0;
+
+                    updateStatusBadge(item, isOnDisk ? 'In Library' : 'Missing', isOnDisk ? 'is-library' : 'is-missing');
+                });
+            })
+            .catch(() => {
+                resultItems.forEach((item) => {
+                    if (item.dataset.mediaType === 'movie' || item.dataset.mediaType === 'tv') {
+                        updateStatusBadge(item, 'Error', 'is-error');
+                    }
+                });
+            });
+    }
+
+    function checkBookLibraryStatus(resultItem, mediaId) {
+        fetch(`/check_library_status?type=book&id=${mediaId}`)
+            .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+            .then(data => {
+                updateStatusBadge(resultItem, data.in_library ? 'In Library' : 'Available', data.in_library ? 'is-library' : 'is-available');
+            })
+            .catch(() => {
+                updateStatusBadge(resultItem, 'Error', 'is-error');
+            });
+    }
+
+    function updateStatusBadge(resultItem, text, stateClass) {
+        const statusBadge = resultItem.querySelector('.status-badge');
+        if (!statusBadge) return;
+
+        statusBadge.textContent = text;
+        statusBadge.className = `status-badge results-listing__status ${stateClass}`;
+    }
+
     function checkLibraryStatus(mediaType, mediaId, card) {
         if (!card) return;
         const statusBadge = card.querySelector('.status-badge');
-        const deleteBtn   = card.querySelector('.delete-btn');
         if (!statusBadge) return;
 
         fetch(`/check_library_status?type=${mediaType}&id=${mediaId}`)
@@ -221,55 +267,28 @@
                             const isOnDisk = mediaType === 'movie'
                                 ? (itemData.hasFile || false)
                                 : (itemData.statistics?.episodeFileCount || 0) > 0;
+
                             if (isOnDisk) {
-                                statusBadge.textContent = 'On Disk';
-                                statusBadge.className = 'status-badge text-xs badge text-bg-success';
+                                statusBadge.textContent = 'In Library';
+                                statusBadge.className = 'status-badge results-listing__status is-library';
                             } else {
                                 statusBadge.textContent = 'Missing';
-                                statusBadge.className = 'status-badge text-xs badge text-bg-danger';
-                            }
-                            if (deleteBtn) {
-                                deleteBtn.style.display = 'block';
-                                deleteBtn.dataset.mediaType = mediaType;
-                                deleteBtn.dataset.mediaId   = mediaId;
-                                deleteBtn.onclick = deleteFromLibrary;
+                                statusBadge.className = 'status-badge results-listing__status is-missing';
                             }
                         })
                         .catch(() => {
                             statusBadge.textContent = 'Error';
-                            statusBadge.className = 'status-badge text-xs badge bg-danger';
+                            statusBadge.className = 'status-badge results-listing__status is-error';
                         });
                 } else {
-                    statusBadge.textContent = 'Not Added';
-                    statusBadge.className = 'status-badge text-xs badge bg-secondary';
-                    if (deleteBtn) deleteBtn.style.display = 'none';
+                    statusBadge.textContent = mediaType === 'book' ? 'Available' : 'Not Added';
+                    statusBadge.className = 'status-badge results-listing__status is-available';
                 }
             })
             .catch(() => {
                 statusBadge.textContent = 'Error';
-                statusBadge.className = 'status-badge text-xs badge bg-danger';
-                if (deleteBtn) deleteBtn.style.display = 'none';
+                statusBadge.className = 'status-badge results-listing__status is-error';
             });
-    }
-
-    function deleteFromLibrary(e) {
-        e.stopPropagation();
-        const mediaType = this.dataset.mediaType;
-        const mediaId   = this.dataset.mediaId;
-        if (confirm('Are you sure you want to delete this from your library?')) {
-            fetch(`/api/${mediaType}/${mediaId}`, { method: 'DELETE' })
-                .then(r => {
-                    if (r.ok) {
-                        showNotification('Item deleted successfully', 'success');
-                        checkLibraryStatus(mediaType, mediaId, this.closest('.search-result-card'));
-                    } else throw new Error();
-                })
-                .catch(() => showNotification('Failed to delete item', 'error'));
-        }
-    }
-
-    function showNotification(message, type) {
-        alert(`${type === 'success' ? '✅' : '❌'} ${message}`);
     }
 
     function validateForm() {
