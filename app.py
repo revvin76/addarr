@@ -1,4 +1,12 @@
 # app.py (Simplified)
+import sys
+import io
+# Force UTF-8 encoding for console output on Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+else:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 import os
 from flask import Flask
 import logging
@@ -6,7 +14,6 @@ from logging.handlers import RotatingFileHandler
 import threading
 import time
 import atexit
-import sys
 import gc
 import psutil
 import requests
@@ -19,71 +26,20 @@ from memory_manager import MemoryManager
 from update_manager import UpdateManager
 from utils import SharedUtils
 import routes
+import books_db
+try:
+    from ruflo.restart_monitor_thread import RestartMonitor
+except ImportError:
+    try:
+        from restart_monitor_thread import RestartMonitor
+    except ImportError:
+        RestartMonitor = None
 
 # Global variables for tunnel functionality - define them at module level
 tunnel_process = None
 tunnel_url = None
-tunnel_lock = threading.Lock()
-tunnel_should_run = True
-
-def monitor_tunnel():
-    """Monitor tunnel and auto-reconnect if it drops"""
-    global tunnel_process, tunnel_url, tunnel_should_run
-
-    logging.info("Tunnel monitor started")
-
-    while tunnel_should_run:
-        time.sleep(5)
-
-        with tunnel_lock:
-            if not tunnel_process:
-                continue
-
-            # Detect dead tunnel
-            try:
-                # If the process has a poll method (subprocess-like)
-                if hasattr(tunnel_process, "poll") and tunnel_process.poll() is not None:
-                    logging.warning("Tunnel process exited. Attempting reconnect...")
-                    print("Tunnel disconnected. Attempting reconnect...")
-                    tunnel_process = None
-                    tunnel_url = None
-                    attempt_reconnect()
-
-                # If Pinggy exposes a connected flag
-                elif hasattr(tunnel_process, "connected") and not tunnel_process.connected:
-                    logging.warning("Tunnel connection lost. Attempting reconnect...")
-                    print("Tunnel connection lost. Attempting reconnect...")
-                    tunnel_process = None
-                    tunnel_url = None
-                    attempt_reconnect()
-
-            except Exception as e:
-                logging.error(f"Tunnel monitor error: {e}")
-
-def attempt_reconnect():
-    """Try to reconnect tunnel every 10 seconds until successful"""
-    global tunnel_process, tunnel_url
-
-    while tunnel_should_run:
-        try:
-            print("Reconnecting tunnel...")
-            logging.info("Attempting tunnel reconnect...")
-
-            start_pinggy_tunnel()
-
-            # Wait up to 15 seconds for tunnel_url to populate
-            for _ in range(15):
-                if tunnel_url:
-                    print("Tunnel reconnected")
-                    logging.info("Tunnel successfully reconnected")
-                    return
-                time.sleep(1)
-
-        except Exception as e:
-            logging.error(f"Reconnect failed: {e}")
-
-        print("Reconnect failed. Retrying in 10 seconds...")
-        time.sleep(10)
+tunnel_url_lock = threading.Lock()  # Lock to protect tunnel_url access
+restart_monitor = None
 
 # Setup basic logging
 def setup_basic_logging():
@@ -91,7 +47,7 @@ def setup_basic_logging():
     logger.setLevel(logging.INFO)
     
     handler = RotatingFileHandler(
-        'addarr.log', 
+        'arrdash.log', 
         maxBytes=5*1024*1024,
         backupCount=3,
         encoding='utf-8'
@@ -103,7 +59,38 @@ setup_basic_logging()
 
 # Initialize core components
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_DEBUG') if os.getenv('FLASK_DEBUG') else os.urandom(24)
+app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.urandom(24)
+
+# ── Jinja filter: route any remote image URL through the local caching proxy ──
+from urllib.parse import quote as _url_quote
+
+@app.template_filter('imgproxy')
+def imgproxy_filter(url, w=174, h=261, title=''):
+    """{{ url | imgproxy }} or {{ url | imgproxy(174, 261, item.title) }}"""
+    if not url or url.startswith('/'):
+        return url or '/static/images/apple-touch-icon.png'
+    qs = f'/api/img?url={_url_quote(url, safe="")}&w={w}&h={h}'
+    if title:
+        qs += f'&t={_url_quote(str(title), safe="")}'
+    return qs
+
+@app.before_request
+def kindle_redirect():
+    """Auto-redirect Kindle/Silk browsers to the Kindle-optimised book view."""
+    from flask import request, redirect, url_for, session
+
+    # Only redirect on the very first hit per session — don't trap the user
+    if session.get('kindle_redirected'):
+        return
+
+    # Skip API calls, static files, auth routes and the kindle route itself
+    exempt_prefixes = ('/static', '/api', '/login', '/logout', '/kindle', '/offline')
+    if any(request.path.startswith(p) for p in exempt_prefixes):
+        return
+
+    if is_kindle_request():
+        session['kindle_redirected'] = True
+        return redirect(url_for('kindle_books'))
 
 CONFIG = LazyConfig()
 memory_manager = MemoryManager(CONFIG)
@@ -122,6 +109,16 @@ def get_ip_address():
     except Exception:
         ip_address = '127.0.0.1'
     return ip_address
+
+# ============ KINDLE DETECTION ============
+
+KINDLE_UA_TOKENS = ('kindle', 'silk', 'kftt', 'kfot', 'kfjwi', 'kfjwa', 'kfsowi', 'kfmewi', 'kfgiwi')
+
+def is_kindle_request():
+    """Return True if the current request came from a Kindle or Silk browser."""
+    from flask import request
+    ua = request.headers.get('User-Agent', '').lower()
+    return any(token in ua for token in KINDLE_UA_TOKENS)
 
 def display_enhanced_qr_code(url):
     """Display an enhanced QR code with better formatting"""
@@ -162,67 +159,86 @@ def start_pinggy_tunnel():
     
     def tunnel_worker():
         global tunnel_process, tunnel_url
-        try:
-            print("🚀 Starting Pinggy Pro tunnel...")
-            logging.info("Starting Pinggy Pro tunnel...")
-            
-            # For Pinggy Pro: Use token and reserved subdomain
-            pinggy_token = CONFIG.tunnel.auth_token
-            reserved_subdomain = CONFIG.tunnel.reserved_subdomain
-            
-            # Build the connection arguments
-            connection_args = {
-                'forwardto': f"localhost:{CONFIG.app.port}",
-                'type': 'http',
-                'headermodification': ["X-Pinggy-No-Screen:bypass"],
-                'force': True
-            }
-            
-            # For Pinggy Pro with token authentication
-            if pinggy_token and reserved_subdomain:
-                # Remove .a.pinggy.link if present, just use the subdomain name
-                clean_subdomain = reserved_subdomain.replace('.a.pinggy.link', '').replace('.pinggy.io', '')
-                # The token+subdomain combination goes in the 'token' parameter
-                connection_args['token'] = f"{pinggy_token}+{clean_subdomain}"
-                print(f"🔐 Using Pinggy Pro authentication & subdomain: {clean_subdomain}")
-            elif pinggy_token:
-                connection_args['token'] = pinggy_token
-                print("🔐 Using Pinggy Pro authentication")
-            else:
-                print("🔐 Using public Pinggy tunnel")
-            
-            print(f"🎯 Starting tunnel on port {CONFIG.app.port}...")
-            print("🔄 Establishing tunnel connection...")
-            
-            # Start the tunnel with the correct parameters
-            tunnel_process = pinggy.start_tunnel(**connection_args)
-            
-            # Wait for tunnel with timeout
-            start_time = time.time()
-            max_wait = 30  # 30 second timeout
-            
-            print("⏳ Waiting for tunnel URLs...", end="", flush=True)
-            
-            while not hasattr(tunnel_process, 'urls') or not tunnel_process.urls:
-                if time.time() - start_time > max_wait:
-                    raise Exception(f"Tunnel connection timeout after {max_wait} seconds")
-                time.sleep(1)
-                print(".", end="", flush=True)  # Show progress
-            
-            print()  # New line after progress dots
-            
-            if tunnel_process.urls:
-                tunnel_url = tunnel_process.urls[1] if len(tunnel_process.urls) > 1 else tunnel_process.urls[0]
-                print(f"✅ Pinggy Pro tunnel started successfully!")
-                print(f"   🌐 Public URL: {tunnel_url}")                
-                logging.info(f"Pinggy Pro tunnel started: {tunnel_url}")
-            else:
-                raise Exception("No tunnel URLs received")
-            
-        except Exception as e:
-            print(f"\n❌ Tunnel failed: {e}")
-            logging.error(f"Tunnel failed: {str(e)}")
-            tunnel_url = None
+
+        pinggy_token       = CONFIG.tunnel.auth_token
+        reserved_subdomain = CONFIG.tunnel.reserved_subdomain
+
+        # Build connection args once — they don't change between reconnects
+        connection_args = {
+            'forwardto':          f"localhost:{CONFIG.app.port}",
+            'type':               'http',
+            'headermodification': ["X-Pinggy-No-Screen:bypass"],
+            'force':              True,
+        }
+        if pinggy_token and reserved_subdomain:
+            clean_subdomain = (reserved_subdomain
+                               .replace('.a.pinggy.link', '')
+                               .replace('.pinggy.io', ''))
+            connection_args['token'] = f"{pinggy_token}+{clean_subdomain}"
+            print(f"🔐 Using Pinggy Pro authentication & subdomain: {clean_subdomain}")
+        elif pinggy_token:
+            connection_args['token'] = pinggy_token
+            print("🔐 Using Pinggy Pro authentication")
+        else:
+            print("🔐 Using public Pinggy tunnel")
+
+        retry_delay = 5   # seconds between reconnect attempts (doubles each time, capped at 60)
+        attempt     = 0
+
+        while True:   # ── Auto-reconnect loop ─────────────────────────────────
+            attempt += 1
+            try:
+                print(f"🚀 Starting Pinggy tunnel (attempt {attempt})...")
+                logging.info("Starting Pinggy tunnel (attempt %d)...", attempt)
+
+                tunnel_process = pinggy.start_tunnel(**connection_args)
+
+                # Wait up to 30 s for URLs to appear
+                start_time = time.time()
+                print("⏳ Waiting for tunnel URLs...", end="", flush=True)
+                while not (hasattr(tunnel_process, 'urls') and tunnel_process.urls):
+                    if time.time() - start_time > 30:
+                        raise Exception("Tunnel connection timeout after 30 s")
+                    time.sleep(1)
+                    print(".", end="", flush=True)
+                print()
+
+                with tunnel_url_lock:
+                    tunnel_url = (tunnel_process.urls[1]
+                                  if len(tunnel_process.urls) > 1
+                                  else tunnel_process.urls[0])
+                    _url = tunnel_url
+                print(f"✅ Pinggy tunnel active: {_url}")
+                logging.info("Pinggy tunnel active: %s", _url)
+                retry_delay = 5  # reset back-off after a successful connect
+
+                # ── Monitor the live tunnel ─────────────────────────────────
+                # Poll every 10 s; if urls goes empty the tunnel has dropped.
+                while True:
+                    time.sleep(10)
+                    try:
+                        alive = (hasattr(tunnel_process, 'urls') and
+                                 bool(tunnel_process.urls))
+                    except Exception:
+                        alive = False
+                    if not alive:
+                        raise Exception("Tunnel disconnected (urls gone)")
+
+            except Exception as e:
+                print(f"\n⚠️  Tunnel error: {e} — reconnecting in {retry_delay} s...")
+                logging.warning("Tunnel error (attempt %d): %s — reconnecting in %d s",
+                                attempt, e, retry_delay)
+                with tunnel_url_lock:
+                    tunnel_url = None
+                # Close the dead tunnel object if possible
+                try:
+                    if tunnel_process and hasattr(tunnel_process, 'close'):
+                        tunnel_process.close()
+                except Exception:
+                    pass
+                tunnel_process = None
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60)  # exponential back-off, cap 60 s
     
     # Start tunnel in separate thread
     print("🧵 Starting tunnel thread...")
@@ -243,7 +259,8 @@ def cleanup_tunnel():
                 except Exception as e:
                     print(f"Warning: Error closing tunnel gracefully: {e}")
             tunnel_process = None
-            tunnel_url = None
+            with tunnel_url_lock:
+                tunnel_url = None
         except Exception as e:
             print(f"Warning: Error during tunnel cleanup: {e}")
             logging.warning(f"Error during tunnel cleanup: {str(e)}")
@@ -251,14 +268,16 @@ def cleanup_tunnel():
 def get_network_info():
     """Get comprehensive network information"""
     global tunnel_url
+    with tunnel_url_lock:
+        current_tunnel_url = tunnel_url
     return {
         'local_ip': get_ip_address(),
         'port': CONFIG.app.port,
         'duckdns_enabled': CONFIG.duckdns.enabled,
         'duckdns_domain': CONFIG.duckdns.domain,
         'tunnel_enabled': CONFIG.tunnel.enabled,
-        'tunnel_url': tunnel_url,
-        'tunnel_active': tunnel_url is not None
+        'tunnel_url': current_tunnel_url,
+        'tunnel_active': current_tunnel_url is not None
     }
 
 # ============ WELCOME FUNCTION ============
@@ -268,15 +287,18 @@ def print_welcome():
     global tunnel_url  # Add this line to access the global variable
 
     app_info = f"""
-    {Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}
+    {Fore.GREEN}🚀 arrdash MEDIA MANAGER{Style.RESET_ALL}
     {Fore.WHITE}• Version: {CONFIG.app.version}
     {Fore.WHITE}• Local: {Fore.CYAN}http://127.0.0.1:{CONFIG.app.port}{Style.RESET_ALL}
     {Fore.WHITE}• Network: {Fore.CYAN}http://{get_ip_address()}:{CONFIG.app.port}{Style.RESET_ALL}
     """
     
     # Check if tunnel URL is available (it might be set by the tunnel thread)
-    if tunnel_url:
-        app_info += f"{Fore.WHITE}• Tunnel: {Fore.CYAN}{tunnel_url}{Style.RESET_ALL}\n"
+    with tunnel_url_lock:
+        current_tunnel_url = tunnel_url
+    
+    if current_tunnel_url:
+        app_info += f"{Fore.WHITE}• Tunnel: {Fore.CYAN}{current_tunnel_url}{Style.RESET_ALL}\n"
     elif CONFIG.tunnel.enabled:
         app_info += f"{Fore.WHITE}• Tunnel: {Fore.YELLOW}Starting...{Style.RESET_ALL}\n"
     
@@ -289,11 +311,13 @@ def print_welcome():
         my_art.to_terminal()
     except Exception as e:
         # Fallback if logo isn't available
-        print(f"{Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}🚀 arrdash MEDIA MANAGER{Style.RESET_ALL}")
     
     print(app_info)
-    if tunnel_url:
-        display_enhanced_qr_code(tunnel_url)
+    with tunnel_url_lock:
+        current_tunnel_url = tunnel_url
+    if current_tunnel_url:
+        display_enhanced_qr_code(current_tunnel_url)
 
     print(f"{Fore.GREEN}✅ Ready to add media!{Style.RESET_ALL}\n")
     print(f"{Fore.YELLOW}Press Ctrl-C to shutdown{Style.RESET_ALL}")
@@ -362,18 +386,18 @@ def restart_application():
         # Stop managers gracefully
         try:
             update_manager.stop()
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error stopping update_manager: {str(e)}")
             
         try:
             memory_manager.stop()
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error stopping memory_manager: {str(e)}")
             
         try:
             cleanup_tunnel()
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error cleaning up tunnel: {str(e)}")
         
         # Use subprocess to restart
         python = sys.executable
@@ -421,7 +445,6 @@ def conditional_debug_log(func):
         if not CONFIG.app.debug:
             return func(*args, **kwargs)
         
-        import time
         start_time = time.time()
         logger = logging.getLogger(func.__module__)
         
@@ -438,6 +461,18 @@ def conditional_debug_log(func):
             raise
     return wrapper
 
+# ── Pinggy tunnel: suppress interstitial injection ────────────────────────────
+# Pinggy injects its own HTML into responses when the X-Pinggy-No-Screen header
+# is absent from the *response*.  Without it, the injected bytes push the actual
+# response body past the Content-Length Flask declared, which Chrome reports as
+# ERR_CONTENT_LENGTH_MISMATCH and the truncated page means JS never runs.
+# Sending this header on every response costs nothing and is harmless on non-
+# Pinggy requests.
+@app.after_request
+def add_pinggy_bypass_header(response):
+    response.headers['X-Pinggy-No-Screen'] = 'bypass'
+    return response
+
 # Initialize routes
 routes.init_routes(
     app=app,
@@ -446,19 +481,59 @@ routes.init_routes(
     debug_decorator=conditional_debug_log,
     shared_utils=utils,
     network_info_func=get_network_info,
-    update_manager=update_manager
+    update_manager=update_manager,
+    kindle_detector=is_kindle_request
 )
 
 # ============ STARTUP AND SHUTDOWN ============
 
+def _background_azw3_scan():
+    """Scan the book library and ensure every book has an AZW3 file.
+
+    Runs in a daemon thread so it does not block server startup.
+    """
+    try:
+        import time as _time
+        _time.sleep(8)  # let Flask fully finish starting up first
+        from utils import scan_books_folder, ensure_azw3
+        root_folder = (
+            CONFIG.readarr.root_folder
+            if hasattr(CONFIG, 'readarr') and getattr(CONFIG.readarr, 'enabled', False)
+            else None
+        )
+        if not root_folder:
+            logging.info('[AZW3] No Readarr root folder configured — skipping scan.')
+            return
+        logging.info('[AZW3] Starting background AZW3 scan of %s', root_folder)
+        books = scan_books_folder(root_folder)
+        to_convert = [
+            b['file_path'] for b in books
+            if b['extension'] in ('.epub', '.mobi', '.pdf')
+        ]
+        logging.info('[AZW3] %d books to check for AZW3 conversion', len(to_convert))
+        converted = failed = already = 0
+        for fp in to_convert:
+            _, status = ensure_azw3(fp)
+            if status == 'converted':
+                converted += 1
+            elif status == 'failed':
+                failed += 1
+            else:
+                already += 1
+        logging.info(
+            '[AZW3] Scan complete — %d converted, %d already exist, %d failed',
+            converted, already, failed,
+        )
+    except Exception as e:
+        logging.error('[AZW3] Background scan error: %s', e, exc_info=True)
+
+
 def startup_sequence():
     global tunnel_url  # Add this line to access the global variable
-    
-    import gc
-    gc.collect()
-    
-    # Only run in the main process, not the reloader process
-    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+
+    # In debug/reloader mode, only run in Werkzeug's child process.
+    # In normal mode, run in the main Python process.
+    if CONFIG.app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         return
         
     # Check for updates FIRST before anything else
@@ -477,31 +552,43 @@ def startup_sequence():
         print("🔧 Starting tunnel...")
         start_pinggy_tunnel()
         
-        monitor_thread = threading.Thread(
-            target=monitor_tunnel,
-            daemon=True,
-            name="TunnelMonitor"
-        )
-        monitor_thread.start()        
-        # # Wait for tunnel to establish
-        # print("⏳ Waiting for tunnel to establish...", end="", flush=True)
-        # for i in range(15):  # Wait up to 15 seconds
-        #     if tunnel_url is not None:
-        #         break
-        #     time.sleep(1)
-        #     print(".", end="", flush=True)
-        # print()  # New line after progress dots
+        # Wait for tunnel to establish
+        print("⏳ Waiting for tunnel to establish...", end="", flush=True)
+        for i in range(15):  # Wait up to 15 seconds
+            with tunnel_url_lock:
+                if tunnel_url is not None:
+                    break
+            time.sleep(1)
+            print(".", end="", flush=True)
+        print()  # New line after progress dots
 
     
+    # Initialise local books database
+    books_db.init_db()
+
+    # Start background AZW3 conversion scan
+    azw3_thread = threading.Thread(
+        target=_background_azw3_scan, daemon=True, name='AZW3Converter'
+    )
+    azw3_thread.start()
+
     # Start update manager if enabled (background checks)
     if CONFIG.update.enabled:
         update_manager.start()
-    
+
     # Start memory manager
     memory_manager.start()
-    
+
     # Print welcome message
     print_welcome()
+
+    # Start restart monitor
+    global restart_monitor
+    if RestartMonitor is not None:
+        restart_monitor = RestartMonitor(reload_file_path='.reload', check_interval=1.0)
+        restart_monitor.start()
+    else:
+        logging.warning("RestartMonitor unavailable; automatic .reload restarts are disabled.")
 
     # # Print welcome message in main process only
     # if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
@@ -510,10 +597,17 @@ def startup_sequence():
 def shutdown_sequence():
     global tunnel_process  # Add this line to access the global variable
     global tunnel_should_run
+    global restart_monitor
     tunnel_should_run = False
-    
+
     logging.info("Shutting down application...")
-    
+
+    try:
+        if restart_monitor:
+            restart_monitor.stop()
+    except Exception as e:
+        logging.warning(f"Error stopping restart monitor: {e}")
+
     # Stop managers with error handling
     try:
         if hasattr(update_manager, 'stop'):
@@ -537,9 +631,8 @@ def shutdown_sequence():
 atexit.register(shutdown_sequence)
 
 if __name__ == '__main__':
-    startup_sequence()
-    
     try:
+        startup_sequence()
         app.run(
             host='0.0.0.0', 
             debug=CONFIG.app.debug, 

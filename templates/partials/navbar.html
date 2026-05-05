@@ -1,0 +1,1924 @@
+{#
+  templates/partials/navbar.html
+  ─────────────────────────────
+  Shared navbar + modals + config JS for every page.
+  Set   {% set current_page = 'index' %}   (or manage / manage-books / results /
+  trending / links / prowlarr / downloads) before {% include 'partials/navbar.html' %}.
+#}
+
+<!-- ═══ Navbar ═══ -->
+<div class="container-fluid bg-dark py-2 app-topbar" id="appTopbar">
+    <div class="container d-flex align-items-center">
+        <a href="/" class="d-flex align-items-center text-decoration-none me-auto">
+            <img src="/static/images/logo.png" alt="arrdash Logo" height="40" class="me-2">
+        </a>
+
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-radarr" type="button" data-nav-open aria-label="Open navigation" title="Menu">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="nav-drawer" id="appNavDrawer" data-open="false" aria-hidden="true">
+    <div class="nav-drawer__backdrop" data-nav-close></div>
+    <aside class="nav-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="appNavDrawerTitle" tabindex="-1">
+        <nav class="nav-drawer__body" aria-label="Primary">
+            <a class="nav-drawer__item {% if current_page == 'index' %}is-active{% endif %}" href="/">
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--arrdash"><i class="fas fa-house"></i></span>
+                <span>Home</span>
+            </a>
+
+            {% if config.radarr.enabled %}
+            <a class="nav-drawer__item {% if current_page == 'manage-movies' %}is-active{% endif %}" href="/manage?view=movie">
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--radarr"><i class="fas fa-film"></i></span>
+                <span>Manage Movies</span>
+            </a>
+            {% endif %}
+
+            {% if config.sonarr.enabled %}
+            <a class="nav-drawer__item {% if current_page == 'manage-tv' %}is-active{% endif %}" href="/manage?view=tv">
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--sonarr"><i class="fas fa-tv"></i></span>
+                <span>Manage TV</span>
+            </a>
+            {% endif %}
+
+            {% if config.readarr.enabled %}
+            <a class="nav-drawer__item {% if current_page == 'manage-books' %}is-active{% endif %}" href="/manage-books">
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--readarr"><i class="fas fa-book"></i></span>
+                <span>Manage Books</span>
+            </a>
+            {% endif %}
+
+            {% if config.tmdb.enabled %}
+            <a class="nav-drawer__item {% if current_page == 'trending' %}is-active{% endif %}" href="/trending">
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--tmdb"><i class="fas fa-fire"></i></span>
+                <span>Trending</span>
+            </a>
+            {% endif %}
+
+            {% if (config.radarr.enabled and config.radarr.url) or (config.sonarr.enabled and config.sonarr.url) or (config.readarr.enabled and config.readarr.url) or (config.prowlarr.enabled and config.prowlarr.url) or (config.qbit.enabled and config.qbit.url) %}
+            <a class="nav-drawer__item {% if current_page == 'links' %}is-active{% endif %}" href="/links">
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--arrdash"><i class="fas fa-link"></i></span>
+                <span>Service Links</span>
+            </a>
+            {% endif %}
+
+            {% if config.prowlarr.enabled %}
+            <a class="nav-drawer__item {% if current_page == 'prowlarr' %}is-active{% endif %}" href="/prowlarr">
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--prowlarr"><i class="fas fa-magnifying-glass"></i></span>
+                <span>Prowlarr Search</span>
+            </a>
+            {% endif %}
+
+            {% if config.qbit.enabled %}
+            <a class="nav-drawer__item {% if current_page == 'downloads' %}is-active{% endif %}" href="/downloads">
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--qbit"><i class="fas fa-download"></i></span>
+                <span>Downloads</span>
+            </a>
+            {% endif %}
+        </nav>
+
+        <div class="nav-drawer__footer">
+            <div class="nav-drawer__utility-pill">
+                <button class="nav-drawer__utility-btn" type="button" data-settings-open aria-label="Open settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button class="nav-drawer__utility-link" type="button" data-about-open>
+                    <i class="fas fa-info-circle"></i>
+                    <span>About</span>
+                </button>
+                {% if config.auth.enabled %}
+                    {% if session.get('authenticated') %}
+                    <a class="nav-drawer__utility-btn nav-drawer__utility-btn--link" href="/logout" aria-label="Sign out">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
+                    {% else %}
+                    <a class="nav-drawer__utility-btn nav-drawer__utility-btn--link" href="/login" aria-label="Sign in">
+                        <i class="fas fa-sign-in-alt"></i>
+                    </a>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </aside>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     Config Modal
+════════════════════════════════════════════════════════ -->
+<div class="settings-drawer" id="configModal" data-open="false" aria-hidden="true">
+    <div class="settings-drawer__backdrop" id="configOverlay" data-settings-close></div>
+    <aside class="settings-drawer__panel bg-dark text-light" role="dialog" aria-modal="true" aria-labelledby="configModalLabel" tabindex="-1">
+        <div class="settings-drawer__header border-secondary">
+            <button type="button" class="settings-drawer__back btn btn-link text-light p-0" data-settings-close aria-label="Back">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h5 class="modal-title mb-0" id="configModalLabel">Settings</h5>
+            <span class="settings-drawer__header-spacer" aria-hidden="true"></span>
+        </div>
+
+        <form class="config-form settings-drawer__form" id="configForm" method="POST">
+            <div class="settings-drawer__body">
+                <section class="settings-group" aria-labelledby="settingsGroupServices">
+                    <p class="settings-group__label" id="settingsGroupServices">Media Services</p>
+                    <div class="settings-group__card">
+
+                    <!-- Radarr Settings -->
+                    <div class="mb-3 settings-block {% if not config.radarr.enabled %}is-disabled{% endif %}" data-block-id="radarr">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-radarr mb-0"><i class="fas fa-film me-2"></i>Radarr</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="radarrEnabled"
+                                                name="RADARR_ENABLED" {% if config.radarr.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="radarrEnabled">Enable Radarr</label>
+                                        </div>
+                                        <small class="settings-module-note">Movie collection management and automation. <a href="https://radarr.video" target="_blank" rel="noopener noreferrer">radarr.video</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="radarrContent" {% if not config.radarr.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="radarrUrl" class="form-label">Radarr URL</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="radarrUrl" name="RADARR_URL" value="{{ config.radarr.url }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="radarrApiKey" class="form-label">API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="radarrApiKey" name="RADARR_API_KEY" value="{{ config.radarr.api_key }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="radarrRootFolder" class="form-label">Root Folder</label>
+                                        <select class="form-control bg-dark text-light border-secondary"
+                                                id="radarrRootFolder" name="RADARR_ROOT_FOLDER">
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="radarrQualityProfile" class="form-label">Quality Profile</label>
+                                        <select class="form-control bg-dark text-light border-secondary"
+                                                id="radarrQualityProfile" name="RADARR_QUALITY_PROFILE">
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-info w-100 test-connection" id="testRadarr">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sonarr Settings -->
+                    <div class="mb-3 settings-block {% if not config.sonarr.enabled %}is-disabled{% endif %}" data-block-id="sonarr">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-sonarr mb-0"><i class="fas fa-tv me-2"></i>Sonarr</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="sonarrEnabled"
+                                                name="SONARR_ENABLED" {% if config.sonarr.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="sonarrEnabled">Enable Sonarr</label>
+                                        </div>
+                                        <small class="settings-module-note">TV series management and automation. <a href="https://sonarr.tv" target="_blank" rel="noopener noreferrer">sonarr.tv</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="sonarrContent" {% if not config.sonarr.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="sonarrUrl" class="form-label">Sonarr URL</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="sonarrUrl" name="SONARR_URL" value="{{ config.sonarr.url }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="sonarrApiKey" class="form-label">API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="sonarrApiKey" name="SONARR_API_KEY" value="{{ config.sonarr.api_key }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="sonarrRootFolder" class="form-label">Root Folder</label>
+                                        <select class="form-control bg-dark text-light border-secondary"
+                                                id="sonarrRootFolder" name="SONARR_ROOT_FOLDER">
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="sonarrQualityProfile" class="form-label">Quality Profile</label>
+                                        <select class="form-control bg-dark text-light border-secondary"
+                                                id="sonarrQualityProfile" name="SONARR_QUALITY_PROFILE">
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="sonarrLanguageProfile" class="form-label">Language Profile</label>
+                                        <select class="form-control bg-dark text-light border-secondary"
+                                                id="sonarrLanguageProfile" name="SONARR_LANGUAGE_PROFILE">
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-info w-100 test-connection" id="testSonarr">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Readarr Settings -->
+                    <div class="mb-3 settings-block {% if not config.readarr.enabled %}is-disabled{% endif %}" data-block-id="readarr">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="mb-0 service-accent--readarr"><i class="fas fa-book me-2"></i>Readarr</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="readarrEnabled"
+                                                name="READARR_ENABLED" {% if config.readarr.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="readarrEnabled">Enable Readarr</label>
+                                        </div>
+                                        <small class="settings-module-note">Book and ebook library management. <a href="https://readarr.com" target="_blank" rel="noopener noreferrer">readarr.com</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="readarrContent" {% if not config.readarr.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="readarrUrl" class="form-label">Readarr URL</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary"
+                                                    id="readarrUrl" name="READARR_URL" value="{{ config.readarr.url }}"
+                                                    placeholder="http://localhost:8787">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="readarrApiKey" class="form-label">API Key</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary"
+                                                    id="readarrApiKey" name="READARR_API_KEY" value="{{ config.readarr.api_key }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="readarrRootFolder" class="form-label">Root Folder</label>
+                                                <select class="form-control bg-dark text-light border-secondary"
+                                                        id="readarrRootFolder" name="READARR_ROOT_FOLDER">
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="readarrQualityProfile" class="form-label">Quality Profile</label>
+                                                <select class="form-control bg-dark text-light border-secondary"
+                                                        id="readarrQualityProfile" name="READARR_QUALITY_PROFILE">
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="readarrMetadataProfile" class="form-label">Metadata Profile</label>
+                                                <select class="form-control bg-dark text-light border-secondary"
+                                                        id="readarrMetadataProfile" name="READARR_METADATA_PROFILE">
+                                                </select>
+                                            </div>
+                                            <div class="col-12">
+                                                <button type="button" class="btn btn-outline-info w-100" id="testReadarr">
+                                                    <i class="fas fa-plug me-2"></i>Test Connection
+                                                </button>
+                                            </div>
+                                            <div class="col-12">
+                                                <button type="button" class="btn btn-outline-warning w-100"
+                                                        onclick="clearThumbCache(this)">
+                                                    <i class="fas fa-trash-alt me-2"></i>Clear Thumbnail Cache
+                                                </button>
+                                            </div>
+                                            <small class="text-muted d-block mt-1">
+                                                Forces all book covers to re-download on next page load.
+                                                Useful if covers are showing placeholder images.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Plex Settings -->
+                    <div class="mb-3 settings-block {% if not config.plex.enabled %}is-disabled{% endif %}" data-block-id="plex">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="mb-0 service-accent--plex"><i class="fas fa-play me-2"></i>Plex</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="plexEnabled"
+                                                name="PLEX_ENABLED" {% if config.plex.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="plexEnabled">Enable Plex</label>
+                                        </div>
+                                        <small class="settings-module-note">Media server for browsing and accessing your library. Primary source for recently downloaded content. <a href="https://www.plex.tv" target="_blank" rel="noopener noreferrer">plex.tv</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="plexContent" {% if not config.plex.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="plexUrl" class="form-label">Plex URL</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary"
+                                                    id="plexUrl" name="PLEX_URL" value="{{ config.plex.url }}"
+                                                    placeholder="http://localhost:32400">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="plexToken" class="form-label">Access Token</label>
+                                                <input type="password" class="form-control bg-dark text-light border-secondary"
+                                                    id="plexToken" name="PLEX_TOKEN" value="{{ config.plex.token }}"
+                                                    placeholder="Your Plex access token">
+                                            </div>
+                                            <div class="col-12">
+                                                <button type="button" class="btn btn-outline-info w-100" id="testPlex">
+                                                    <i class="fas fa-plug me-2"></i>Test Connection
+                                                </button>
+                                            </div>
+                                            <small class="text-muted col-12">
+                                                Find your access token at <a href="https://www.plex.tv/claim" target="_blank" class="text-info">plex.tv/claim</a>
+                                                or by going to Settings → Account in the Plex web app.
+                                                If Plex is enabled, it will be the primary source for "Recently Downloaded" content,
+                                                falling back to Radarr/Sonarr/Readarr if unavailable.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    </div>
+                </section>
+                <section class="settings-group" aria-labelledby="settingsGroupDiscovery">
+                    <p class="settings-group__label" id="settingsGroupDiscovery">Discovery &amp; Downloads</p>
+                    <div class="settings-group__card">
+
+                    <!-- Google Books Settings -->
+                    <div class="mb-3 settings-block {% if not config.google_books.enabled %}is-disabled{% endif %}" data-block-id="googlebooks">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="mb-0 service-accent--google-books"><i class="fas fa-book-open me-2"></i>Google Books</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="googleBooksEnabled"
+                                                name="GOOGLE_BOOKS_ENABLED" {% if config.google_books.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="googleBooksEnabled">Enable Google Books search</label>
+                                        </div>
+                                        <small class="settings-module-note">
+                                            Book metadata and lookup support via Google Books. <a href="https://developers.google.com/books/docs/v1/using" target="_blank" rel="noopener noreferrer">Google Books API docs</a>
+                                        </small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="googleBooksContent" {% if not config.google_books.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-12">
+                                                <label for="googleBooksApiKey" class="form-label">API Key <small class="text-muted">(optional)</small></label>
+                                                <input type="password" class="form-control bg-dark text-light border-secondary"
+                                                    id="googleBooksApiKey" name="GOOGLE_BOOKS_API_KEY"
+                                                    value="{{ config.google_books.api_key }}"
+                                                    placeholder="Leave blank to use anonymous access">
+                                            </div>
+                                                <small class="text-muted">
+                                                    Get a free key at
+                                                    <a href="https://console.developers.google.com/" target="_blank" class="text-info">console.developers.google.com</a>
+                                                    → enable the Books API.
+                                                </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Prowlarr Settings -->
+                    <div class="mb-3 settings-block {% if not config.prowlarr.enabled %}is-disabled{% endif %}" data-block-id="prowlarr">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="mb-0 service-accent--prowlarr"><i class="fas fa-search me-2"></i>Prowlarr</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="prowlarrEnabled"
+                                                name="PROWLARR_ENABLED" {% if config.prowlarr.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="prowlarrEnabled">Enable Prowlarr</label>
+                                        </div>
+                                        <small class="settings-module-note">Indexer management and unified release search. <a href="https://prowlarr.com" target="_blank" rel="noopener noreferrer">prowlarr.com</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="prowlarrContent" {% if not config.prowlarr.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="prowlarrUrl" class="form-label">Prowlarr URL</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="prowlarrUrl" name="PROWLARR_URL" value="{{ config.prowlarr.url }}"
+                                            placeholder="http://localhost:9696">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="prowlarrApiKey" class="form-label">API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="prowlarrApiKey" name="PROWLARR_API_KEY" value="{{ config.prowlarr.api_key }}">
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-info w-100" id="testProwlarr">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- qBittorrent Settings -->
+                    <div class="mb-3 settings-block {% if not config.qbit.enabled %}is-disabled{% endif %}" data-block-id="qbittorrent">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="mb-0 service-accent--qbit"><i class="fas fa-download me-2"></i>qBittorrent</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="qbitEnabled"
+                                                name="QBIT_ENABLED" {% if config.qbit.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="qbitEnabled">Enable qBittorrent</label>
+                                        </div>
+                                        <small class="settings-module-note">Torrent and magnet download client integration. <a href="https://www.qbittorrent.org" target="_blank" rel="noopener noreferrer">qbittorrent.org</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="qbitContent" {% if not config.qbit.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="qbitUrl" class="form-label">qBittorrent URL</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="qbitUrl" name="QBIT_URL" value="{{ config.qbit.url }}"
+                                            placeholder="http://localhost:8080">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="qbitUsername" class="form-label">Username</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="qbitUsername" name="QBIT_USERNAME" value="{{ config.qbit.username }}"
+                                            placeholder="admin">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="qbitPassword" class="form-label">Password</label>
+                                        <input type="password" class="form-control bg-dark text-light border-secondary"
+                                            id="qbitPassword" name="QBIT_PASSWORD" value="{{ config.qbit.password }}">
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-info w-100" id="testQbit">
+                                            <i class="fas fa-plug me-2"></i>Test Connection
+                                        </button>
+                                    </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TMDB Settings -->
+                    <div class="mb-3 settings-block {% if not config.tmdb.enabled %}is-disabled{% endif %}" data-block-id="tmdb">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-info mb-0"><i class="fas fa-database me-2"></i>TMDB</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="tmdbEnabled"
+                                                name="TMDB_ENABLED" {% if config.tmdb.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="tmdbEnabled">Enable TMDB</label>
+                                        </div>
+                                        <small class="settings-module-note">Movie and TV metadata lookups. <a href="https://developer.themoviedb.org/docs/getting-started" target="_blank" rel="noopener noreferrer">TMDB developer docs</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="tmdbContent" {% if not config.tmdb.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="tmdbKey" class="form-label">TMDB API Key</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                                            id="tmdbKey" name="TMDB_KEY" value="{{ config.tmdb.key }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="tmdbToken" class="form-label">TMDB Token</label>
+                                        <input type="password" class="form-control bg-dark text-light border-secondary"
+                                            id="tmdbToken" name="TMDB_TOKEN" value="{{ config.tmdb.token }}">
+                                    </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    </div>
+                </section>
+                <section class="settings-group" aria-labelledby="settingsGroupAccess">
+                    <p class="settings-group__label" id="settingsGroupAccess">Access &amp; Network</p>
+                    <div class="settings-group__card">
+
+                    <!-- DuckDNS Settings -->
+                    <div class="mb-3 settings-block {% if not config.duckdns.enabled %}is-disabled{% endif %}" data-block-id="duckdns">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-warning mb-0"><i class="fas fa-globe me-2"></i>DuckDNS</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="duckdnsEnabled"
+                                                name="DUCKDNS_ENABLED" {% if config.duckdns.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="duckdnsEnabled">Enable DuckDNS</label>
+                                        </div>
+                                            <small class="settings-module-note">Dynamic DNS for a stable hostname to reach arrdash remotely. <a href="https://www.duckdns.org" target="_blank" rel="noopener noreferrer">duckdns.org</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="duckdnsContent" {% if not config.duckdns.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="duckdnsDomain" class="form-label">Domain</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary"
+                                                    id="duckdnsDomain" name="DUCKDNS_DOMAIN"
+                                                    value="{{ config.duckdns.domain }}"
+                                                    placeholder="yourdomain (without .duckdns.org)">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="duckdnsToken" class="form-label">Token</label>
+                                                <input type="password" class="form-control bg-dark text-light border-secondary"
+                                                    id="duckdnsToken" name="DUCKDNS_TOKEN"
+                                                    value="{{ config.duckdns.token }}">
+                                            </div>
+                                            <div class="col-12">
+                                                <button type="button" class="btn btn-outline-info w-100" id="testDuckDNS">
+                                                    <i class="fas fa-plug me-2"></i>Test Connection
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Auto-Updater Settings -->
+                    <div class="mb-3 settings-block {% if not config['update']['enabled'] %}is-disabled{% endif %}" data-block-id="autoupdate">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-warning mb-0"><i class="fas fa-sync-alt me-2"></i>Auto-Updater</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="enableAutoUpdate"
+                                                name="ENABLE_AUTO_UPDATE" {% if config['update']['enabled'] %}checked{% endif %}>
+                                            <label class="form-check-label" for="enableAutoUpdate">Enable Auto Update</label>
+                                        </div>
+                                            <small class="settings-module-note">Automatically check your configured arrdash repository for releases. <a href="https://github.com/{{ config['update']['github_repo'] }}" target="_blank" rel="noopener noreferrer">Repository</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="autoUpdateContent" {% if not config['update']['enabled'] %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="githubRepo" class="form-label">GitHub Repository</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary"
+                                                    id="githubRepo" name="GITHUB_REPO" value="{{ config['update']['github_repo'] }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="updatesFolder" class="form-label">Updates Folder</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary"
+                                                    id="updatesFolder" name="UPDATES_FOLDER" value="{{ config['update']['updates_folder'] }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="checkInterval" class="form-label">Check Interval (seconds)</label>
+                                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                                    id="checkInterval" name="CHECK_INTERVAL"
+                                                    value="{{ config['update']['check_interval'] or 3600 }}"
+                                                    placeholder="3600" min="300" max="86400">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tunnel Settings -->
+                    <div class="mb-3 settings-block {% if not config.tunnel.enabled %}is-disabled{% endif %}" data-block-id="tunnel">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-primary mb-0"><i class="fas fa-cloud me-2"></i>Pinggy</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="tunnelEnabled"
+                                                name="TUNNEL_ENABLED" {% if config.tunnel.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="tunnelEnabled">Enable Pinggy Tunnel</label>
+                                        </div>
+                                            <small class="settings-module-note">Secure tunnel access for reaching arrdash remotely. <a href="https://pinggy.io" target="_blank" rel="noopener noreferrer">pinggy.io</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="tunnelContent" {% if not config.tunnel.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="pinggyAuthToken" class="form-label">Pinggy Auth Token</label>
+                                                <input type="password" class="form-control bg-dark text-light border-secondary"
+                                                    id="pinggyAuthToken" name="PINGGY_AUTH_TOKEN" value="{{ config.tunnel.auth_token }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="pinggyReservedSubdomain" class="form-label">Reserved Subdomain</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary"
+                                                    id="pinggyReservedSubdomain" name="PINGGY_RESERVED_SUBDOMAIN" value="{{ config.tunnel.reserved_subdomain }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Authentication Settings -->
+                    <div class="mb-3 settings-block {% if not config.auth.enabled %}is-disabled{% endif %}" data-block-id="authentication">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-warning mb-0"><i class="fas fa-lock me-2"></i>Authentication</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="authEnabled"
+                                                name="AUTH_ENABLED" {% if config.auth.enabled %}checked{% endif %}>
+                                            <label class="form-check-label" for="authEnabled">Enable Basic Authentication</label>
+                                        </div>
+                                            <small class="settings-module-note">Protect arrdash with username and password access. <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication" target="_blank" rel="noopener noreferrer">MDN guide</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="authContent" {% if not config.auth.enabled %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="authUsername" class="form-label">Username</label>
+                                                <input type="text" class="form-control bg-dark text-light border-secondary"
+                                                    id="authUsername" name="AUTH_USERNAME" value="{{ config.auth.username }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="authPassword" class="form-label">Password</label>
+                                                <input type="password" class="form-control bg-dark text-light border-secondary"
+                                                    id="authPassword" name="AUTH_PASSWORD" value="{{ config.auth.password }}">
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="alert alert-warning">
+                                                    <small><i class="fas fa-exclamation-triangle me-1"></i>
+                                                    Make sure to remember your credentials. If you lose them, you'll need to manually edit the .env file.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    </div>
+                </section>
+                <section class="settings-group" aria-labelledby="settingsGroupApp">
+                    <p class="settings-group__label" id="settingsGroupApp">Application</p>
+                    <div class="settings-group__card">
+
+                    <!-- Display Settings -->
+                    <div class="mb-3 settings-block" data-block-id="display">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-info mb-0"><i class="fas fa-palette me-2"></i>Display</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <p class="settings-module-note mb-3">Set the shared theme tokens for the whole app: color accents, surfaces, text, borders, and corner shape. Light and dark mode both use this same design system.</p>
+                                <div class="d-flex justify-content-end mb-3">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="displayResetBtn">
+                                        <i class="fas fa-undo me-1"></i>Reset to Default
+                                    </button>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="displayMode" class="form-label">Color Mode</label>
+                                        <select class="form-control bg-dark text-light border-secondary" id="displayMode" name="DISPLAY_MODE">
+                                            <option value="dark" {% if config.display.mode == 'dark' %}selected{% endif %}>Dark</option>
+                                            <option value="light" {% if config.display.mode == 'light' %}selected{% endif %}>Light</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displayAccent" class="form-label">Accent</label>
+                                        <input type="color" class="form-control form-control-color settings-color-input" id="displayAccent" name="DISPLAY_ACCENT" value="{{ config.display.accent }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displayBg" class="form-label">App Background</label>
+                                        <input type="color" class="form-control form-control-color settings-color-input" id="displayBg" name="DISPLAY_BG" value="{{ config.display.bg }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displayPanel" class="form-label">Drawer Background</label>
+                                        <input type="color" class="form-control form-control-color settings-color-input" id="displayPanel" name="DISPLAY_PANEL" value="{{ config.display.panel }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displaySurface" class="form-label">Card Surface</label>
+                                        <input type="color" class="form-control form-control-color settings-color-input" id="displaySurface" name="DISPLAY_SURFACE" value="{{ config.display.surface }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displaySurfaceAlt" class="form-label">Alt Surface</label>
+                                        <input type="color" class="form-control form-control-color settings-color-input" id="displaySurfaceAlt" name="DISPLAY_SURFACE_ALT" value="{{ config.display.surface_alt }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displayText" class="form-label">Primary Text</label>
+                                        <input type="color" class="form-control form-control-color settings-color-input" id="displayText" name="DISPLAY_TEXT" value="{{ config.display.text }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displayMuted" class="form-label">Muted Text</label>
+                                        <input type="color" class="form-control form-control-color settings-color-input" id="displayMuted" name="DISPLAY_MUTED" value="{{ config.display.muted }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displayRadius" class="form-label">Corner Radius</label>
+                                        <input type="number" min="0" max="24" class="form-control bg-dark text-light border-secondary" id="displayRadius" name="DISPLAY_RADIUS" value="{{ config.display.radius }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displayBorderWidth" class="form-label">Border Width</label>
+                                        <input type="number" min="0" max="4" step="0.5" class="form-control bg-dark text-light border-secondary" id="displayBorderWidth" name="DISPLAY_BORDER_WIDTH" value="{{ config.display.border_width }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displayShadowOpacity" class="form-label">Shadow Strength</label>
+                                        <input type="number" min="0" max="1" step="0.05" class="form-control bg-dark text-light border-secondary" id="displayShadowOpacity" name="DISPLAY_SHADOW_OPACITY" value="{{ config.display.shadow_opacity }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="displayBorder" class="form-label">Border Color</label>
+                                        <input type="text" class="form-control bg-dark text-light border-secondary" id="displayBorder" name="DISPLAY_BORDER" value="{{ config.display.border }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Application Settings -->
+                    <div class="mb-3 settings-block" data-block-id="application">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-info mb-0"><i class="fas fa-sliders-h me-2"></i>Application</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch module-switch">
+                                            <input class="form-check-input" type="checkbox" id="debugEnabled"
+                                                name="FLASK_DEBUG" {% if config.app.debug %}checked{% endif %}>
+                                            <label class="form-check-label" for="debugEnabled">Enable Debug Mode</label>
+                                        </div>
+                                            <small class="settings-module-note">Control local logging and developer diagnostics. <a href="https://github.com/{{ config['update']['github_repo'] }}" target="_blank" rel="noopener noreferrer">arrdash repository</a></small>
+                                    </div>
+                                    <div class="col-12 collapsible-content" id="debugContent" {% if not config.app.debug %}style="display: none;"{% endif %}>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="logLevel" class="form-label">Log Level</label>
+                                                <select class="form-control bg-dark text-light border-secondary"
+                                                        id="logLevel" name="LOG_LEVEL">
+                                                    <option value="DEBUG" {% if config.app.log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                                                    <option value="INFO" {% if config.app.log_level == 'INFO' %}selected{% endif %}>INFO</option>
+                                                    <option value="WARNING" {% if config.app.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+                                                    <option value="ERROR" {% if config.app.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                                                </select>
+                                            </div>
+                                            <input type="hidden" name="SERVER_PORT" value="{{ config.app.port }}">
+                                            <input type="hidden" name="APP_VERSION" value="{{ config.app.version }}">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Version Information -->
+                    <div class="mb-3 settings-block" data-block-id="version">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-info mb-0"><i class="fas fa-code-branch me-2"></i>Version</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <p class="settings-module-note mb-3">Review release status and downloaded updates for your arrdash install. <a href="https://github.com/{{ config['update']['github_repo'] }}/blob/{{ config['update']['channel'] }}/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a></p>
+                                <div class="version-info">
+                                    v{{ config.app.version }}
+                                    <span class="badge {% if config.update.channel == 'dev' %}badge-warning{% else %}badge-success{% endif %}">
+                                        {{ config.update.channel|upper }}
+                                    </span>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-outline-info w-100" id="checkUpdateBtn">
+                                            <i class="fas fa-sync-alt me-2"></i>Check Updates
+                                        </button>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-outline-info w-100" id="downloadUpdateBtn" style="display: none;">
+                                            <i class="fas fa-download me-2"></i>Download
+                                        </button>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-outline-info w-100" id="listUpdatesBtn" data-settings-close>
+                                            <i class="fas fa-list me-2"></i>View Updates
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Server Management -->
+                    <div class="mb-3 settings-block" data-block-id="servermanagement">
+                        <div class="settings-block-header" onclick="toggleSettingsBlock(this)">
+                            <h5 class="text-danger mb-0"><i class="fas fa-power-off me-2"></i>Server Management</h5>
+                            <i class="fas fa-chevron-down settings-chevron"></i>
+                        </div>
+                        <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
+                            <div class="card-body">
+                                <p class="settings-module-note mb-3">Restart the running arrdash process after major configuration changes. <a href="https://github.com/{{ config['update']['github_repo'] }}" target="_blank" rel="noopener noreferrer">Project home</a></p>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <p class="text-muted mb-3">
+                                            <i class="fas fa-exclamation-circle me-2"></i>
+                                            Restarting the server will briefly disconnect all users. The page will automatically refresh when the server comes back online.
+                                        </p>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-danger w-100" id="restartServerBtn">
+                                            <i class="fas fa-power-off me-2"></i>Restart Server
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    </div>
+                </section>
+            </div>
+
+            <div class="settings-drawer__footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-settings-close>
+                        <i class="fas fa-times me-2"></i>Cancel
+                </button>
+                <button id="configSubmitBtn" type="submit" class="btn btn-radarr">
+                    <i class="fas fa-save me-2"></i>Save Configuration
+                </button>
+            </div>
+        </form>
+    </aside>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     About Drawer
+════════════════════════════════════════════════════════ -->
+<div class="about-drawer" id="infoModal" data-open="false" aria-hidden="true">
+    <div class="about-drawer__backdrop" data-about-close></div>
+    <aside class="about-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="infoModalLabel" tabindex="-1">
+        <div class="about-drawer__header">
+            <button type="button" class="about-drawer__back btn btn-link text-light p-0" data-about-close aria-label="Back">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <!-- <h5 class="about-drawer__title" id="infoModalLabel">About</h5> -->
+            <span class="about-drawer__header-spacer" aria-hidden="true"></span>
+        </div>
+
+        <div class="about-drawer__body">
+            <div class="about-drawer__hero">
+                <img src="/static/images/logo.png" alt="arrdash Logo" class="about-drawer__logo">
+                <p class="about-drawer__subtitle">Media Management System</p>
+                <div class="about-drawer__badges">
+                    <span class="badge bg-radarr">Version: <span id="infoVersion">{{ config.app.version }}</span></span>
+                    <span class="badge bg-secondary">Last Updated: <span id="infoLastUpdated">Loading...</span></span>
+                </div>
+            </div>
+
+            <section class="about-drawer__section">
+                <h6 class="about-drawer__section-title">Access URLs</h6>
+                <div class="about-drawer__card">
+                    <div class="about-drawer__row">
+                        <span class="about-drawer__row-icon"><i class="fas fa-wifi"></i></span>
+                        <div>
+                            <div class="about-drawer__row-label">Internal Address</div>
+                            <code class="text-wrap d-block" id="networkAddress">Loading...</code>
+                        </div>
+                    </div>
+                    {% if config.duckdns.enabled and config.duckdns.domain %}
+                    <div class="about-drawer__row">
+                        <span class="about-drawer__row-icon"><i class="fas fa-globe"></i></span>
+                        <div>
+                            <div class="about-drawer__row-label">DuckDNS Address</div>
+                            <code class="text-wrap d-block">http://{{ config.duckdns.domain }}.duckdns.org:{{ config.app.port }}</code>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if config.tunnel.enabled %}
+                    <div class="about-drawer__row">
+                        <span class="about-drawer__row-icon"><i class="fas fa-cloud"></i></span>
+                        <div>
+                            <div class="about-drawer__row-label">Tunnel Address</div>
+                            <code class="text-wrap d-block" id="tunnelAddress">Loading...</code>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="about-drawer__section">
+                <h6 class="about-drawer__section-title">Recent Changes</h6>
+                <div class="about-drawer__card">
+                    <div id="changelogContent" class="changelog-content">
+                        <div class="text-center">
+                            <div class="spinner-border spinner-border-sm text-radarr me-2" role="status"></div>
+                            Loading changelog...
+                        </div>
+                    </div>
+                </div>
+                <div class="text-end mt-2">
+                    <small class="text-muted">
+                        <a href="https://github.com/{{ config['update']['github_repo'] }}/blob/{{ config['update']['channel'] }}/CHANGELOG.md"
+                           target="_blank" class="text-radarr">View Full Changelog</a>
+                    </small>
+                </div>
+            </section>
+        </div>
+    </aside>
+</div>
+
+<!-- ═══ Notification Modal ═══ -->
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content" id="notificationContent">
+            <div class="modal-body text-center py-4">
+                <i class="fas fa-check-circle fa-3x mb-3 text-success" id="notificationIcon"></i>
+                <h6 class="mb-0" id="notificationMessage">Saved Successfully!</h6>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     Settings accordion styles
+════════════════════════════════════════════════════════ -->
+<style>
+.settings-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 12px;
+    border: 0;
+    user-select: none;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+.settings-block-header:hover { opacity: 1; }
+.settings-chevron {
+    color: #888;
+    font-size: 0.8rem;
+    transition: transform 0.25s ease;
+    flex-shrink: 0;
+}
+.settings-block.open .settings-chevron { transform: rotate(180deg); }
+</style>
+
+<!-- ═══════════════════════════════════════════════════════
+     Shared JS: config modal, notifications, test connections
+════════════════════════════════════════════════════════ -->
+<script>
+window.arrdashDefaultDisplayConfig = {
+    mode: 'dark',
+    accent: '#6ab759',
+    bg: '#1c1d24',
+    surface: '#24242d',
+    surfaceAlt: '#2f323b',
+    panel: '#1d1d25',
+    text: '#f5f7fb',
+    muted: '#a5acb8',
+    border: 'rgba(255,255,255,0.08)',
+    radius: '8',
+    borderWidth: '1',
+    shadowOpacity: '0.38'
+};
+
+window.arrdashDisplayConfig = {
+    mode: {{ config.display.mode | tojson }},
+    accent: {{ config.display.accent | tojson }},
+    bg: {{ config.display.bg | tojson }},
+    surface: {{ config.display.surface | tojson }},
+    surfaceAlt: {{ config.display.surface_alt | tojson }},
+    panel: {{ config.display.panel | tojson }},
+    text: {{ config.display.text | tojson }},
+    muted: {{ config.display.muted | tojson }},
+    border: {{ config.display.border | tojson }},
+    radius: {{ config.display.radius | tojson }},
+    borderWidth: {{ config.display.border_width | tojson }},
+    shadowOpacity: {{ config.display.shadow_opacity | tojson }}
+};
+
+function applyDisplayConfigToInputs(cfg) {
+    const fieldMap = {
+        displayMode: 'mode',
+        displayAccent: 'accent',
+        displayBg: 'bg',
+        displayPanel: 'panel',
+        displaySurface: 'surface',
+        displaySurfaceAlt: 'surfaceAlt',
+        displayText: 'text',
+        displayMuted: 'muted',
+        displayRadius: 'radius',
+        displayBorderWidth: 'borderWidth',
+        displayShadowOpacity: 'shadowOpacity',
+        displayBorder: 'border'
+    };
+
+    Object.entries(fieldMap).forEach(([id, key]) => {
+        const input = document.getElementById(id);
+        if (input && cfg[key] !== undefined && cfg[key] !== null) {
+            input.value = cfg[key];
+        }
+    });
+}
+
+function syncDisplayConfigFromInputs() {
+    const next = {
+        mode: document.getElementById('displayMode')?.value || 'dark',
+        accent: document.getElementById('displayAccent')?.value || window.arrdashDefaultDisplayConfig.accent,
+        bg: document.getElementById('displayBg')?.value || window.arrdashDefaultDisplayConfig.bg,
+        panel: document.getElementById('displayPanel')?.value || window.arrdashDefaultDisplayConfig.panel,
+        surface: document.getElementById('displaySurface')?.value || window.arrdashDefaultDisplayConfig.surface,
+        surfaceAlt: document.getElementById('displaySurfaceAlt')?.value || window.arrdashDefaultDisplayConfig.surfaceAlt,
+        text: document.getElementById('displayText')?.value || window.arrdashDefaultDisplayConfig.text,
+        muted: document.getElementById('displayMuted')?.value || window.arrdashDefaultDisplayConfig.muted,
+        radius: document.getElementById('displayRadius')?.value || window.arrdashDefaultDisplayConfig.radius,
+        borderWidth: document.getElementById('displayBorderWidth')?.value || window.arrdashDefaultDisplayConfig.borderWidth,
+        shadowOpacity: document.getElementById('displayShadowOpacity')?.value || window.arrdashDefaultDisplayConfig.shadowOpacity,
+        border: document.getElementById('displayBorder')?.value || window.arrdashDefaultDisplayConfig.border
+    };
+
+    window.arrdashDisplayConfig = next;
+    applyDisplayTheme();
+}
+
+function resetDisplayThemeDefaults() {
+    const defaults = { ...window.arrdashDefaultDisplayConfig };
+    applyDisplayConfigToInputs(defaults);
+    window.arrdashDisplayConfig = defaults;
+    applyDisplayTheme();
+}
+
+function applyDisplayTheme() {
+    const cfg = window.arrdashDisplayConfig || {};
+    const root = document.documentElement;
+    if (!root) return;
+
+    root.dataset.theme = cfg.mode === 'light' ? 'light' : 'dark';
+
+    const mappings = {
+        '--theme-accent': cfg.accent,
+        '--theme-bg': cfg.bg,
+        '--theme-surface': cfg.surface,
+        '--theme-surface-alt': cfg.surfaceAlt,
+        '--theme-panel': cfg.panel,
+        '--theme-text': cfg.text,
+        '--theme-muted': cfg.muted,
+        '--theme-border-color': cfg.border,
+        '--theme-radius-md': cfg.radius ? `${cfg.radius}px` : '',
+        '--theme-border-width': cfg.borderWidth ? `${cfg.borderWidth}px` : '',
+        '--theme-shadow-opacity': cfg.shadowOpacity
+    };
+
+    Object.entries(mappings).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            root.style.setProperty(key, value);
+        }
+    });
+
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+        metaTheme.setAttribute('content', getComputedStyle(root).getPropertyValue('--theme-panel').trim() || cfg.panel || '#1d1d25');
+    }
+}
+
+applyDisplayTheme();
+
+window.appModuleAvailability = {
+    radarr: {{ 'true' if config.radarr.enabled else 'false' }},
+    sonarr: {{ 'true' if config.sonarr.enabled else 'false' }},
+    readarr: {{ 'true' if config.readarr.enabled else 'false' }},
+    plex: {{ 'true' if config.plex.enabled else 'false' }},
+    prowlarr: {{ 'true' if config.prowlarr.enabled else 'false' }},
+    qbit: {{ 'true' if config.qbit.enabled else 'false' }},
+    tmdb: {{ 'true' if config.tmdb.enabled else 'false' }}
+};
+
+let lastNavTrigger = null;
+let lastSettingsTrigger = null;
+let lastAboutTrigger = null;
+let drawerTouchStart = null;
+let reopenNavOnSettingsClose = false;
+let reopenNavOnAboutClose = false;
+
+function syncDrawerBodyState() {
+    const anyDrawerOpen = isNavDrawerOpen() || isConfigDrawerOpen() || isAboutDrawerOpen();
+    document.body.classList.toggle('settings-drawer-open', anyDrawerOpen);
+}
+
+function syncSetupGuidance() {
+    const modules = window.appModuleAvailability || {};
+    const setupMode = !modules.radarr && !modules.sonarr && !modules.readarr;
+    const navTrigger = document.querySelector('[data-nav-open]');
+    const settingsTrigger = document.querySelector('.nav-drawer__utility-btn[data-settings-open]');
+
+    if (!setupMode) {
+        if (navTrigger) navTrigger.classList.remove('is-guided');
+        if (settingsTrigger) settingsTrigger.classList.remove('is-guided');
+        return;
+    }
+
+    const navOpen = isNavDrawerOpen();
+    const anyDrawerOpen = navOpen || isConfigDrawerOpen() || isAboutDrawerOpen();
+    if (navTrigger) navTrigger.classList.toggle('is-guided', !anyDrawerOpen);
+    if (settingsTrigger) settingsTrigger.classList.toggle('is-guided', navOpen);
+}
+
+function isNavDrawerOpen() {
+    const drawer = document.getElementById('appNavDrawer');
+    return drawer ? drawer.dataset.open === 'true' : false;
+}
+
+function openNavDrawer(trigger) {
+    const drawer = document.getElementById('appNavDrawer');
+    const panel = drawer ? drawer.querySelector('.nav-drawer__panel') : null;
+    if (!drawer || !panel) return;
+
+    lastNavTrigger = trigger || document.activeElement;
+    drawer.dataset.open = 'true';
+    drawer.setAttribute('aria-hidden', 'false');
+    syncDrawerBodyState();
+    syncSetupGuidance();
+    requestAnimationFrame(() => panel.focus());
+}
+
+function closeNavDrawer() {
+    const drawer = document.getElementById('appNavDrawer');
+    if (!drawer) return;
+
+    drawer.dataset.open = 'false';
+    drawer.setAttribute('aria-hidden', 'true');
+    syncDrawerBodyState();
+    syncSetupGuidance();
+    if (lastNavTrigger && typeof lastNavTrigger.focus === 'function') {
+        lastNavTrigger.focus();
+    }
+}
+
+function isConfigDrawerOpen() {
+    const drawer = document.getElementById('configModal');
+    return drawer ? drawer.dataset.open === 'true' : false;
+}
+
+function isAboutDrawerOpen() {
+    const drawer = document.getElementById('infoModal');
+    return drawer ? drawer.dataset.open === 'true' : false;
+}
+
+function openConfigDrawer(trigger) {
+    const drawer = document.getElementById('configModal');
+    const panel = drawer ? drawer.querySelector('.settings-drawer__panel') : null;
+    if (!drawer || !panel) return;
+
+    reopenNavOnSettingsClose = isNavDrawerOpen();
+    closeNavDrawer();
+    lastSettingsTrigger = trigger || document.activeElement;
+    drawer.dataset.open = 'true';
+    drawer.setAttribute('aria-hidden', 'false');
+    syncDrawerBodyState();
+    syncSetupGuidance();
+    loadConfigurationData();
+    setTimeout(restoreSettingsBlockState, 100);
+    requestAnimationFrame(() => panel.focus());
+}
+
+function closeConfigDrawer() {
+    const drawer = document.getElementById('configModal');
+    if (!drawer) return;
+
+    drawer.dataset.open = 'false';
+    drawer.setAttribute('aria-hidden', 'true');
+    syncDrawerBodyState();
+    syncSetupGuidance();
+    if (lastSettingsTrigger && typeof lastSettingsTrigger.focus === 'function') {
+        lastSettingsTrigger.focus();
+    }
+    if (reopenNavOnSettingsClose) {
+        reopenNavOnSettingsClose = false;
+        openNavDrawer(lastNavTrigger || document.querySelector('[data-nav-open]'));
+    }
+}
+
+function openAboutDrawer(trigger) {
+    const drawer = document.getElementById('infoModal');
+    const panel = drawer ? drawer.querySelector('.about-drawer__panel') : null;
+    if (!drawer || !panel) return;
+
+    reopenNavOnAboutClose = isNavDrawerOpen();
+    closeNavDrawer();
+    lastAboutTrigger = trigger || document.activeElement;
+    drawer.dataset.open = 'true';
+    drawer.setAttribute('aria-hidden', 'false');
+    syncDrawerBodyState();
+    syncSetupGuidance();
+    if (typeof loadInfoPanel === 'function') {
+        loadInfoPanel();
+    }
+    requestAnimationFrame(() => panel.focus());
+}
+
+function closeAboutDrawer() {
+    const drawer = document.getElementById('infoModal');
+    if (!drawer) return;
+
+    drawer.dataset.open = 'false';
+    drawer.setAttribute('aria-hidden', 'true');
+    syncDrawerBodyState();
+    syncSetupGuidance();
+    if (lastAboutTrigger && typeof lastAboutTrigger.focus === 'function') {
+        lastAboutTrigger.focus();
+    }
+    if (reopenNavOnAboutClose) {
+        reopenNavOnAboutClose = false;
+        openNavDrawer(lastNavTrigger || document.querySelector('[data-nav-open]'));
+    }
+}
+
+document.addEventListener('click', function (event) {
+    const navOpenTrigger = event.target.closest('[data-nav-open]');
+    if (navOpenTrigger) {
+        event.preventDefault();
+        openNavDrawer(navOpenTrigger);
+        return;
+    }
+
+    const navCloseTrigger = event.target.closest('[data-nav-close]');
+    if (navCloseTrigger) {
+        event.preventDefault();
+        closeNavDrawer();
+        return;
+    }
+
+    const aboutOpenTrigger = event.target.closest('[data-about-open]');
+    if (aboutOpenTrigger) {
+        event.preventDefault();
+        openAboutDrawer(aboutOpenTrigger);
+        return;
+    }
+
+    const aboutCloseTrigger = event.target.closest('[data-about-close]');
+    if (aboutCloseTrigger) {
+        event.preventDefault();
+        closeAboutDrawer();
+        return;
+    }
+
+    const openTrigger = event.target.closest('[data-settings-open]');
+    if (openTrigger) {
+        event.preventDefault();
+        openConfigDrawer(openTrigger);
+        return;
+    }
+
+    const closeTrigger = event.target.closest('[data-settings-close]');
+    if (closeTrigger) {
+        event.preventDefault();
+        closeConfigDrawer();
+    }
+});
+
+function toggleSettingsBlock(header) {
+    const block = header.closest('.settings-block');
+    const body  = block.querySelector('.settings-block-body');
+    const isOpen = block.classList.contains('open');
+    const blockId = block.dataset.blockId;
+
+    block.classList.toggle('open', !isOpen);
+
+    // Save state to localStorage
+    if (blockId) {
+        const settingsState = JSON.parse(localStorage.getItem('settingsBlockState') || '{}');
+        settingsState[blockId] = !isOpen;
+        localStorage.setItem('settingsBlockState', JSON.stringify(settingsState));
+    }
+
+    if (!isOpen) {
+        body.style.display = 'block';
+        body.style.opacity = '0';
+        body.style.transform = 'translateY(-6px)';
+        setTimeout(() => { body.style.transition = 'opacity 0.2s, transform 0.2s'; body.style.opacity = '1'; body.style.transform = 'translateY(0)'; }, 10);
+    } else {
+        body.style.opacity = '0';
+        body.style.transform = 'translateY(-6px)';
+        setTimeout(() => { body.style.display = 'none'; body.style.transition = ''; }, 200);
+    }
+}
+
+// ── Config dropdown data loaders ──────────────────────────────────────────────
+function fetchRadarrData() {
+    fetch('/api/radarr/rootfolders')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('radarrRootFolder');
+            select.innerHTML = '';
+            const current = "{{ config.radarr.root_folder }}";
+            data.forEach(folder => {
+                const opt = document.createElement('option');
+                opt.value = folder.path;
+                opt.textContent = folder.path;
+                if (folder.path.toString() === current.toString()) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }).catch(err => console.error('Error loading Radarr root folders:', err));
+
+    fetch('/api/radarr/qualityprofile')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('radarrQualityProfile');
+            select.innerHTML = '';
+            const current = "{{ config.radarr.quality_profile_id }}";
+            data.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.id === current) opt.selected = true;
+                select.appendChild(opt);
+            });
+            if (current && select.value !== current) select.value = current;
+        }).catch(err => console.error('Error loading Radarr quality profiles:', err));
+}
+
+function fetchSonarrData() {
+    fetch('/api/sonarr/rootfolder')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('sonarrRootFolder');
+            select.innerHTML = '';
+            const current = "{{ config.sonarr.root_folder }}";
+            data.forEach(folder => {
+                const opt = document.createElement('option');
+                opt.value = folder.path;
+                opt.textContent = folder.path;
+                if (folder.path.toString() === current.toString()) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }).catch(err => console.error('Error loading Sonarr root folders:', err));
+
+    fetch('/api/sonarr/qualityprofile')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('sonarrQualityProfile');
+            select.innerHTML = '';
+            const current = "{{ config.sonarr.quality_profile_id }}";
+            data.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.id.toString() === current.toString()) opt.selected = true;
+                select.appendChild(opt);
+            });
+            if (current && select.value !== current) select.value = current;
+        }).catch(err => console.error('Error loading Sonarr quality profiles:', err));
+
+    fetch('/api/sonarr/languageprofile')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('sonarrLanguageProfile');
+            select.innerHTML = '';
+            const current = "{{ config.sonarr.language_profile_id }}";
+            data.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.id.toString() === current.toString()) opt.selected = true;
+                select.appendChild(opt);
+            });
+            if (current && select.value !== current) select.value = current;
+        }).catch(err => console.error('Error loading Sonarr language profiles:', err));
+}
+
+function fetchReadarrData() {
+    const readarrUrl = document.getElementById('readarrUrl').value;
+    if (!readarrUrl) return;
+    fetch('/api/readarr/rootfolders')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('readarrRootFolder');
+            select.innerHTML = '';
+            const current = "{{ config.readarr.root_folder }}";
+            (Array.isArray(data) ? data : []).forEach(folder => {
+                const opt = document.createElement('option');
+                opt.value = folder.path;
+                opt.textContent = folder.path;
+                if (folder.path === current) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }).catch(() => {});
+
+    fetch('/api/readarr/qualityprofile')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('readarrQualityProfile');
+            select.innerHTML = '';
+            const current = "{{ config.readarr.quality_profile_id }}";
+            (Array.isArray(data) ? data : []).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.id.toString() === current.toString()) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }).catch(() => {});
+
+    fetch('/api/readarr/metadataprofile')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('readarrMetadataProfile');
+            select.innerHTML = '';
+            const current = "{{ config.readarr.metadata_profile_id }}";
+            (Array.isArray(data) ? data : []).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.id.toString() === current.toString()) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }).catch(() => {});
+}
+
+function loadConfigurationData() {
+    fetchRadarrData();
+    fetchSonarrData();
+    fetchReadarrData();
+}
+
+// ── Notification helper (used by main.js addItem etc.) ────────────────────────
+function showNotification(message, type = 'success') {
+    const modal   = document.getElementById('notificationModal');
+    const content = document.getElementById('notificationContent');
+    const icon    = document.getElementById('notificationIcon');
+    const msgEl   = document.getElementById('notificationMessage');
+    if (!modal) return;
+    if (type === 'success') {
+        content.className = 'modal-content bg-success text-white';
+        icon.className    = 'fas fa-check-circle fa-3x mb-3 text-white';
+    } else {
+        content.className = 'modal-content bg-danger text-white';
+        icon.className    = 'fas fa-exclamation-circle fa-3x mb-3 text-white';
+    }
+    msgEl.textContent = message;
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+    setTimeout(() => modalInstance.hide(), type === 'success' ? 2000 : 3000);
+}
+
+// ── Restore collapsed/expanded state from localStorage ───────────────────────
+function restoreSettingsBlockState() {
+    const settingsState = JSON.parse(localStorage.getItem('settingsBlockState') || '{}');
+    document.querySelectorAll('.settings-block[data-block-id]').forEach(block => {
+        const blockId = block.dataset.blockId;
+        const shouldBeOpen = settingsState[blockId];
+        const body = block.querySelector('.settings-block-body');
+
+        if (shouldBeOpen) {
+            block.classList.add('open');
+            body.style.display = 'block';
+        } else {
+            block.classList.remove('open');
+            body.style.display = 'none';
+        }
+    });
+}
+
+// ── Collapsible config sections ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    function setupCollapsibleSection(checkboxId, contentId) {
+        const checkbox = document.getElementById(checkboxId);
+        const content  = document.getElementById(contentId);
+        if (!checkbox || !content) return;
+        const block = checkbox.closest('.settings-block');
+        function toggleContent(cb, el) {
+            if (block) {
+                block.classList.toggle('is-disabled', !cb.checked);
+            }
+            if (cb.checked) {
+                el.style.display = 'block';
+                setTimeout(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }, 10);
+            } else {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(-10px)';
+                setTimeout(() => { el.style.display = 'none'; }, 300);
+            }
+        }
+        toggleContent(checkbox, content);
+        checkbox.addEventListener('change', function () { toggleContent(this, content); });
+    }
+
+    setupCollapsibleSection('googleBooksEnabled', 'googleBooksContent');
+    setupCollapsibleSection('radarrEnabled', 'radarrContent');
+    setupCollapsibleSection('sonarrEnabled', 'sonarrContent');
+    setupCollapsibleSection('readarrEnabled', 'readarrContent');
+    setupCollapsibleSection('plexEnabled', 'plexContent');
+    setupCollapsibleSection('prowlarrEnabled', 'prowlarrContent');
+    setupCollapsibleSection('qbitEnabled', 'qbitContent');
+    setupCollapsibleSection('tmdbEnabled', 'tmdbContent');
+    setupCollapsibleSection('duckdnsEnabled',  'duckdnsContent');
+    setupCollapsibleSection('enableAutoUpdate', 'autoUpdateContent');
+    setupCollapsibleSection('tunnelEnabled',    'tunnelContent');
+    setupCollapsibleSection('debugEnabled',     'debugContent');
+    setupCollapsibleSection('authEnabled',      'authContent');
+
+    document.querySelectorAll('.settings-block-header').forEach(header => {
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        header.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleSettingsBlock(this);
+            }
+        });
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            if (isConfigDrawerOpen()) {
+                closeConfigDrawer();
+            } else if (isAboutDrawerOpen()) {
+                closeAboutDrawer();
+            } else if (isNavDrawerOpen()) {
+                closeNavDrawer();
+            }
+        }
+    });
+
+    syncSetupGuidance();
+
+    document.addEventListener('touchstart', function (event) {
+        if (event.touches.length !== 1 || isNavDrawerOpen() || isConfigDrawerOpen()) return;
+        const touch = event.touches[0];
+        drawerTouchStart = {
+            x: touch.clientX,
+            y: touch.clientY,
+            active: touch.clientX <= 28
+        };
+    }, { passive: true });
+
+    document.addEventListener('touchend', function (event) {
+        if (!drawerTouchStart || !drawerTouchStart.active || event.changedTouches.length !== 1) {
+            drawerTouchStart = null;
+            return;
+        }
+
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - drawerTouchStart.x;
+        const deltaY = Math.abs(touch.clientY - drawerTouchStart.y);
+
+        if (deltaX > 72 && deltaY < 48) {
+            openNavDrawer(document.querySelector('[data-nav-open]'));
+        }
+
+        drawerTouchStart = null;
+    }, { passive: true });
+});
+
+// ── Test connection buttons ───────────────────────────────────────────────────
+(function () {
+    function wireTestBtn(id, handler) {
+        document.addEventListener('DOMContentLoaded', function () {
+            const btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', handler);
+        });
+    }
+
+    function simpleTest(btnId, url, parseOk) {
+        wireTestBtn(btnId, function () {
+            const btn = document.getElementById(btnId);
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Testing...';
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    const ok = parseOk(data);
+                    btn.innerHTML = ok ? '<i class="fas fa-check me-1"></i>Connection OK'
+                                       : '<i class="fas fa-times me-1"></i>Connection Failed';
+                    btn.classList.add(ok ? 'btn-success' : 'btn-danger');
+                }).catch(() => {
+                    btn.innerHTML = '<i class="fas fa-times me-1"></i>Connection Failed';
+                    btn.classList.add('btn-danger');
+                }).finally(() => {
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="fas fa-plug me-2"></i>Test Connection';
+                        btn.classList.remove('btn-success', 'btn-danger');
+                        btn.disabled = false;
+                    }, 3000);
+                });
+        });
+    }
+
+    simpleTest('testRadarr',  '/api/radarr/test',  d => d.status === 'ok' || d.success);
+    simpleTest('testSonarr',  '/api/sonarr/test',  d => d.status === 'ok' || d.success);
+    simpleTest('testReadarr', '/api/readarr/test', d => d.status === 'ok' || d.success);
+    simpleTest('testQbit',    '/api/qbit/test',    d => d.status === 'ok');
+
+    wireTestBtn('testPlex', function () {
+        const btn = document.getElementById('testPlex');
+        const plexUrl = document.getElementById('plexUrl').value;
+        const plexToken = document.getElementById('plexToken').value;
+        if (!plexUrl || !plexToken) { alert('Please enter Plex URL and token first'); return; }
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Testing...';
+        fetch(`/api/plex/test?url=${encodeURIComponent(plexUrl)}&token=${encodeURIComponent(plexToken)}`)
+            .then(r => r.json())
+            .then(data => {
+                const ok = data.status === 'ok' || data.success;
+                btn.innerHTML = ok ? '<i class="fas fa-check me-1"></i>Connection OK'
+                                   : '<i class="fas fa-times me-1"></i>Connection Failed';
+                btn.classList.add(ok ? 'btn-success' : 'btn-danger');
+            }).catch(() => {
+                btn.innerHTML = '<i class="fas fa-times me-1"></i>Connection Failed';
+                btn.classList.add('btn-danger');
+            }).finally(() => {
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-plug me-2"></i>Test Connection';
+                    btn.classList.remove('btn-success', 'btn-danger');
+                    btn.disabled = false;
+                }, 3000);
+            });
+    });
+
+    wireTestBtn('testProwlarr', function () {
+        const btn = document.getElementById('testProwlarr');
+        const prowlarrUrl = document.getElementById('prowlarrUrl').value;
+        const prowlarrKey = document.getElementById('prowlarrApiKey').value;
+        if (!prowlarrUrl) { alert('Please enter a Prowlarr URL first'); return; }
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Testing...';
+        fetch(`${prowlarrUrl}/api/v1/system/status?apikey=${prowlarrKey}`)
+            .then(r => {
+                btn.innerHTML = r.ok ? '<i class="fas fa-check me-1"></i>Connection OK'
+                                     : '<i class="fas fa-times me-1"></i>Connection Failed';
+                btn.classList.add(r.ok ? 'btn-success' : 'btn-danger');
+            }).catch(() => {
+                btn.innerHTML = '<i class="fas fa-times me-1"></i>Connection Failed';
+                btn.classList.add('btn-danger');
+            }).finally(() => {
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-plug me-2"></i>Test Connection';
+                    btn.classList.remove('btn-success', 'btn-danger');
+                    btn.disabled = false;
+                }, 3000);
+            });
+    });
+
+    wireTestBtn('testDuckDNS', function () {
+        const btn    = document.getElementById('testDuckDNS');
+        const domain = document.getElementById('duckdnsDomain').value;
+        const token  = document.getElementById('duckdnsToken').value;
+        if (!domain || !token) { alert('Please enter DuckDNS domain and token first'); return; }
+        if (!domain.match(/^[a-z0-9-]+$/i)) {
+            btn.innerHTML = '<i class="fas fa-times"></i> Invalid domain';
+            btn.classList.add('btn-danger');
+            setTimeout(() => { btn.innerHTML = 'Test Connection'; btn.classList.remove('btn-danger'); btn.disabled = false; }, 3000);
+            return;
+        }
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Testing...';
+        fetch(`https://www.duckdns.org/update?domains=${domain}&token=${token}&ip=check`, { mode: 'no-cors' })
+            .then(() => {
+                btn.innerHTML = '<i class="fas fa-check"></i> Connection OK';
+                btn.classList.add('btn-success');
+            }).catch(() => {
+                btn.innerHTML = '<i class="fas fa-times"></i> Connection Failed';
+                btn.classList.add('btn-danger');
+            }).finally(() => {
+                setTimeout(() => {
+                    btn.innerHTML = 'Test Connection';
+                    btn.classList.remove('btn-success', 'btn-danger');
+                    btn.disabled = false;
+                }, 3000);
+            });
+    });
+})();
+
+// ── Clear thumbnail cache ─────────────────────────────────────────────────────
+function clearThumbCache(btn) {
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Clearing…';
+    fetch('/api/books/covers/clear-cache', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            btn.innerHTML = d.success
+                ? `<i class="fas fa-check me-1"></i> Cleared ${d.deleted} files`
+                : '<i class="fas fa-times me-1"></i> Failed';
+            btn.classList.add(d.success ? 'btn-success' : 'btn-danger');
+        })
+        .catch(() => {
+            btn.innerHTML = '<i class="fas fa-times me-1"></i> Error';
+            btn.classList.add('btn-danger');
+        })
+        .finally(() => {
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.remove('btn-success', 'btn-danger');
+                btn.disabled = false;
+            }, 3000);
+        });
+}
+
+// ── Config form submit ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    const displayResetBtn = document.getElementById('displayResetBtn');
+    const displayInputs = [
+        'displayMode',
+        'displayAccent',
+        'displayBg',
+        'displayPanel',
+        'displaySurface',
+        'displaySurfaceAlt',
+        'displayText',
+        'displayMuted',
+        'displayRadius',
+        'displayBorderWidth',
+        'displayShadowOpacity',
+        'displayBorder'
+    ];
+
+    displayInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', syncDisplayConfigFromInputs);
+            input.addEventListener('change', syncDisplayConfigFromInputs);
+        }
+    });
+
+    if (displayResetBtn) {
+        displayResetBtn.addEventListener('click', resetDisplayThemeDefaults);
+    }
+
+    const configForm = document.getElementById('configForm');
+    if (!configForm) return;
+
+    configForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const cfg = {};
+        for (let [key, value] of formData.entries()) {
+            cfg[key] = (this.elements[key] && this.elements[key].type === 'checkbox')
+                       ? this.elements[key].checked : value;
+        }
+        this.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            if (!formData.has(cb.name)) cfg[cb.name] = false;
+        });
+        const submitBtn = document.getElementById('configSubmitBtn');
+        const origText  = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Saving...';
+        submitBtn.disabled  = true;
+
+        fetch('/save_config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cfg)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                closeConfigDrawer();
+                showNotification('Configuration saved successfully!', 'success');
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                throw new Error(data.error || 'Failed to save configuration');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showNotification('Error: ' + err.message, 'error');
+        })
+        .finally(() => {
+            submitBtn.innerHTML = origText;
+            submitBtn.disabled  = false;
+        });
+    });
+});
+
+// ── Server Restart Indicator HTML ─────────────────────────────────────────────
+function initRestartIndicator() {
+    if (!document.getElementById('restartIndicator')) {
+        const indicator = document.createElement('div');
+        indicator.id = 'restartIndicator';
+        indicator.innerHTML = `
+            <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Restarting...</span>
+            </div>
+            <div id="restartIndicator-text">Waiting for server to restart...</div>
+        `;
+        document.body.insertBefore(indicator, document.body.firstChild);
+    }
+}
+
+// ── Server Restart Handler ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    initRestartIndicator();
+    const restartBtn = document.getElementById('restartServerBtn');
+    if (!restartBtn) return;
+
+    restartBtn.addEventListener('click', function () {
+        if (!confirm('Are you sure you want to restart the server?\n\nAll users will be disconnected and the page will refresh automatically.')) {
+            return;
+        }
+
+        const origText = restartBtn.innerHTML;
+        restartBtn.disabled = true;
+        restartBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Restarting...';
+
+        fetch('/api/restart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const indicator = document.getElementById('restartIndicator');
+                const text = document.getElementById('restartIndicator-text');
+
+                indicator.classList.add('show');
+                document.body.classList.add('restart-pending');
+                text.textContent = 'Waiting for server to restart...';
+
+                closeConfigDrawer();
+
+                let retries = 0;
+                const maxRetries = 60;
+                const pollInterval = 1000;
+
+                function checkServerOnline() {
+                    fetch('/', { method: 'HEAD', cache: 'no-store' })
+                        .then(r => {
+                            if (r.ok) {
+                                text.textContent = 'Server is back online! Reloading...';
+                                setTimeout(() => {
+                                    indicator.classList.remove('show');
+                                    indicator.classList.add('hide');
+                                    setTimeout(() => window.location.reload(), 300);
+                                }, 1000);
+                            } else {
+                                throw new Error('Server not ready yet');
+                            }
+                        })
+                        .catch(err => {
+                            retries++;
+                            if (retries < maxRetries) {
+                                setTimeout(checkServerOnline, pollInterval);
+                            } else {
+                                text.textContent = 'Server restart timed out. Please refresh manually.';
+                                indicator.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+                                restartBtn.innerHTML = origText;
+                                restartBtn.disabled = false;
+                            }
+                        });
+                }
+
+                setTimeout(checkServerOnline, 2000);
+            } else {
+                throw new Error(data.error || 'Failed to restart server');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showNotification('Error: ' + err.message, 'error');
+            restartBtn.innerHTML = origText;
+            restartBtn.disabled = false;
+        });
+    });
+});
+</script>

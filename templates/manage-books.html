@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Books - arrdash</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/styles.css" rel="stylesheet">
+    <link href="/static/css/manage-page.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a1a" />
+    <script>
+    // Per-page-load timestamp — appended to every /api/book/cover/ request so
+    // the browser's HTTP cache (max-age=604800) never serves a stale thumbnail
+    // across page loads.  All cover fetches within the same page load share the
+    // same value so they still benefit from in-session browser caching.
+    const PAGE_TS = Date.now();
+
+    // Sequential batch image loader — 20 at a time. Mirrors manage.html.
+    function startProgressiveLoading() {
+        const items = [...document.querySelectorAll('.book-item')];
+        if (!items.length) return Promise.resolve();
+        let batchStart = 0;
+        const BATCH = 20;
+        function loadBatch() {
+            const slice = items.slice(batchStart, batchStart + BATCH);
+            if (!slice.length) return Promise.resolve();
+            batchStart += BATCH;
+            const promises = slice.map(item => {
+                const img = item.querySelector('.search-result-thumbnail');
+                if (!img) return Promise.resolve();
+                let src = img.getAttribute('data-src');
+                if (!src) return Promise.resolve();
+                // Append page-load cache buster to book cover proxy URLs
+                if (src.includes('/api/book/cover/')) {
+                    src += '&v=' + PAGE_TS;
+                }
+                if (img.src && img.src === src) return Promise.resolve();
+                return new Promise(resolve => {
+                    img.onload  = resolve;
+                    img.onerror = resolve;
+                    img.src = src;
+                });
+            });
+            return Promise.all(promises).then(loadBatch);
+        }
+        return loadBatch();
+    }
+    </script>
+</head>
+{% set current_page = 'manage-books' %}
+<body class="manage-library-page manage-books-page{% if source_home and open_id %} manage-library-page--home-launch app-header-hidden{% endif %}" data-manage-view="book" data-home-launch="{{ 'true' if source_home and open_id else 'false' }}">
+    <div id="globalLoadingSpinner" class="loading-spinner show">
+        <div class="loading-spinner__panel">
+            <button id="forceCloseSpinner" class="btn-close btn-close-white force-close-spinner-hidden loading-spinner__close"></button>
+            <div class="loading-spinner__logo" aria-hidden="true">
+                <span class="loading-spinner__triangle loading-spinner__triangle--left"></span>
+                <span class="loading-spinner__triangle loading-spinner__triangle--top"></span>
+                <span class="loading-spinner__triangle loading-spinner__triangle--bottom"></span>
+                <span class="loading-spinner__plus loading-spinner__plus--h"></span>
+                <span class="loading-spinner__plus loading-spinner__plus--v"></span>
+            </div>
+        </div>
+    </div>
+    {% include 'partials/navbar.html' %}
+
+    <div class="page-sticky-controls manage-library-controls" id="stickyControls">
+        <div class="container manage-library-controls__inner">
+            <input type="hidden" id="mediaFilter" value="book">
+
+            <div class="manage-library-tabs" role="tablist" aria-label="Book filters">
+                <button class="manage-library-tab is-active" type="button" data-manage-filter="all">All</button>
+                <button class="manage-library-tab" type="button" data-manage-filter="not_started">Not Started</button>
+                <button class="manage-library-tab" type="button" data-manage-filter="reading">Reading</button>
+                <button class="manage-library-tab" type="button" data-manage-filter="complete">Complete</button>
+                <button class="manage-library-tab" type="button" data-manage-filter="dnf">DNF</button>
+                <button class="manage-library-tab" type="button" data-manage-filter="wishlist">Wishlist</button>
+            </div>
+
+            <div class="manage-library-searchbar">
+                <span class="manage-library-searchbar__icon"><i class="fas fa-magnifying-glass"></i></span>
+                <input type="text"
+                       id="searchInput"
+                       class="manage-library-searchbar__input"
+                       placeholder="Search the {{ total_downloaded }} books in your library"
+                       autocomplete="off">
+                <button type="button" class="manage-library-searchbar__clear" id="clearSearch" disabled aria-label="Clear search">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="manage-library-toolbar">
+                <button class="btn btn-outline-secondary btn-sm flex-shrink-0" id="azToggle" type="button" onclick="toggleAzNav()">
+                    <i class="fas fa-arrow-down-a-z me-1"></i>A-Z
+                </button>
+                <div id="azLetters" class="flex-grow-1"></div>
+                <label class="form-check form-switch manage-library-toolbar__toggle mb-0">
+                    <input class="form-check-input" type="checkbox" id="includeMissingToggle" {% if include_missing %}checked{% endif %}>
+                    <span class="form-check-label">Include Missing Books</span>
+                </label>
+                <button class="btn btn-outline-secondary btn-sm flex-shrink-0 manage-library-toolbar__prefs"
+                        type="button"
+                        title="Reading preferences" onclick="openReadingPrefs()">
+                    <i class="fas fa-sliders-h"></i>
+                </button>
+                <button id="backToTop" class="btn btn-outline-secondary btn-sm btn-back-to-top"
+                        type="button"
+                        title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="manage-library-main">
+    <div class="container manage-library-shell">
+        {% if books %}
+        <section class="manage-library-list manage-books-list" id="booksGrid">
+            {% for book in books %}
+            {% set rs = book.reading_status or 'not_started' %}
+            {% set book_pages = (book.pages ~ 'p') if book.pages else '' %}
+            {% set book_meta_secondary = book.genre or 'Library' %}
+            <article class="media-item book-item result-item results-listing results-listing--book results-listing--book-library"
+                     data-title="{{ (book.title or book.filename)|lower }}"
+                     data-author="{{ (book.author or '')|lower }}"
+                     data-genre="{{ (book.genre or '')|lower }}"
+                     data-reading-status="{{ rs }}"
+                     data-wishlist="{{ 1 if book.is_wishlist else 0 }}"
+                     data-file-path="{{ book.file_path }}"
+                     data-db-id="{{ book.id or '' }}"
+                     data-source="{{ book.source or 'unknown' }}"
+                     data-file-state="{{ book.file_state or 'downloaded' }}"
+                     data-internal-id="{{ book.internal_id or '' }}"
+                     data-foreign-id="{{ book.foreign_book_id or '' }}"
+                     data-has-azw3="{{ 'true' if book.has_azw3 else 'false' }}"
+                     onclick="openBookDetails(this)">
+
+                    <div class="results-listing__poster-wrap search-result-thumbnail-container book-card">
+                        {% if book.id %}
+                        <img data-src="/api/book/cover/{{ book.id }}?w=180&h=270"
+                        {% else %}
+                        <img data-src="{{ book.cover_url or '/static/images/apple-touch-icon.png' }}"
+                        {% endif %}
+                             src="/static/images/placeholder.png"
+                             class="results-listing__poster manage-result-thumbnail search-result-thumbnail book-thumb"
+                             alt="{{ book.title or book.filename }}"
+                             onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
+                        <div class="book-status-ribbon rs-{{ rs }} book-rs-badge"
+                             title="Reading status: {{ rs|replace('_', ' ')|title }}">
+                            {% if rs == 'complete' %}
+                            <i class="fas fa-check"></i>
+                            {% elif rs == 'dnf' %}
+                            <i class="fas fa-times"></i>
+                            {% else %}
+                            <i class="fas fa-bookmark"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="results-listing__body manage-book-row">
+                        <div class="results-listing__head">
+                            <h2 class="results-listing__title book-title">{{ book.title or book.filename }}</h2>
+                            <div class="dropdown book-card-menu">
+                                <button class="results-listing__menu"
+                                        type="button"
+                                        data-bs-toggle="dropdown"
+                                        aria-expanded="false"
+                                        aria-label="Book status actions"
+                                        onclick="event.stopPropagation()">
+                                    <i class="fas fa-ellipsis-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-dark book-card-menu__dropdown" onclick="event.stopPropagation()">
+                                    <li><button class="dropdown-item" type="button" onclick="setBookStatusQuick(this.closest('.book-item'), 'reading')">Reading</button></li>
+                                    <li><button class="dropdown-item" type="button" onclick="setBookStatusQuick(this.closest('.book-item'), 'complete')">Complete</button></li>
+                                    <li><button class="dropdown-item" type="button" onclick="setBookStatusQuick(this.closest('.book-item'), 'dnf')">DNF</button></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="results-listing__meta">
+                            <span class="results-listing__year">{{ book.year or 'N/A' }}</span>
+                            <span class="results-listing__status {{ 'is-missing' if (book.file_state or 'downloaded') == 'missing' else 'is-library' }}">
+                                {{ 'Missing' if (book.file_state or 'downloaded') == 'missing' else rs|replace('_', ' ')|title }}
+                            </span>
+                        </div>
+
+                        <p class="results-listing__overview book-pages-meta">{{ (book.genre or 'No genre available.') ~ (book_pages and (' · ' ~ book_pages) or '') }}</p>
+
+                        <button class="book-heart-btn {{ 'wishlisted' if book.is_wishlist else '' }}"
+                                data-wishlisted="{{ '1' if book.is_wishlist else '0' }}"
+                                onclick="event.stopPropagation(); quickToggleWishlist(this)"
+                                title="{{ 'Remove from wishlist' if book.is_wishlist else 'Add to wishlist' }}">
+                            <i class="{{ 'fas' if book.is_wishlist else 'far' }} fa-heart"></i>
+                        </button>
+                    </div>
+            </article>
+            {% endfor %}
+        </section>
+        {% else %}
+        <div class="alert alert-secondary text-center">
+            <i class="fas fa-book-open fa-2x mb-2 d-block"></i>
+            No book files found in <strong>{{ root_folder or 'the configured books folder' }}</strong>.
+        </div>
+        {% endif %}
+
+        <div id="emptySearch" class="alert alert-secondary text-center" style="display:none;">
+            No books match your search.
+        </div>
+    </div>
+    </main>
+
+    <!-- ── Reading Preferences Panel ── -->
+    <div id="readingPrefsOverlay" onclick="closeReadingPrefs()"></div>
+    <div id="readingPrefsPanel">
+        <div class="rp-header">
+            <span><i class="fas fa-sliders-h me-2"></i>Reading Preferences</span>
+            <button class="rp-close" onclick="closeReadingPrefs()">✕</button>
+        </div>
+        <div class="rp-body">
+            <div class="rp-section">
+                <span class="rp-label">Font Size</span>
+                <div class="rp-font-size-row">
+                    <button class="rp-fs-btn" onclick="rpAdjSize(-1)">A−</button>
+                    <input type="range" id="rpFontSizeSlider" min="10" max="32" value="17"
+                           oninput="rpOnSlider(this.value)">
+                    <span id="rpFontSizeVal">17px</span>
+                    <button class="rp-fs-btn" onclick="rpAdjSize(1)">A+</button>
+                </div>
+            </div>
+            <div class="rp-section">
+                <span class="rp-label">Font</span>
+                <div class="rp-font-grid">
+                    <button class="rp-font-btn" data-font="Georgia"             onclick="rpPickFont(this)">Georgia</button>
+                    <button class="rp-font-btn" data-font="Arial"               onclick="rpPickFont(this)">Arial</button>
+                    <button class="rp-font-btn" data-font="'Times New Roman'"   onclick="rpPickFont(this)">Times</button>
+                    <button class="rp-font-btn" data-font="Palatino"            onclick="rpPickFont(this)">Palatino</button>
+                    <button class="rp-font-btn" data-font="Verdana"             onclick="rpPickFont(this)">Verdana</button>
+                </div>
+            </div>
+            <div class="rp-section">
+                <span class="rp-label">Theme</span>
+                <div class="rp-theme-row">
+                    <button class="rp-theme-btn" id="rpThemeLightBtn" onclick="rpPickTheme('light')">☀ Light</button>
+                    <button class="rp-theme-btn" id="rpThemeDarkBtn"  onclick="rpPickTheme('dark')">🌙 Dark</button>
+                </div>
+                <p class="rp-note">These are your default reader settings — applied to every book unless overridden per-book.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Details Modal ── -->
+    <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-modal="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="detailsModalLabel">Book Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="detailsContent">Loading…</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Manual Import / Edit Metadata Modal ── -->
+    <!-- Left click area to close the modal (70px from left edge) -->
+    <div id="importModalBackdrop" class="import-modal-backdrop"></div>
+
+    <!-- Main edit metadata panel (slides in from right) -->
+    <div id="importModal" class="import-modal-panel">
+        <div class="import-modal-header bg-dark text-light" style="border-bottom: 1px solid #333;">
+            <h5 class="import-modal-title">
+                <i class="fas fa-edit me-2" style="color:#c0392b;"></i>Edit Metadata
+            </h5>
+            <button type="button" class="import-modal-close" aria-label="Close" onclick="closeImportModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="import-modal-body bg-dark text-light">
+            <input type="hidden" id="importFilePath">
+            <input type="hidden" id="importDbId">
+            <input type="hidden" id="importSelectedSource">
+            <input type="hidden" id="importSelectedForeignBookId">
+
+            <div class="row g-3">
+                <!-- Cover column -->
+                <div class="col-md-3 text-center">
+                    <img id="importCoverPreview" src="" alt="Cover"
+                         style="max-height:140px;border-radius:6px;display:none;margin-bottom:8px;">
+                    <div class="d-flex flex-column gap-2">
+                        <div>
+                            <label class="form-label d-block" style="font-size:0.78rem;">Cover URL</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   id="importCoverUrl" placeholder="https://…"
+                                   oninput="previewCover(this.value)">
+                        </div>
+                        <div>
+                            <label class="form-label d-block" style="font-size:0.78rem;">Upload image</label>
+                            <input type="file" class="form-control form-control-sm"
+                                   id="importCoverFile" accept="image/*"
+                                   onchange="previewLocalCover(this)">
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                id="importDeleteCoverBtn" onclick="deleteCover()"
+                                title="Remove the current cover image">
+                            <i class="fas fa-trash me-1"></i>Delete cover
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                id="importRefreshBtn" onclick="refreshMetadata()"
+                                title="Re-fetch metadata and cover from Goodreads/Readarr">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh online
+                        </button>
+                        <!-- Online search results picker moved here - directly after Refresh button -->
+                        <div class="col-12">
+                            <div id="onlinePickerWrap" style="display:none; margin-top:12px; padding: 12px; background:#242424; border-radius:6px; border:1px solid #333;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                    <div style="font-size:0.78rem; font-weight:600; text-transform:uppercase;
+                                                letter-spacing:0.06em; color:#aaa;">
+                                        Pick a result to fill the form
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            id="onlinePickerCancelBtn"
+                                            onclick="closeOnlinePickerWrap()"
+                                            title="Close search results">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </button>
+                                </div>
+                                <div id="onlinePickerGrid"
+                                     style="display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+                                            gap:10px; max-height:340px; overflow-y:auto; padding-right:4px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Fields column -->
+                <div class="col-md-9">
+                    <div class="row g-2">
+                        <!-- ── CORE INFORMATION SECTION ── -->
+                        <div class="col-12">
+                            <div style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#888; margin-bottom:8px;">
+                                Essential Metadata
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importTitle" style="font-weight:600; color:#f5f7fb;">Title <span style="color:#c0392b;">*</span></label>
+                            <input type="text" class="form-control" id="importTitle" required
+                                   style="border-color:#c0392b; border-width:2px;">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importAuthor" style="font-weight:600;">Author</label>
+                            <input type="text" class="form-control" id="importAuthor">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importGenre" style="font-weight:600;">Genre</label>
+                            <input type="text" class="form-control" id="importGenre"
+                                   placeholder="e.g. Fiction, Fantasy">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importGoodreadsUrl">
+                                Goodreads URL
+                                <small class="text-muted ms-1" style="font-size:0.75rem;">(paste to help find the right book, then click Refresh online)</small>
+                            </label>
+                            <input type="url" class="form-control" id="importGoodreadsUrl"
+                                   placeholder="https://www.goodreads.com/book/show/…">
+                        </div>
+
+                        <!-- ── DESCRIPTION SECTION ── -->
+                        <div class="col-12" style="margin-top:12px;">
+                            <div style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#888; margin-bottom:8px;">
+                                Description
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importOverview">Synopsis / Overview</label>
+                            <textarea class="form-control" id="importOverview" rows="4"></textarea>
+                        </div>
+
+                        <!-- ── ADVANCED DETAILS (COLLAPSIBLE) ── -->
+                        <div class="col-12" style="margin-top:12px;">
+                            <button type="button" class="btn btn-link p-0"
+                                    onclick="toggleAdvancedDetails()"
+                                    style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#888; text-decoration:none;">
+                                <i class="fas fa-chevron-down me-2" id="advancedToggleIcon" style="display:inline-block; width:12px; transition:transform 200ms ease;"></i>
+                                <span>Technical Details</span>
+                            </button>
+                        </div>
+
+                        <!-- Spacer for advanced section -->
+                        <div class="col-12 import-advanced-detail" style="margin-top:8px; display:none;"></div>
+
+                        <!-- Year field -->
+                        <div class="col-md-4 import-advanced-detail" style="display:none;">
+                            <label class="form-label" for="importYear">Year</label>
+                            <input type="number" class="form-control" id="importYear"
+                                   min="1000" max="2099">
+                        </div>
+
+                        <!-- Pages field -->
+                        <div class="col-md-4 import-advanced-detail" style="display:none;">
+                            <label class="form-label" for="importPages">Pages</label>
+                            <input type="number" class="form-control" id="importPages" min="1">
+                        </div>
+
+                        <!-- ISBN field -->
+                        <div class="col-md-4 import-advanced-detail" style="display:none;">
+                            <label class="form-label" for="importIsbn">ISBN</label>
+                            <input type="text" class="form-control" id="importIsbn">
+                        </div>
+
+                        <!-- File label -->
+                        <div class="col-12 import-advanced-detail" style="display:none;">
+                            <small class="text-muted me-auto" id="importFileLabel"></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="importError"   class="alert alert-danger mt-3"  style="display:none;"></div>
+            <div id="importSuccess" class="alert alert-success mt-3" style="display:none;"></div>
+        </div>
+
+        <div class="settings-drawer__footer border-secondary" style="border-top: 1px solid #333;">
+            <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+            <button type="button" class="btn btn-danger" id="importSaveBtn"
+                    onclick="saveImport()">
+                <i class="fas fa-save me-1"></i>Save
+            </button>
+        </div>
+    </div>
+
+    <div id="overlay-backdrop" class="overlay-backdrop"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    <script>
+    // ── Safe HTML helper ─────────────────────────────────────────────────────
+    // Use for ANY user-sourced string placed inside a JS template literal.
+    // Handles backticks (which would prematurely close the literal) and the
+    // usual HTML-injection characters.
+    function escHtml(s) {
+        return (s == null ? '' : String(s))
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/`/g, '&#96;');
+    }
+
+    // ── Search / filter ──────────────────────────────────────────────────────
+    const searchInput  = document.getElementById('searchInput');
+    const clearBtn     = document.getElementById('clearSearch');
+    const emptyMsg     = document.getElementById('emptySearch');
+    let currentBookFilter = 'all';
+
+    function updateBookSearchPlaceholder(visibleCount) {
+        searchInput.placeholder = `Search the ${visibleCount} books in your library`;
+    }
+
+    function applyFilters() {
+        const term   = searchInput.value.trim().toLowerCase();
+        const status = currentBookFilter;
+        clearBtn.disabled = !term;
+        let anyVisible = false;
+        let visibleCount = 0;
+        document.querySelectorAll('.book-item').forEach(item => {
+            const titleMatch  = !term || (item.dataset.title  || '').includes(term);
+            const authorMatch = !term || (item.dataset.author || '').includes(term);
+            const genreMatch  = !term || (item.dataset.genre  || '').includes(term);
+            const textOk = titleMatch || authorMatch || genreMatch;
+
+            let statusOk = true;
+            if (status === 'wishlist') {
+                statusOk = item.dataset.wishlist === '1';
+            } else if (status !== 'all') {
+                statusOk = item.dataset.readingStatus === status;
+            }
+
+            const show = textOk && statusOk;
+            item.style.display = show ? '' : 'none';
+            if (show) {
+                anyVisible = true;
+                visibleCount += 1;
+            }
+        });
+        emptyMsg.style.display = anyVisible ? 'none' : 'block';
+        updateBookSearchPlaceholder(visibleCount);
+    }
+
+    function updateMediaDisplay() {
+        applyFilters();
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+    document.querySelectorAll('[data-manage-filter]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('[data-manage-filter]').forEach(tab => tab.classList.remove('is-active'));
+            this.classList.add('is-active');
+            currentBookFilter = this.dataset.manageFilter || 'all';
+            applyFilters();
+        });
+    });
+
+    clearBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        this.disabled = true;
+        applyFilters();
+    });
+
+    const includeMissingToggle = document.getElementById('includeMissingToggle');
+    if (includeMissingToggle) {
+        includeMissingToggle.addEventListener('change', function() {
+            const url = new URL(window.location.href);
+            if (this.checked) url.searchParams.set('include_missing', '1');
+            else url.searchParams.delete('include_missing');
+            window.location.href = url.toString();
+        });
+    }
+
+    // ── Auto-open book details if ?open=<id> parameter present ────────────────
+    function handleAutoOpenBook() {
+        const params = new URLSearchParams(window.location.search);
+        const bookId = params.get('open');
+        const openForeignId = params.get('openForeign') || '';
+        const openInternalId = params.get('openInternal') || '';
+        const launchSource = params.get('source');
+        if (!bookId || launchSource !== 'home') return;
+
+        const cardSelectors = [
+            `[data-db-id="${bookId}"]`,
+            openForeignId ? `[data-foreign-id="${openForeignId}"]` : '',
+            `[data-foreign-id="${bookId}"]`,
+            openInternalId ? `[data-internal-id="${openInternalId}"]` : '',
+            `[data-internal-id="${bookId}"]`
+        ].filter(Boolean);
+
+        let bookCard = null;
+        for (const selector of cardSelectors) {
+            bookCard = document.querySelector(selector);
+            if (bookCard) break;
+        }
+
+        const modalEl = document.getElementById('detailsModal');
+        if (modalEl) {
+            modalEl.addEventListener('hidden.bs.modal', function onHomeLaunchClose() {
+                modalEl.removeEventListener('hidden.bs.modal', onHomeLaunchClose);
+                window.location.href = '/';
+            });
+        }
+
+        function fetchHomeLaunchBookDetails() {
+            const attempts = [];
+            const seen = new Set();
+            const enqueue = (url) => {
+                if (!url || seen.has(url)) return;
+                seen.add(url);
+                attempts.push(url);
+            };
+
+            if (openInternalId) {
+                enqueue(`/get_media_details?type=book&id=${encodeURIComponent(openInternalId)}&source=internal`);
+            }
+            if (openForeignId) {
+                enqueue(`/get_media_details?type=book&id=${encodeURIComponent(openForeignId)}`);
+            }
+            enqueue(`/get_media_details?type=book&id=${encodeURIComponent(bookId)}`);
+
+            const isUsableBookPayload = (book) => {
+                if (!book || book.error) return false;
+                const data = book.data || book;
+                if (!data || typeof data !== 'object') return false;
+                const title = (data.title || '').trim();
+                const author = (data.authorTitle || data.author?.authorName || data.author || '').trim();
+                const foreignId = String(data.foreignBookId || data.foreign_book_id || '').trim();
+                const internalId = String(data.id || data.internal_id || '').trim();
+                return Boolean(title || author || foreignId || internalId);
+            };
+
+            return attempts.reduce((chain, url) => {
+                return chain.catch(() => fetch(url)
+                    .then(r => {
+                        if (!r.ok) throw new Error(`API error: ${r.status}`);
+                        return r.json();
+                    })
+                    .then(book => {
+                        if (!isUsableBookPayload(book)) {
+                            throw new Error(`Empty book payload from ${url}`);
+                        }
+                        return book;
+                    }));
+            }, Promise.reject(new Error('No fetch attempts available')));
+        }
+
+        setTimeout(() => {
+            if (bookCard) {
+                openBookDetails(bookCard);
+                return;
+            }
+
+            // Fallback for home links that only know the Readarr/foreign id.
+            const fallbackBook = {
+                id: null,
+                internal_id: null,
+                foreign_book_id: openForeignId || bookId,
+                title: params.get('plexTitle') || 'Book',
+                author: '',
+                file_path: '',
+                year: params.get('plexYear') || '',
+                genre: '',
+                monitored: true
+            };
+            _renderBookDetailModal(fallbackBook, null);
+            const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+            modal.show();
+
+            fetchHomeLaunchBookDetails()
+                .then(book => _renderBookDetailModal(book, null))
+                .catch(err => {
+                    console.warn('[handleAutoOpenBook] Readarr fallback failed:', err);
+                });
+        }, 60);
+    }
+
+    function initializeClearSearch() {
+        clearBtn.disabled = !searchInput.value.trim();
+    }
+
+    // ── Card patch helper ─────────────────────────────────────────────────────
+    function patchBookCard(card, book) {
+        if (!card || !book) return;
+
+        const title = book.title || card.dataset.title;
+        if (title) {
+            const el = card.querySelector('.book-title');
+            if (el) el.textContent = title;
+            card.dataset.title = title.toLowerCase();
+        }
+
+        const author = book.author;
+        if (author !== undefined) {
+            const el = card.querySelector('.book-author');
+            if (el) el.textContent = author || '';
+            card.dataset.author = (author || '').toLowerCase();
+        }
+
+        if (book.genre !== undefined) {
+            card.dataset.genre = (book.genre || '').toLowerCase();
+            const genreEl = card.querySelector('.book-genre');
+            if (genreEl) genreEl.textContent = book.genre || 'No genre available.';
+        }
+
+        // Cover: when the book has a DB id always use the /api/book/cover endpoint
+        // with a timestamp cache-buster so the newly-served image is picked up
+        // even if the browser or server had cached the old one.
+        // For books without a DB id (edge case) fall back to the raw cover_url.
+        if (book.id) {
+            const thumbSrc = `/api/book/cover/${book.id}?w=174&h=261&t=${Date.now()}`;
+            const img = card.querySelector('.book-thumb');
+            if (img) { img.src = thumbSrc; img.setAttribute('data-src', thumbSrc); }
+            const backdrop = card.querySelector('.manage-library-card__backdrop');
+            if (backdrop) { backdrop.src = `/api/book/cover/${book.id}?w=800&h=450&t=${Date.now()}`; }
+        } else if (book.cover_url) {
+            const img = card.querySelector('.book-thumb');
+            if (img) { img.src = book.cover_url; img.setAttribute('data-src', book.cover_url); }
+            const backdrop = card.querySelector('.manage-library-card__backdrop');
+            if (backdrop) { backdrop.src = book.cover_url; }
+        }
+
+        if (book.source) card.dataset.source = book.source;
+        if (book.file_state) card.dataset.fileState = book.file_state;
+
+        if (book.id) {
+            card.dataset.dbId = book.id;
+            const readBtn = card.querySelector('a.btn-outline-success');
+            if (readBtn) readBtn.href = `/read/local/${book.id}`;
+        }
+        if (book.file_path) card.dataset.filePath = book.file_path;
+        if (book.foreign_book_id) card.dataset.foreignId = book.foreign_book_id;
+        if (book.internal_id) card.dataset.internalId = book.internal_id;
+
+        // Replace "enriching…" pill with final source pill
+        const pill = card.querySelector('.source-pill');
+        if (pill) {
+            pill.classList.remove('enriching', 'needs-manual');
+            pill.innerHTML = book.source || 'local';
+        }
+
+        // Hide Import button once we have real metadata
+        const src = book.source || '';
+        if (!['file', 'filename', 'unknown'].includes(src)) {
+            const importBtn = card.querySelector('.import-btn');
+            if (importBtn) importBtn.style.display = 'none';
+        }
+
+        const yearEl = card.querySelector('.results-listing__year');
+        if (yearEl) yearEl.textContent = book.year || 'N/A';
+
+        const statusEl = card.querySelector('.results-listing__status');
+        if (statusEl) {
+            const fileState = book.file_state || card.dataset.fileState || 'downloaded';
+            const labels = {
+                not_started: 'Not Started',
+                reading: 'Reading',
+                complete: 'Complete',
+                dnf: 'Did Not Finish'
+            };
+            statusEl.textContent = fileState === 'missing'
+                ? 'Missing'
+                : (labels[book.reading_status] || book.reading_status || 'Downloaded');
+            statusEl.className = `results-listing__status ${fileState === 'missing' ? 'is-missing' : 'is-library'}`;
+        }
+
+        const pagesEl = card.querySelector('.book-pages-meta');
+        if (pagesEl) {
+            const genre = book.genre || 'No genre available.';
+            const pages = book.pages ? `${book.pages}p` : '';
+            pagesEl.textContent = pages ? `${genre} · ${pages}` : genre;
+        }
+
+        // Update reading ribbon
+        if (book.reading_status) {
+            card.dataset.readingStatus = book.reading_status;
+            const ribbon = card.querySelector('.book-rs-badge');
+            if (ribbon) {
+                ribbon.className = `book-status-ribbon rs-${book.reading_status} book-rs-badge`;
+                ribbon.title = `Reading status: ${book.reading_status.replace(/_/g, ' ')}`;
+                const iconClass = book.reading_status === 'complete'
+                    ? 'fas fa-check'
+                    : book.reading_status === 'dnf'
+                        ? 'fas fa-times'
+                        : 'fas fa-bookmark';
+                ribbon.innerHTML = `<i class="${iconClass}"></i>`;
+            }
+        }
+    }
+
+    function syncActiveBookUi(book, fallbackCard = null) {
+        if (!book) return;
+
+        const modalEl = document.getElementById('detailsModal');
+        const activeCard = fallbackCard || modalEl?._bookCard || null;
+
+        if (activeCard) {
+            patchBookCard(activeCard, book);
+        }
+
+        const activeBookId = modalEl?._bookId ? String(modalEl._bookId) : '';
+        const savedBookId = book.id ? String(book.id) : '';
+        if (modalEl && savedBookId && activeBookId && savedBookId === activeBookId && typeof _renderBookDetailModal === 'function') {
+            _renderBookDetailModal(book, activeCard);
+        }
+    }
+
+    function normalizeManageBookForSharedModal(book, card) {
+        const authorName = typeof book?.author === 'object'
+            ? (book.author?.authorName || book.author?.name || '')
+            : (book?.author || card?.dataset.author || '');
+        const coverId = book?.id || book?.internal_id || book?.internalId || null;
+        const coverVersion = encodeURIComponent(book?.updated_at || book?.added || PAGE_TS);
+        const posterImage = (book?.images || []).find(img => img?.coverType === 'poster' || img?.coverType === 'cover');
+        const remoteCoverUrl =
+            book?.cover_url ||
+            book?.remotePoster ||
+            posterImage?.remoteUrl ||
+            posterImage?.url ||
+            card?.querySelector('.book-thumb')?.src ||
+            '/static/images/apple-touch-icon.png';
+        const coverUrl = coverId
+            ? `/api/book/cover/${coverId}?w=320&h=480&v=${coverVersion}`
+            : remoteCoverUrl;
+        const backdropUrl = coverId
+            ? `/api/book/cover/${coverId}?w=1280&h=720&v=${coverVersion}`
+            : remoteCoverUrl;
+
+        return {
+            id: book.id,
+            internal_id: book.internal_id || book.internalId || null,
+            foreignBookId: book.foreignBookId || book.foreign_book_id || '',
+            title: book.title || card?.querySelector('.book-title')?.textContent || 'Unknown Title',
+            overview: book.overview || '',
+            path: book.file_path || book.path || card?.dataset.filePath || '',
+            releaseDate: book.releaseDate || (book.year ? `${book.year}-01-01` : ''),
+            pageCount: book.pageCount || book.pages || null,
+            added: book.added || '',
+            format: book.format || book.extension || '',
+            source: book.source || card?.dataset.source || 'unknown',
+            author: { authorName: authorName },
+            remotePoster: coverUrl,
+            images: [
+                { coverType: 'poster', remoteUrl: coverUrl, url: coverUrl },
+                { coverType: 'backdrop', remoteUrl: backdropUrl, url: backdropUrl }
+            ]
+        };
+    }
+
+    function normalizeManageBookEnvelope(book, card) {
+        return {
+            monitored: book.monitored ?? true,
+            on_disk: true,
+            status: 'existing',
+            data: normalizeManageBookForSharedModal(book, card)
+        };
+    }
+
+    // ── Book detail modal ─────────────────────────────────────────────────────
+    function openBookDetails(card) {
+        const dbId = card.dataset.dbId;
+        document.getElementById('detailsModalLabel').textContent = 'Book Details';
+        _openSimpleBookModal(card);
+        new bootstrap.Modal(document.getElementById('detailsModal')).show();
+
+        const foreignId = card.dataset.foreignId || '';
+        const fetchUrl = dbId
+            ? `/api/books/local/${dbId}`
+            : (foreignId ? `/get_media_details?type=book&id=${encodeURIComponent(foreignId)}` : '');
+
+        if (!fetchUrl) {
+            return;
+        }
+
+        fetch(fetchUrl)
+            .then(r => {
+                if (!r.ok) throw new Error(`API error: ${r.status}`);
+                return r.json();
+            })
+            .then(book => _renderBookDetailModal(book, card))
+            .catch(err => {
+                console.warn('[openBookDetails] API fetch failed, falling back to card data:', err);
+                // Fallback: set modal data from card when API fetch fails
+                const modalEl = document.getElementById('detailsModal');
+                if (modalEl && card) {
+                    modalEl._bookFilePath = card.dataset.filePath || '';
+                    modalEl._bookId = card.dataset.dbId || null;
+                }
+            });
+    }
+
+    function _renderBookDetailModal(book, card) {
+        const detailBook = book && book.data ? book.data : book;
+        const normalizedBook = normalizeManageBookForSharedModal(detailBook, card);
+        const modalEl = document.getElementById('detailsModal');
+        document.getElementById('detailsModalLabel').textContent = detailBook?.title || 'Book Details';
+        if (typeof setDetailsModalVariant === 'function') {
+            setDetailsModalVariant('book');
+        }
+        const fullData = (book && (book.data || book.status || book.on_disk !== undefined || book.monitored !== undefined))
+            ? book
+            : normalizeManageBookEnvelope(detailBook, card);
+        if (card && (card.dataset.fileState || 'downloaded') === 'missing') {
+            fullData.on_disk = false;
+            fullData.status = 'missing';
+        }
+        renderBookDetails(
+            normalizedBook,
+            fullData,
+            'book',
+            normalizedBook?.id || normalizedBook?.internal_id || null
+        );
+        modalEl._bookCard = card || null;
+        modalEl._bookId = normalizedBook?.id || normalizedBook?.internal_id || null;
+        modalEl._bookFilePath = normalizedBook?.path || detailBook?.file_path || '';
+    }
+
+    // Called by the "Edit Metadata" button inside the details modal.
+    // Reads file path + db-id from data attributes (avoids embedding paths
+    // in onclick strings, which breaks when paths contain quotes or special chars).
+    function openEditFromModal(btn) {
+        const fp     = btn.dataset.editFp  || '';
+        const bookId = btn.dataset.editId  || null;
+        // Close the details modal first
+        const detailsModal = document.getElementById('detailsModal');
+        if (detailsModal) {
+            const bsModal = bootstrap.Modal.getInstance(detailsModal);
+            if (bsModal) bsModal.hide();
+            else detailsModal.classList.remove('show');
+        }
+        setTimeout(() => triggerImport({ dataset: { filePath: fp } }, bookId || null), 300);
+    }
+
+    function _openSimpleBookModal(card) {
+        const simpleBook = {
+            id: card.dataset.dbId || null,
+            title: card.querySelector('.book-title')?.textContent || '',
+            author: card.dataset.author || '',
+            file_path: card.dataset.filePath || '',
+            year: card.querySelector('.results-listing__year')?.textContent || '',
+            genre: card.querySelector('.book-genre')?.textContent || '',
+            extension: '',
+            monitored: true
+        };
+
+        document.getElementById('detailsModalLabel').textContent = simpleBook.title || 'Book Details';
+        if (typeof setDetailsModalVariant === 'function') {
+            setDetailsModalVariant('book');
+        }
+        const fullData = normalizeManageBookEnvelope(simpleBook, card);
+        if ((card.dataset.fileState || 'downloaded') === 'missing') {
+            fullData.on_disk = false;
+            fullData.status = 'missing';
+        }
+        renderBookDetails(
+            normalizeManageBookForSharedModal(simpleBook, card),
+            fullData,
+            'book',
+            simpleBook.id || null
+        );
+        document.getElementById('detailsModal')._bookCard = card || null;
+    }
+
+    // ── Reading status update ─────────────────────────────────────────────────
+    function setBookStatus(dbId, status, btn) {
+        const _rsLabels = {
+            not_started: 'Not Started',
+            reading: 'Reading',
+            complete: 'Complete',
+            dnf: 'Did Not Finish',
+        };
+        fetch('/api/books/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ db_id: dbId, reading_status: status })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            const dropdownBtn = document.getElementById('readingStatusDropdownBtn');
+            if (dropdownBtn) {
+                dropdownBtn.dataset.status = status;
+                const labelSpan = dropdownBtn.querySelector('span');
+                if (labelSpan) labelSpan.textContent = _rsLabels[status] || status;
+            }
+            const menu = btn.closest('.dropdown-menu');
+            if (menu) {
+                menu.querySelectorAll('.dropdown-item').forEach(item => item.classList.remove('active'));
+                btn.classList.add('active');
+            }
+            // Patch the card if still visible
+            const card = document.getElementById('detailsModal')._bookCard;
+            if (card) patchBookCard(card, data.book);
+        })
+        .catch(console.error);
+    }
+
+    // ── Wishlist toggle ───────────────────────────────────────────────────────
+    function toggleWishlist(dbId, btn) {
+        const current  = btn.dataset.wishlisted === '1';
+        const newState = current ? 0 : 1;
+        fetch('/api/books/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ db_id: dbId, is_wishlist: newState })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            const inList = !!data.book.is_wishlist;
+            btn.dataset.wishlisted = inList ? '1' : '0';
+            btn.className = `btn btn-sm ${inList ? 'btn-danger' : 'btn-outline-danger'}`;
+            btn.textContent = `${inList ? '♥' : '♡'} ${inList ? 'In Wishlist' : 'Add to Wishlist'}`;
+            // Patch card
+            const card = document.getElementById('detailsModal')._bookCard;
+            if (card) {
+                card.dataset.wishlist = inList ? '1' : '0';
+                let heart = card.querySelector('.position-absolute[style*="top:4px"]');
+                if (inList && !heart) {
+                    const thumb = card.querySelector('.search-result-thumbnail-container');
+                    if (thumb) {
+                        heart = document.createElement('div');
+                        heart.className = 'position-absolute';
+                        heart.style.cssText = 'top:4px;right:4px;font-size:0.9rem;';
+                        heart.textContent = '♥';
+                        thumb.appendChild(heart);
+                    }
+                } else if (!inList && heart) {
+                    heart.remove();
+                }
+            }
+        })
+        .catch(console.error);
+    }
+
+    // ── Bookmark badges ───────────────────────────────────────────────────────
+    function applyBookmarkBadges() {
+        document.querySelectorAll('.book-item[data-internal-id]').forEach(card => {
+            const internalId    = card.dataset.internalId;
+            const bmKey         = `epub_bm_${internalId}`;
+            const actionsDiv    = card.querySelector('.book-actions');
+            const existingBadge = actionsDiv ? actionsDiv.querySelector('.bm-badge') : null;
+
+            if (!localStorage.getItem(bmKey)) {
+                if (existingBadge) existingBadge.remove();
+                return;
+            }
+            if (!actionsDiv) return;
+
+            const pageInfo = localStorage.getItem(bmKey + '_page') || '';
+            const badge = existingBadge || document.createElement('span');
+            badge.className     = 'bm-badge badge';
+            badge.style.cssText = 'background:#f39c12;color:#000;font-size:0.7rem;cursor:default;';
+            if (pageInfo) {
+                const [pg] = pageInfo.split('/');
+                badge.textContent = `🔖 p.${pg}`;
+                badge.title = `Bookmarked at page ${pg}`;
+            } else {
+                badge.textContent = '🔖';
+                badge.title = 'Bookmarked';
+            }
+            if (!existingBadge) actionsDiv.prepend(badge);
+        });
+    }
+
+    // ── Background enrichment ─────────────────────────────────────────────────
+    function enrichPendingBooks() {
+        // Primary: books with no useful metadata yet
+        // Secondary: already-enriched books that are missing genre (pre-fix records)
+        const noMeta = [...document.querySelectorAll(
+            '.book-item[data-source="file"],' +
+            '.book-item[data-source="filename"],' +
+            '.book-item[data-source="unknown"]'
+        )];
+        const missingGenre = [...document.querySelectorAll(
+            '.book-item[data-source="goodreads"],' +
+            '.book-item[data-source="readarr"]'
+        )].filter(c => !c.dataset.genre);
+        const pending = [...noMeta, ...missingGenre];
+        if (!pending.length) return;
+
+        let i = 0;
+        const BATCH = 5;
+
+        function nextBatch() {
+            if (window._bg && window._bg.controller.signal.aborted) {
+                if (window._registerBgResume) window._registerBgResume(enrichPendingBooks);
+                return;
+            }
+            const slice = pending.slice(i, i + BATCH);
+            if (!slice.length) return;
+            i += BATCH;
+
+            Promise.allSettled(slice.map(card => {
+                const fp     = card.dataset.filePath;
+                const title  = card.querySelector('.book-title')?.textContent?.trim() || '';
+                const author = card.querySelector('.book-author')?.textContent?.trim() || '';
+                return fetch('/api/books/enrich', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ file_path: fp, title, author }),
+                    signal:  window._bg ? window._bg.signal : undefined,
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'ok' && data.book) {
+                        patchBookCard(card, data.book);
+                    } else if (data.status === 'needs_manual') {
+                        const pill = card.querySelector('.source-pill');
+                        if (pill) {
+                            pill.classList.remove('enriching');
+                            pill.classList.add('needs-manual');
+                            pill.innerHTML = '<i class="fas fa-question-circle me-1"></i>no match';
+                        }
+                        // Clear any stale thumbnail — server already busted the cache,
+                        // so force the img to the placeholder to avoid showing a wrong cover.
+                        const img = card.querySelector('.book-thumb');
+                        if (img) {
+                            img.src = '/static/images/apple-touch-icon.png';
+                            img.removeAttribute('data-src');
+                        }
+                    }
+                })
+                .catch(err => {
+                    if (err.name === 'AbortError') throw err;
+                });
+            }))
+            .then(results => {
+                if (results.some(r => r.status === 'rejected' &&
+                        r.reason?.name === 'AbortError')) {
+                    if (window._registerBgResume) window._registerBgResume(enrichPendingBooks);
+                    return;
+                }
+                nextBatch();
+            });
+        }
+
+        nextBatch();
+    }
+
+    // ── A-Z quick navigation ──────────────────────────────────────────────────
+    function buildAzNav() {
+        const letters = document.getElementById('azLetters');
+        if (!letters) return;
+        const used = new Set();
+        document.querySelectorAll('.book-item[data-title]').forEach(item => {
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
+            const c = t.charAt(0);
+            if (/[0-9]/.test(c)) used.add('0');
+            else if (/[a-z]/i.test(c)) used.add(c.toLowerCase());
+        });
+        const chars = ['0', ...'abcdefghijklmnopqrstuvwxyz'];
+        letters.innerHTML = chars.map(c => {
+            const label  = c === '0' ? '0–9' : c.toUpperCase();
+            const active = used.has(c);
+            return `<button class="az-btn" ${active ? `onclick="scrollToLetter('${c}')"` : 'disabled'}>${label}</button>`;
+        }).join('');
+    }
+
+    function toggleAzNav() {
+        const isOpen = document.getElementById('azLetters').classList.toggle('open');
+        document.getElementById('azToggle').classList.toggle('az-active', isOpen);
+    }
+
+    function scrollToLetter(letter) {
+        for (const item of document.querySelectorAll('.book-item[data-title]')) {
+            if (item.style.display === 'none') continue;
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s*/i, '').trim();
+            const c = t.charAt(0).toLowerCase();
+            const match = letter === '0' ? /[0-9]/.test(c) : c === letter;
+            if (match) {
+                document.getElementById('azLetters').classList.remove('open');
+                document.getElementById('azToggle').classList.remove('az-active');
+                item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+        }
+    }
+
+    // ── Manual import / Edit Metadata ─────────────────────────────────────────
+    let _importCard = null;
+
+    // explicitDbId is passed from modal call-sites that already know the DB id
+    async function triggerImport(btn, explicitDbId) {
+        const fp = btn.dataset ? btn.dataset.filePath : btn;
+
+        // Try to find card by file-path attribute first …
+        _importCard = document.querySelector(
+            `.book-item[data-file-path="${CSS.escape ? CSS.escape(fp) : fp}"]`
+        );
+
+        const dbId = explicitDbId
+            || (_importCard && _importCard.dataset.dbId)
+            || null;
+
+        // … fall back to db-id lookup (more reliable — no special-char issues)
+        if (!_importCard && dbId) {
+            _importCard = document.querySelector(`.book-item[data-db-id="${dbId}"]`);
+        }
+
+        // ── Reset form ──────────────────────────────────────────────────────
+        document.getElementById('importFilePath').value        = fp;
+        document.getElementById('importDbId').value            = dbId || '';
+        document.getElementById('importSelectedSource').value  = '';
+        document.getElementById('importSelectedForeignBookId').value = '';
+        document.getElementById('importFileLabel').textContent = fp.split(/[\\/]/).pop();
+        ['importTitle','importAuthor','importYear','importPages',
+         'importIsbn','importGenre','importGoodreadsUrl','importOverview','importCoverUrl'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('importCoverFile').value          = '';
+        document.getElementById('importCoverPreview').style.display = 'none';
+        document.getElementById('importError').style.display      = 'none';
+        document.getElementById('importSuccess').style.display    = 'none';
+
+        // Show cover-management buttons only for existing DB records
+        document.getElementById('importRefreshBtn').style.display     = dbId ? '' : 'none';
+        document.getElementById('importDeleteCoverBtn').style.display = dbId ? '' : 'none';
+
+        // ── Step 1: pre-populate from local DB (most reliable source) ───────
+        if (dbId) {
+            try {
+                const r    = await fetch(`/api/books/local/${dbId}`);
+                const book = await r.json();
+                if (r.ok && book) {
+                    const set = (id, v) => { if (v) document.getElementById(id).value = v; };
+                    set('importTitle',    book.title);
+                    set('importAuthor',   book.author);
+                    set('importYear',     book.year);
+                    set('importPages',    book.pages);
+                    set('importIsbn',     book.isbn);
+                    set('importGenre',    book.genre);
+                    set('importOverview', book.overview);
+                    // Cover: show via API endpoint (handles local files + remote URLs)
+                    if (book.id) {
+                        const coverSrc = `/api/book/cover/${book.id}?w=200&h=300&t=${Date.now()}`;
+                        const prev = document.getElementById('importCoverPreview');
+                        prev.src = coverSrc;
+                        prev.style.display = 'block';
+                        prev.onerror = () => { prev.style.display = 'none'; };
+                        // Only put remote URL in the text field (not local paths)
+                        if (book.cover_url && book.cover_url.startsWith('http')) {
+                            document.getElementById('importCoverUrl').value = book.cover_url;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[import] DB fetch failed:', e);
+            }
+        }
+
+        // ── Step 2: fill any still-empty fields from file's embedded metadata ─
+        try {
+            const r    = await fetch(`/api/books/file-metadata?path=${encodeURIComponent(fp)}`);
+            const meta = await r.json();
+            if (r.ok) {
+                const pairs = [
+                    ['importTitle', 'title'], ['importAuthor', 'author'],
+                    ['importYear', 'year'],   ['importPages',  'pages'],
+                    ['importIsbn', 'isbn'],   ['importGenre',  'genre'],
+                    ['importOverview', 'overview'],
+                ];
+                pairs.forEach(([id, key]) => {
+                    const el = document.getElementById(id);
+                    if (el && !el.value && meta[key]) el.value = meta[key];
+                });
+            }
+        } catch (e) {
+            console.warn('[import] file-metadata fetch failed:', e);
+        }
+
+        // Show custom modal with slide-in animation
+        const modalEl = document.getElementById('importModal');
+        const backdropEl = document.getElementById('importModalBackdrop');
+        const detailsModal = document.getElementById('detailsModal');
+        if (modalEl && backdropEl) {
+            modalEl.classList.add('show');
+            backdropEl.classList.add('show');
+            // Dim the background details modal
+            if (detailsModal) {
+                detailsModal.classList.add('import-modal-open');
+            }
+        }
+    }
+
+    window.triggerImport = triggerImport;
+
+    function closeImportModal() {
+        const modalEl = document.getElementById('importModal');
+        const backdropEl = document.getElementById('importModalBackdrop');
+        const detailsModal = document.getElementById('detailsModal');
+        if (modalEl && backdropEl) {
+            modalEl.classList.remove('show');
+            backdropEl.classList.remove('show');
+            // Remove dimming from details modal
+            if (detailsModal) {
+                detailsModal.classList.remove('import-modal-open');
+            }
+        }
+    }
+
+    window.closeImportModal = closeImportModal;
+
+    // ── Toggle advanced details section ───────────────────────────────────────
+    function toggleAdvancedDetails() {
+        const section = document.getElementById('advancedDetailsSection');
+        const icon = document.getElementById('advancedToggleIcon');
+        if (section && icon) {
+            const isHidden = section.style.display === 'none';
+            section.style.display = isHidden ? 'contents' : 'none';
+            icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+    }
+
+    window.toggleAdvancedDetails = toggleAdvancedDetails;
+
+    // Initialize click-to-close on backdrop (left 70px area)
+    document.addEventListener('DOMContentLoaded', function() {
+        const backdropEl = document.getElementById('importModalBackdrop');
+        if (backdropEl) {
+            backdropEl.addEventListener('click', function(e) {
+                // Only close if click is in the clickable area (first 70px from left)
+                if (e.clientX < 70) {
+                    closeImportModal();
+                }
+            });
+        }
+    });
+
+    function previewCover(url) {
+        const img = document.getElementById('importCoverPreview');
+        if (url) { img.src = url; img.style.display = 'block'; img.onerror = () => {}; }
+        else      { img.style.display = 'none'; }
+    }
+
+    function previewLocalCover(input) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.getElementById('importCoverPreview');
+            img.src = e.target.result;
+            img.style.display = 'block';
+            // Clear the URL field so there's no conflict on save
+            document.getElementById('importCoverUrl').value = '';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function refreshMetadata() {
+        const dbId = document.getElementById('importDbId').value;
+        if (!dbId) return;
+        const btn = document.getElementById('importRefreshBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Searching…';
+        document.getElementById('importError').style.display   = 'none';
+        document.getElementById('importSuccess').style.display = 'none';
+        document.getElementById('onlinePickerWrap').style.display = 'none';
+
+        try {
+            const query = [
+                document.getElementById('importTitle').value.trim(),
+                document.getElementById('importAuthor').value.trim()
+            ].filter(Boolean).join(' ');
+            const r    = await fetch(`/api/books/search-online/${dbId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    query,
+                    title: document.getElementById('importTitle').value.trim(),
+                    author: document.getElementById('importAuthor').value.trim(),
+                    goodreads_url: document.getElementById('importGoodreadsUrl').value.trim()
+                }),
+            });
+            const data = await r.json();
+            const results = data.results || [];
+
+            if (!results.length) {
+                document.getElementById('importError').textContent = 'No results found online.';
+                document.getElementById('importError').style.display = 'block';
+                return;
+            }
+
+            // Build picker cards
+            const grid = document.getElementById('onlinePickerGrid');
+            grid.innerHTML = '';
+            results.forEach(function(res, idx) {
+                const card = document.createElement('div');
+                card.className = 'op-card';
+                card.dataset.idx = idx;
+
+                const srcClass = res.source === 'Google Books' ? 'google' : 'readarr';
+                const coverSrc = res.cover_preview_url || res.cover_url || '/static/images/apple-touch-icon.png';
+                const authorShort = (res.author || '').split(',')[0];
+                const year = res.year ? ' · ' + res.year : '';
+
+                card.innerHTML =
+                    '<img class="op-cover" src="' + escHtml(coverSrc) + '" ' +
+                         'onerror="this.src=\'/static/images/apple-touch-icon.png\'">' +
+                    '<div class="op-meta">' +
+                        '<strong title="' + escHtml(res.title) + '">' + escHtml(res.title) + '</strong>' +
+                        escHtml(authorShort) + escHtml(year) +
+                        '<br><span class="op-badge ' + srcClass + '">' + escHtml(res.source) + '</span>' +
+                    '</div>';
+
+                card.addEventListener('click', function() {
+                    // Deselect all, select this
+                    grid.querySelectorAll('.op-card').forEach(function(c) { c.classList.remove('op-sel'); });
+                    card.classList.add('op-sel');
+                    applyPickerResult(res);
+                });
+                grid.appendChild(card);
+            });
+
+            const counts = results.reduce(function(acc, res) {
+                const key = res.source_key || 'other';
+                acc[key] = (acc[key] || 0) + 1;
+                return acc;
+            }, {});
+            const googleCount = counts.google_books || 0;
+            const readarrCount = counts.readarr || 0;
+            document.getElementById('onlinePickerWrap').style.display = 'block';
+            document.querySelector('#onlinePickerWrap > div').textContent =
+                `Pick a result to fill the form (${googleCount} Google Books, ${readarrCount} Readarr)`;
+
+        } catch (e) {
+            document.getElementById('importError').textContent = 'Search failed: ' + e.message;
+            document.getElementById('importError').style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Refresh online';
+        }
+    }
+
+    function closeOnlinePickerWrap() {
+        /* Close the online search results picker */
+        document.getElementById('onlinePickerWrap').style.display = 'none';
+    }
+
+    function applyPickerResult(res) {
+        /* Fill the form fields from a picked search result (does NOT save yet). */
+        const set = function(id, v) {
+            const el = document.getElementById(id);
+            if (el && v !== undefined && v !== null) el.value = v;
+        };
+        set('importTitle',    res.title);
+        set('importAuthor',   res.author);
+        set('importYear',     res.year);
+        set('importPages',    res.pages || '');
+        set('importIsbn',     res.isbn);
+        set('importGenre',    res.genre_str || (res.genres || []).slice(0,3).join(', '));
+        set('importOverview', res.overview);
+        set('importCoverUrl', res.cover_url || '');
+        document.getElementById('importSelectedSource').value =
+            res.source_key || ((res.source || '').toLowerCase().replace(/\s+/g, '_'));
+        document.getElementById('importSelectedForeignBookId').value =
+            res.source_key === 'readarr' ? (res.foreign_book_id || '') : '';
+
+        const prev = document.getElementById('importCoverPreview');
+        const previewUrl = res.cover_preview_url || res.cover_url || '';
+        if (previewUrl) {
+            prev.src = previewUrl;
+            prev.style.display = 'block';
+            prev.onerror = function() { prev.style.display = 'none'; };
+        } else {
+            prev.style.display = 'none';
+        }
+
+        document.getElementById('importSuccess').textContent =
+            '✓ Filled from ' + (res.source || 'online') + ' — click Save to apply.';
+        document.getElementById('importSuccess').style.display = 'block';
+        document.getElementById('importError').style.display = 'none';
+
+        // Auto-close the search results picker after selection
+        closeOnlinePickerWrap();
+    }
+
+    async function deleteCover() {
+        const dbId = document.getElementById('importDbId').value;
+        if (!dbId) return;
+        if (!confirm('Remove the cover image for this book?')) return;
+        document.getElementById('importError').style.display   = 'none';
+        document.getElementById('importSuccess').style.display = 'none';
+        try {
+            const r    = await fetch(`/api/books/cover/${dbId}`, { method: 'DELETE' });
+            const data = await r.json();
+            if (data.success) {
+                document.getElementById('importCoverPreview').style.display = 'none';
+                document.getElementById('importCoverUrl').value  = '';
+                document.getElementById('importCoverFile').value = '';
+                syncActiveBookUi(data.book, _importCard);
+                document.getElementById('importSuccess').textContent = '✓ Cover removed';
+                document.getElementById('importSuccess').style.display = 'block';
+            }
+        } catch (e) {
+            document.getElementById('importError').textContent = 'Delete failed: ' + e.message;
+            document.getElementById('importError').style.display = 'block';
+        }
+    }
+
+    async function saveImport() {
+        const fp = document.getElementById('importFilePath').value;
+        if (!fp) return;
+
+        const title = document.getElementById('importTitle').value.trim();
+        if (!title) {
+            document.getElementById('importError').textContent = 'Title is required.';
+            document.getElementById('importError').style.display = 'block';
+            return;
+        }
+
+        const btn = document.getElementById('importSaveBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+        document.getElementById('importError').style.display   = 'none';
+        document.getElementById('importSuccess').style.display = 'none';
+
+        try {
+            const selectedSource = document.getElementById('importSelectedSource').value.trim();
+            const selectedForeignBookId = document.getElementById('importSelectedForeignBookId').value.trim();
+            // ── Step 1: save text metadata ──────────────────────────────────
+            const r    = await fetch('/api/books/save-metadata', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    file_path: fp,
+                    title,
+                    author:    document.getElementById('importAuthor').value.trim()  || null,
+                    year:      parseInt(document.getElementById('importYear').value)  || null,
+                    pages:     parseInt(document.getElementById('importPages').value) || null,
+                    isbn:      document.getElementById('importIsbn').value.trim()     || null,
+                    genre:     document.getElementById('importGenre').value.trim()    || null,
+                    overview:  document.getElementById('importOverview').value.trim() || null,
+                    cover_url: document.getElementById('importCoverUrl').value.trim() || null,
+                    foreign_book_id: selectedSource === 'readarr' ? (selectedForeignBookId || null) : null,
+                    source:    selectedSource || 'manual',
+                }),
+            });
+            const data = await r.json();
+            if (!r.ok || !data.success) throw new Error(data.error || 'Save failed');
+
+            let savedBook = data.book;
+
+            // ── Step 2: upload local cover file if selected ─────────────────
+            const fileInput = document.getElementById('importCoverFile');
+            if (fileInput.files && fileInput.files.length > 0 && savedBook.id) {
+                const fd = new FormData();
+                fd.append('cover', fileInput.files[0]);
+                const upR    = await fetch(`/api/books/cover/upload/${savedBook.id}`, {
+                    method: 'POST', body: fd,
+                });
+                const upData = await upR.json();
+                if (upData.success && upData.book) savedBook = Object.assign(savedBook, upData.book);
+            }
+
+            if (savedBook) {
+                syncActiveBookUi(savedBook, _importCard);
+            }
+            if (_importCard) {
+                // Brief highlight so the user can see which card was updated
+                _importCard.style.outline = '2px solid #6ab759';
+                setTimeout(() => { if (_importCard) _importCard.style.outline = ''; }, 1800);
+            }
+            // Close the custom modal
+            closeImportModal();
+        } catch (e) {
+            document.getElementById('importError').textContent = e.message;
+            document.getElementById('importError').style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save me-1"></i>Save';
+        }
+    }
+
+    // ── Bookmark sync across tabs ─────────────────────────────────────────────
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) applyBookmarkBadges();
+    });
+    window.addEventListener('pageshow', applyBookmarkBadges);
+
+    // ── Service worker ────────────────────────────────────────────────────────
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(() => console.log('ServiceWorker registration successful'))
+                .catch(err => console.log('ServiceWorker registration failed: ', err));
+        });
+    }
+
+    // ── Quick card actions (no modal needed) ─────────────────────────────────
+    function quickToggleWishlist(heartBtn) {
+        const card  = heartBtn.closest('.book-item');
+        const dbId  = card && card.dataset.dbId;
+        if (!dbId) return;
+        const inList = heartBtn.dataset.wishlisted === '1';
+        fetch('/api/books/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ db_id: parseInt(dbId), is_wishlist: inList ? 0 : 1 })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            const now = !!data.book.is_wishlist;
+            heartBtn.dataset.wishlisted = now ? '1' : '0';
+            heartBtn.classList.toggle('wishlisted', now);
+            heartBtn.innerHTML = `<i class="${now ? 'fas' : 'far'} fa-heart"></i>`;
+            heartBtn.title = now ? 'Remove from wishlist' : 'Add to wishlist';
+            if (card) card.dataset.wishlist = now ? '1' : '0';
+            // Keep detail modal in sync if open
+            const wBtn = document.getElementById('wishlistBtn');
+            if (wBtn && document.getElementById('detailsModal')._bookId === parseInt(dbId)) {
+                wBtn.dataset.wishlisted = now ? '1' : '0';
+                wBtn.className = `btn btn-sm ${now ? 'btn-danger' : 'btn-outline-danger'}`;
+                wBtn.textContent = `${now ? '♥' : '♡'} ${now ? 'In Wishlist' : 'Add to Wishlist'}`;
+            }
+        })
+        .catch(console.error);
+    }
+
+    function setBookStatusQuick(card, status) {
+        if (!card) return;
+        const dbId = card.dataset.dbId;
+        if (!dbId) return;
+
+        fetch('/api/books/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ db_id: parseInt(dbId), reading_status: status })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            patchBookCard(card, data.book);
+        })
+        .catch(console.error);
+    }
+
+    function quickToggleDnf(btn) {
+        const card  = btn.closest('.book-item');
+        const dbId  = card && card.dataset.dbId;
+        if (!dbId) return;
+        const isDnf = card.dataset.readingStatus === 'dnf';
+        const next  = isDnf ? 'not_started' : 'dnf';
+        fetch('/api/books/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ db_id: parseInt(dbId), reading_status: next })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            patchBookCard(card, data.book);
+            // Re-style the DNF button to match new state
+            const nowDnf = data.book.reading_status === 'dnf';
+            btn.className = `btn btn-sm ${nowDnf ? 'btn-danger' : 'btn-outline-secondary'} quick-dnf-btn`;
+            btn.style.cssText = 'padding:0.12rem 0.35rem;font-size:0.62rem;';
+            btn.textContent = nowDnf ? '✕DNF' : 'DNF';
+            btn.title = nowDnf ? 'Undo DNF' : 'Did Not Finish';
+        })
+        .catch(console.error);
+    }
+
+    // ── Reading preferences panel ─────────────────────────────────────────────
+    const RP_KEY = 'reader_defaults';
+
+    function _rpLoad() {
+        try { return JSON.parse(localStorage.getItem(RP_KEY) || '{}'); } catch(e) { return {}; }
+    }
+    function _rpSave(s) {
+        localStorage.setItem(RP_KEY, JSON.stringify(s));
+    }
+
+    function openReadingPrefs() {
+        const s = Object.assign({ fontSize: 17, fontFamily: 'Georgia', theme: 'light' }, _rpLoad());
+        const slider = document.getElementById('rpFontSizeSlider');
+        if (slider) slider.value = s.fontSize;
+        const val = document.getElementById('rpFontSizeVal');
+        if (val) val.textContent = s.fontSize + 'px';
+        document.querySelectorAll('.rp-font-btn').forEach(b => {
+            b.classList.toggle('selected', b.dataset.font === s.fontFamily);
+        });
+        document.getElementById('rpThemeLightBtn').classList.toggle('selected', s.theme === 'light');
+        document.getElementById('rpThemeDarkBtn').classList.toggle('selected', s.theme === 'dark');
+        document.getElementById('readingPrefsPanel').classList.add('open');
+        document.getElementById('readingPrefsOverlay').classList.add('open');
+    }
+    function closeReadingPrefs() {
+        document.getElementById('readingPrefsPanel').classList.remove('open');
+        document.getElementById('readingPrefsOverlay').classList.remove('open');
+    }
+
+    function rpAdjSize(delta) {
+        const slider = document.getElementById('rpFontSizeSlider');
+        const next = Math.min(32, Math.max(10, parseInt(slider.value, 10) + delta));
+        slider.value = next;
+        rpOnSlider(next);
+    }
+    function rpOnSlider(val) {
+        const s = Object.assign({ fontSize: 17, fontFamily: 'Georgia', theme: 'light' }, _rpLoad());
+        s.fontSize = parseInt(val, 10);
+        document.getElementById('rpFontSizeVal').textContent = s.fontSize + 'px';
+        _rpSave(s);
+    }
+    function rpPickFont(btn) {
+        const s = Object.assign({ fontSize: 17, fontFamily: 'Georgia', theme: 'light' }, _rpLoad());
+        s.fontFamily = btn.dataset.font;
+        document.querySelectorAll('.rp-font-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        _rpSave(s);
+    }
+    function rpPickTheme(t) {
+        const s = Object.assign({ fontSize: 17, fontFamily: 'Georgia', theme: 'light' }, _rpLoad());
+        s.theme = t;
+        document.getElementById('rpThemeLightBtn').classList.toggle('selected', t === 'light');
+        document.getElementById('rpThemeDarkBtn').classList.toggle('selected', t === 'dark');
+        _rpSave(s);
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+        const params = new URLSearchParams(window.location.search);
+        const isHomeLaunch = params.get('source') === 'home' && !!params.get('open');
+
+        if (!isHomeLaunch) {
+            initializeClearSearch();
+            applyBookmarkBadges();
+            buildAzNav();
+            if (window.trackGlobalLoading) {
+                window.trackGlobalLoading(startProgressiveLoading(), 'Loading thumbnails...');
+            } else {
+                startProgressiveLoading();
+            }
+            updateMediaDisplay();
+            setTimeout(enrichPendingBooks, 200);
+        } else {
+            handleAutoOpenBook();
+        }
+
+        window.addEventListener('scroll', function() {
+            const backToTop = document.getElementById('backToTop');
+            if (backToTop) {
+                backToTop.classList.toggle('show', window.pageYOffset > 200);
+            }
+        });
+    });
+
+    // ── Toggle Advanced Details in Import Modal ───────────────────────────────
+    function toggleAdvancedDetails() {
+        const icon = document.getElementById('advancedToggleIcon');
+        const fields = document.querySelectorAll('.import-advanced-detail');
+
+        if (!fields.length) return;
+
+        // Check current state
+        const isHidden = fields[0].style.display === 'none';
+
+        // Toggle display
+        fields.forEach(field => {
+            field.style.display = isHidden ? '' : 'none';
+        });
+
+        // Rotate icon
+        if (icon) {
+            const currentRotation = icon.style.transform ?
+                parseInt(icon.style.transform.match(/\d+/)?.[0] || 0) : 0;
+            const nextRotation = isHidden ? 180 : 0;
+            icon.style.transform = `rotate(${nextRotation}deg)`;
+        }
+    }
+    </script>
+</body>
+</html>

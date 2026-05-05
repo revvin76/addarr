@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>arrdash: Links</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/styles.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/static/images/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
+    <link rel="shortcut icon" href="/static/images/favicon.ico" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a1a" />
+    <style>
+        .service-card {
+            background-color: #333333;
+            border: 1px solid #3e3e3e;
+            border-radius: 12px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+        .service-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .service-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin: 0 auto 1rem auto;
+        }
+        .service-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.25rem;
+        }
+        .service-url {
+            font-size: 0.78rem;
+            color: #a0a0a0;
+            word-break: break-all;
+            min-height: 1.2em;
+        }
+        .address-toggle {
+            background: #2a2a2a;
+            border-radius: 50px;
+            padding: 4px;
+            display: inline-flex;
+            gap: 4px;
+        }
+        .address-toggle .toggle-btn {
+            border: none;
+            border-radius: 50px;
+            padding: 6px 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: transparent;
+            color: #a0a0a0;
+        }
+        .address-toggle .toggle-btn.active {
+            background: var(--accent-green);
+            color: #fff;
+        }
+        .service-btn {
+            width: 100%;
+            border-radius: 8px;
+            padding: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: none;
+            transition: opacity 0.2s ease, transform 0.1s ease;
+        }
+        .service-btn:active {
+            transform: scale(0.97);
+        }
+        .service-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .not-configured-badge {
+            font-size: 0.72rem;
+            background: #444;
+            color: #888;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+        .tunnel-badge {
+            font-size: 0.72rem;
+            background: rgba(106, 183, 89, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(106, 183, 89, 0.3);
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+        .tunnel-badge.inactive {
+            background: rgba(255,255,255,0.05);
+            color: #666;
+            border-color: #444;
+        }
+    </style>
+</head>
+{% set current_page = 'links' %}
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <!-- Main Content -->
+    <div class="container d-flex flex-column justify-content-center" style="min-height: calc(100vh - 120px);">
+
+        <!-- Title -->
+        <div class="text-center mb-4 mt-4">
+            <h3 class="text-light"><i class="fas fa-link me-2"></i>Service Links</h3>
+            <p class="text-muted">Quick access to your media management dashboards.</p>
+        </div>
+
+        <!-- Tunnel status info (shown once data loads) -->
+        <div class="d-flex flex-column align-items-center mb-4 gap-2" id="toggleSection" style="display:none !important;">
+            <div id="tunnelStatus" class="tunnel-badge inactive" style="display:none;">
+                <i class="fas fa-circle me-1" style="font-size:0.6rem;"></i>
+                <span id="tunnelStatusText">Tunnel not active</span>
+            </div>
+            <div id="pinggyNote" class="text-muted" style="display:none; font-size:0.8rem; text-align:center; max-width:440px;">
+                <i class="fas fa-info-circle me-1"></i>
+                Pinggy only tunnels arrdash's own port. Service dashboards (Radarr, Sonarr etc.) are only reachable on your local network.
+            </div>
+        </div>
+
+        <!-- Service Cards -->
+        <div class="row g-3 justify-content-center" id="servicesGrid">
+            <div class="col-12 text-center py-4">
+                <div class="spinner-border text-success" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted mt-2">Loading services...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Global Loading Spinner -->
+    <div id="globalLoadingSpinner" class="loading-spinner show">
+        <div class="loading-spinner__panel">
+            <button id="forceCloseSpinner" class="btn-close btn-close-white force-close-spinner-hidden loading-spinner__close"></button>
+            <div class="loading-spinner__logo" aria-hidden="true">
+                <span class="loading-spinner__triangle loading-spinner__triangle--left"></span>
+                <span class="loading-spinner__triangle loading-spinner__triangle--top"></span>
+                <span class="loading-spinner__triangle loading-spinner__triangle--bottom"></span>
+                <span class="loading-spinner__plus loading-spinner__plus--h"></span>
+                <span class="loading-spinner__plus loading-spinner__plus--v"></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="backToTop" class="back-to-top">
+        <i class="fas fa-chevron-up"></i>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    let servicesData = null;
+
+    function getServiceUrl(service) {
+        return service.local || '';
+    }
+
+    function openService(service) {
+        const url = getServiceUrl(service);
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    function renderCards(data) {
+        const grid = document.getElementById('servicesGrid');
+        const services = data.services || [];
+        const tunnelEnabled = data.tunnel_enabled || false;
+        const tunnelActive  = data.tunnel_active  || false;
+        const tunnelUrl     = data.tunnel_url     || '';
+
+        // ── Toggle section visibility ──────────────────────────────────
+        const toggleSection = document.getElementById('toggleSection');
+        toggleSection.style.removeProperty('display'); // un-hide the section
+
+        const tunnelBadge = document.getElementById('tunnelStatus');
+        const pinggyNote  = document.getElementById('pinggyNote');
+
+        if (tunnelEnabled) {
+            tunnelBadge.style.display = '';
+            pinggyNote.style.display  = '';
+            if (tunnelActive && tunnelUrl) {
+                tunnelBadge.className = 'tunnel-badge';
+                document.getElementById('tunnelStatusText').textContent = `arrdash tunnel active: ${tunnelUrl}`;
+            } else {
+                tunnelBadge.className = 'tunnel-badge inactive';
+                document.getElementById('tunnelStatusText').textContent = 'Tunnel starting or not connected';
+            }
+        } else {
+            tunnelBadge.style.display = 'none';
+            pinggyNote.style.display  = 'none';
+        }
+
+        // ── Service cards ──────────────────────────────────────────────
+        if (!services.length) {
+            grid.innerHTML = '<div class="col-12 text-center text-muted py-4">No enabled service dashboards are available right now.</div>';
+            return;
+        }
+
+        grid.innerHTML = services.map(service => {
+            const displayUrl = getServiceUrl(service) || '—';
+            const configured = service.configured;
+            const btnStyle = configured ? `background-color: ${service.color}; color: #fff;` : '';
+
+            return `
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="service-card p-4 text-center ${configured ? '' : 'opacity-75'}"
+                     ${configured ? `onclick="openServiceByName('${service.name}')"` : ''}>
+                    <div class="service-icon mx-auto" style="background: ${service.color}22; color: ${service.color};">
+                        <i class="${service.icon}"></i>
+                    </div>
+                    <div class="service-name">${service.name}</div>
+                    ${configured
+                        ? `<div class="service-url mb-3">${displayUrl}</div>
+                           <button class="service-btn" style="${btnStyle}"
+                                   onclick="event.stopPropagation(); openServiceByName('${service.name}')">
+                               <i class="fas fa-external-link-alt me-1"></i>Open Dashboard
+                           </button>`
+                        : `<div class="service-url mb-3">Not configured</div>
+                           <span class="not-configured-badge">Configure in settings</span>`
+                    }
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function openServiceByName(name) {
+        if (!servicesData) return;
+        const service = (servicesData.services || []).find(s => s.name === name);
+        if (service) openService(service);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/api/links/services')
+            .then(r => r.json())
+            .then(data => {
+                servicesData = data;
+                renderCards(data);
+            })
+            .catch(err => {
+                document.getElementById('servicesGrid').innerHTML =
+                    '<div class="col-12 text-center text-danger py-4">' +
+                    '<i class="fas fa-exclamation-circle me-2"></i>Failed to load services. Check your configuration.</div>';
+                console.error('Error loading services:', err);
+            });
+    });
+    </script>
+</body>
+</html>

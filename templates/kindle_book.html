@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{ book.title|e if book.title else 'Book Details' }}</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box; margin: 0; padding: 0;
+            animation: none !important;
+            transition: none !important;
+        }
+
+        :root {
+            --bg:     #fff;
+            --text:   #111;
+            --text2:  #555;
+            --border: #ccc;
+            --btn-bg: #111;
+            --btn-text: #fff;
+            --chip-border: #bbb;
+        }
+        [data-theme="dark"] {
+            --bg:     #111;
+            --text:   #eee;
+            --text2:  #aaa;
+            --border: #444;
+            --btn-bg: #eee;
+            --btn-text: #111;
+            --chip-border: #555;
+        }
+
+        html, body {
+            height: 100%; width: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        /* ── Bottom bar ── */
+        #bottomBar {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+            height: 54px;
+            background: #000;
+            border-top: 3px solid #fff;
+            display: flex; align-items: center;
+            padding: 0 14px;
+        }
+        #backBtn {
+            color: #fff;
+            font-size: 0.82rem;
+            text-decoration: none;
+        }
+        #backBtn:active { opacity: 0.7; }
+
+        /* ── Scrollable content ── */
+        #content {
+            position: fixed;
+            top: 0; bottom: 54px;
+            left: 0; right: 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 22px 18px;
+        }
+
+        /* Cover */
+        .cover-wrap {
+            text-align: center;
+            margin-bottom: 22px;
+        }
+        .cover-img {
+            max-width: 160px;
+            max-height: 240px;
+            border: 1px solid var(--border);
+            display: inline-block;
+        }
+
+        /* Title & author */
+        .book-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            line-height: 1.3;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+        .book-author {
+            font-size: 0.92rem;
+            color: #c0392b;
+            margin-bottom: 16px;
+        }
+
+        /* Meta row */
+        .meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+        .meta-item {
+            font-size: 0.78rem;
+            color: var(--text2);
+        }
+        .meta-item strong {
+            color: var(--text);
+            font-size: 0.85rem;
+        }
+
+        /* Genre chips */
+        .genre-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 18px;
+        }
+        .genre-chip {
+            font-size: 0.7rem;
+            padding: 4px 11px;
+            border: 1px solid var(--chip-border);
+            border-radius: 100px;
+            color: var(--text2);
+        }
+
+        /* Synopsis */
+        .section-label {
+            font-size: 0.68rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text2);
+            margin-bottom: 7px;
+        }
+        .synopsis {
+            font-size: 0.88rem;
+            line-height: 1.65;
+            color: var(--text);
+            margin-bottom: 28px;
+        }
+
+        /* Call-to-action */
+        .read-btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            text-align: center;
+            font-size: 1.05rem;
+            font-weight: bold;
+            background: var(--btn-bg);
+            color: var(--btn-text);
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .read-btn:active { opacity: 0.7; }
+
+        .convert-btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            text-align: center;
+            font-size: 1.0rem;
+            font-weight: bold;
+            background: var(--btn-bg);
+            color: var(--btn-text);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .convert-btn:active { opacity: 0.7; }
+        .convert-btn:disabled { opacity: 0.5; cursor: default; }
+
+        .status-note {
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--text2);
+            border: 2px dashed var(--border);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="content">
+    <!-- Cover -->
+    <div class="cover-wrap">
+        <img class="cover-img"
+             src="/api/book/cover/{{ book.id }}?w=320&h=480"
+             alt="{{ book.title|e if book.title else '' }}"
+             onerror="this.onerror=null;this.src='/static/images/apple-touch-icon.png'">
+    </div>
+
+    <!-- Title & Author -->
+    <div class="book-title">{{ book.title or 'Unknown Title' }}</div>
+    {% if book.author %}
+    <div class="book-author">{{ book.author }}</div>
+    {% endif %}
+
+    <!-- Meta -->
+    <div class="meta-row">
+        {% if book.year %}
+        <div class="meta-item"><strong>{{ book.year }}</strong></div>
+        {% endif %}
+        {% if file_size %}
+        <div class="meta-item"><strong>{{ file_size }}</strong></div>
+        {% endif %}
+        {% if book.pages %}
+        <div class="meta-item"><strong>{{ book.pages }}</strong> pages</div>
+        {% endif %}
+    </div>
+
+    <!-- Genres -->
+    {% if book.genre %}
+    <div class="genre-list">
+        {% for g in book.genre.split(',') %}
+        {% set gt = g.strip() %}
+        {% if gt %}
+        <span class="genre-chip">{{ gt }}</span>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Synopsis -->
+    {% if book.overview %}
+    <div class="section-label">Synopsis</div>
+    <div class="synopsis">{{ book.overview }}</div>
+    {% endif %}
+
+    <!-- CTA -->
+    <div id="cta">
+    {% if has_azw3 %}
+        <a href="/api/book/azw3/{{ book.id }}" class="read-btn" id="sendBtn">
+            &#128218; Send to Kindle
+        </a>
+    {% else %}
+        <button class="convert-btn" id="convertBtn" onclick="startConvert()">
+            &#9881; Prepare for Kindle
+        </button>
+        <span class="status-note" id="statusNote" style="display:none;"></span>
+    {% endif %}
+    </div>
+</div>
+
+<!-- Bottom bar -->
+<div id="bottomBar">
+    <a href="/kindle" id="backBtn">&#8592; Back to Library</a>
+</div>
+
+<script>
+/* Apply saved dark-mode preference */
+try {
+    if (localStorage.getItem('k_dark') === '1') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+} catch(e) {}
+
+var BOOK_ID = {{ book.id }};
+
+function startConvert() {
+    var btn  = document.getElementById('convertBtn');
+    var note = document.getElementById('statusNote');
+    if (!btn) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Converting… (may take a minute)';
+    note.style.display = 'block';
+    note.textContent   = 'Running ebook-convert. Please wait…';
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/book/convert/' + BOOK_ID, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.timeout = 360000; /* 6 min */
+
+    xhr.onload = function() {
+        var data = {};
+        try { data = JSON.parse(xhr.responseText); } catch(e) {}
+        if (data.success) {
+            /* Replace button area with Send link */
+            var cta = document.getElementById('cta');
+            cta.innerHTML =
+                '<a href="/api/book/azw3/' + BOOK_ID + '" class="read-btn" id="sendBtn">' +
+                '&#128218; Send to Kindle</a>';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '&#9881; Prepare for Kindle';
+            note.textContent = 'Conversion failed. Check that Calibre is installed and the log for details.';
+        }
+    };
+
+    xhr.onerror = xhr.ontimeout = function() {
+        btn.disabled = false;
+        btn.innerHTML = '&#9881; Prepare for Kindle';
+        note.textContent = 'Request timed out or network error. Try again.';
+    };
+
+    xhr.send('{}');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+/* kindle.css */
+
+/* Kindle screens are typically e-ink or low-res LCD — strip animations entirely */
+*, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+}
+
+/* High contrast for e-ink displays */
+body {
+    background: #ffffff;
+    color: #000000;
+    font-size: 18px;      /* Larger tap targets */
+    line-height: 1.8;
+}
+
+/* Simplified navigation — no hover states on touch */
+.btn {
+    min-height: 48px;     /* Minimum tap target size */
+    min-width: 48px;
+    border-radius: 4px;
+    border: 2px solid #000;
+    background: #fff;
+    color: #000;
+    font-size: 16px;
+    padding: 12px 20px;
+}
+
+/* Remove box shadows and gradients — they render poorly on e-ink */
+.card, .modal-content, .manage-result-card {
+    box-shadow: none !important;
+    background: #ffffff;
+    border: 1px solid #333;
+}
+
+/* Remove thumbnail images to save bandwidth on slow Kindle connections */
+.manage-result-thumbnail-container {
+    display: none;
+}
+
+/* Full-width list layout — grid is impractical on Kindle */
+.media-item {
+    width: 100%;
+    border-bottom: 1px solid #ccc;
+    padding: 12px 0;
+}
+
+/* Hide UI elements that don't work well on Kindle */
+.back-to-top,
+.loading-spinner,
+#globalLoadingSpinner,
+.watermark-icon {
+    display: none !important;
+}

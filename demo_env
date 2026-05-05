@@ -1,6 +1,9 @@
 # =========================================
-# Addarr v1.1.9 - Environment Configuration
+# arrdash v1.2.1 - Environment Configuration
 # =========================================
+# VERSION: See VERSION file at project root
+# Last Updated: 2026-04-16
+# VERSION: See VERSION file at project root
 
 # === RADARR SETTINGS ===
 RADARR_URL=http://localhost:7878
@@ -14,6 +17,22 @@ SONARR_API_KEY=****
 SONARR_ROOT_FOLDER=E:\TV
 SONARR_QUALITY_PROFILE=4
 SONARR_LANGUAGE_PROFILE=1
+
+# === READARR SETTINGS ===
+READARR_URL=http://localhost:8787
+READARR_API_KEY=****
+READARR_ROOT_FOLDER=E:\Books
+READARR_QUALITY_PROFILE=1
+READARR_METADATA_PROFILE=1
+
+# === PROWLARR SETTINGS ===
+PROWLARR_URL=http://localhost:9696
+PROWLARR_API_KEY=****
+
+# === QBITTORRENT SETTINGS ===
+QBIT_URL=http://localhost:8080
+QBIT_USERNAME=admin
+QBIT_PASSWORD=****
 
 # === TMDB SETTINGS ===
 TMDB_KEY=****
@@ -34,7 +53,7 @@ ENABLE_AUTO_UPDATE=true
 
 # === FLASK APP SETTINGS ===
 UPDATE_CHANNEL=prod # Options: prod, dev
-APP_VERSION=1.0.0
+APP_VERSION=1.2.1
 APP_COMMIT=abc1234
 FLASK_DEBUG=false
 SERVER_PORT=5000

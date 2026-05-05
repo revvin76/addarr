@@ -1,3 +1,4 @@
+{% set current_page = 'index' %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,488 +10,128 @@
     <link rel="icon" type="image/png" href="/static/images/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
     <link rel="shortcut icon" href="/static/images/favicon.ico" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <!-- Manifest -->
     <link rel="manifest" href="/static/manifest.json">
-
     <!-- iOS support -->
     <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-capable" content="yes">
-
     <!-- Theme color -->
     <meta name="theme-color" content="#1a1a1a" />
 </head>
 <body>
-    <!-- Logo and Header -->
-    <div class="container-fluid bg-dark py-2">
-        <div class="container d-flex align-items-center">
-            <a href="/" class="d-flex align-items-center text-decoration-none me-auto">
-                <img src="/static/images/logo.png" alt="Addarr Logo" height="40" class="me-2">
-            </a>
-            
-            <div class="d-flex gap-2">
+    <script>
+    if (sessionStorage.getItem('addarr.homeState')) {
+        document.body.classList.add('home-restoring');
+    }
+    </script>
+    {% include 'partials/navbar.html' %}
 
-                <a href="/manage" class="btn btn-outline-radarr me-2"><i class="fas fa-film"></i></a>
-                <button id="configToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#configModal">
-                    <i class="fas fa-cog"></i>
-                </button>                
-                <button id="infoToggle" class="btn btn-outline-radarr" data-bs-toggle="modal" data-bs-target="#infoModal">
-                    <i class="fas fa-info-circle"></i>
-                </button>
-
-                <!-- Authentication Button -->
-                {% if config.auth.enabled %}
-                    {% if session.get('authenticated') %}
-                        <a href="/logout" class="btn btn-outline-radarr me-2" title="Logout">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </a>
-                    {% else %}
-                        <a href="/login" class="btn btn-outline-warning me-2" title="Login">
-                            <i class="fas fa-sign-in-alt"></i>
-                        </a>
-                    {% endif %}
-                {% endif %}
-                                
-            </div>
-        </div>
-    </div>
-
-    <!-- Main Content - Centered Form -->
-    <div class="container d-flex flex-column justify-content-center" style="min-height: calc(100vh - 120px);">
-        <div class="text-center mb-4">
+    <!-- Main Content -->
+    <!-- Use 100vw/100vh units with flexbox to ensure proper layout without overflow -->
+    <div id="mainSearchContainer" class="search-container main-search-container">
+        <div class="text-center mb-3 search-hero" id="homeHero">
             <h3 class="text-light">Welcome to ADDARR</h3>
-            <p class="text-light">Search for movies and TV shows to add to your media library.</p>
+            <p class="text-light mb-0" id="homeHeroCopy"></p>
         </div>
-        <div class="col-12 col-xs-12 col-md-8 col-lg-8 mb-2">
+
+        <div class="search-form-wrapper" id="homeSearchForm">
             <form action="/search" method="POST" onsubmit="return validateForm()">
-                    <div class="col-12 mb-2">
-                        <input type="text" class="form-control form-control-lg" 
-                            name="query" placeholder="Search movies and TV shows..." required>
-                    </div>
-                    <div class="col-12 mb-2">
-                        <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
-                    </div>
-                    <div class="col-12 mb-2">
-                        <a href="/trending" class="btn btn-outline-info btn-lg w-100">
-                            <i class="fas fa-fire me-2"></i>View Trending Media
-                        </a>            
-                    </div>
+                <div class="manage-library-searchbar mb-3">
+                    <span class="manage-library-searchbar__icon"><i class="fas fa-magnifying-glass"></i></span>
+                    <input type="text" class="manage-library-searchbar__input"
+                        name="query" id="mainSearchInput"
+                        placeholder="Search movies, TV shows{% if config.readarr.enabled %} and books{% endif %}..." required
+                        autocomplete="off">
+
+                </div>
+                <!-- <div class="mb-2">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
+                </div> -->
             </form>
         </div>
+
+        <!-- Install button moved here for better visibility -->
+        <div class="install-button-wrap">
+            <button id="install-button" class="btn btn-primary install-button-hidden">
+                Install Addarr
+            </button>
+        </div>
     </div>
-        
-<div class="config-overlay" id="configOverlay"></div>
+
+    <!-- Recently Downloaded Sections -->
+    <div class="recently-downloaded-container">
+        {% if config.tmdb.enabled %}
+        <section class="recently-downloaded-section" id="trendingSection" style="display: none;">
+            <div class="section-header" data-source="addarr">
+                <h3>Trending Media</h3>
+                <a href="/trending" class="view-all-link">View All</a>
+            </div>
+            <div class="carousel-container">
+                <button class="carousel-nav carousel-nav-prev" data-carousel="trendingCarousel" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+                <div class="carousel-wrapper">
+                    <div class="carousel" id="trendingCarousel"></div>
+                </div>
+                <button class="carousel-nav carousel-nav-next" data-carousel="trendingCarousel" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Recently Downloaded Movies -->
+        <section class="recently-downloaded-section" id="moviesSection" style="display: none;">
+            <div class="section-header" data-source="radarr">
+                <h3>Recently Downloaded Movies</h3>
+                <a href="/manage?type=movie" class="view-all-link">View All</a>
+            </div>
+            <div class="carousel-container">
+                <button class="carousel-nav carousel-nav-prev" data-carousel="moviesCarousel" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+                <div class="carousel-wrapper">
+                    <div class="carousel" id="moviesCarousel"></div>
+                </div>
+                <button class="carousel-nav carousel-nav-next" data-carousel="moviesCarousel" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </section>
+
+        <!-- Recently Downloaded TV -->
+        <section class="recently-downloaded-section" id="tvSection" style="display: none;">
+            <div class="section-header" data-source="sonarr">
+                <h3>Recently Downloaded TV Shows</h3>
+                <a href="/manage?type=tv" class="view-all-link">View All</a>
+            </div>
+            <div class="carousel-container">
+                <button class="carousel-nav carousel-nav-prev" data-carousel="tvCarousel" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+                <div class="carousel-wrapper">
+                    <div class="carousel" id="tvCarousel"></div>
+                </div>
+                <button class="carousel-nav carousel-nav-next" data-carousel="tvCarousel" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </section>
+
+        <!-- Recently Downloaded Books -->
+        <section class="recently-downloaded-section" id="booksSection" style="display: none;">
+            <div class="section-header" data-source="readarr">
+                <h3>Recently Downloaded Books</h3>
+                <a href="/manage-books" class="view-all-link">View All</a>
+            </div>
+            <div class="carousel-container">
+                <button class="carousel-nav carousel-nav-prev" data-carousel="booksCarousel" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+                <div class="carousel-wrapper">
+                    <div class="carousel" id="booksCarousel"></div>
+                </div>
+                <button class="carousel-nav carousel-nav-next" data-carousel="booksCarousel" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </section>
+    </div>
+
 <div class="config-overlay" id="debugOverlay"></div>
 
-<center>
-    <button id="install-button" class="btn btn-primary" style="display: none;">
-        Install Addarr
-    </button>
-</center>
-
-<!-- Config Panel -->
-<div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content bg-dark text-light">
-            <div class="modal-header border-secondary">
-                <h5 class="modal-title" id="configModalLabel">
-                    <i class="fas fa-cog me-2"></i>Configuration
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            
-            <!-- FORM STARTS HERE -->
-            <form class="config-form" id="configForm" method="POST">
-                <div class="modal-body">
-                    <!-- Radarr Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-radarr mb-3">
-                            <i class="fas fa-film me-2"></i>Radarr Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="radarrUrl" class="form-label">Radarr URL</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                            id="radarrUrl" name="RADARR_URL" value="{{ config.radarr.url }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="radarrApiKey" class="form-label">API Key</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                               id="radarrApiKey" name="RADARR_API_KEY" value="{{ config.radarr.api_key }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="radarrRootFolder" class="form-label">Root Folder</label>
-                                        <select class="form-control bg-dark text-light border-secondary" 
-                                                id="radarrRootFolder" name="RADARR_ROOT_FOLDER">
-                                            <!-- Populated dynamically -->
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="radarrQualityProfile" class="form-label">Quality Profile</label>
-                                        <select class="form-control bg-dark text-light border-secondary" 
-                                                id="radarrQualityProfile" name="RADARR_QUALITY_PROFILE">
-                                            <!-- Populated dynamically -->
-                                        </select>
-                                    </div>
-                                    <div class="col-12">
-                                        <button type="button" class="btn btn-outline-info w-100 test-connection" 
-                                                id="testRadarr">
-                                            <i class="fas fa-plug me-2"></i>Test Connection
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Sonarr Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-sonarr mb-3">
-                            <i class="fas fa-tv me-2"></i>Sonarr Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="sonarrUrl" class="form-label">Sonarr URL</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                               id="sonarrUrl" name="SONARR_URL" value="{{ config.sonarr.url }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="sonarrApiKey" class="form-label">API Key</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                               id="sonarrApiKey" name="SONARR_API_KEY" value="{{ config.sonarr.api_key }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="sonarrRootFolder" class="form-label">Root Folder</label>
-                                        <select class="form-control bg-dark text-light border-secondary" 
-                                                id="sonarrRootFolder" name="SONARR_ROOT_FOLDER">
-                                            <!-- Populated dynamically -->
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="sonarrQualityProfile" class="form-label">Quality Profile</label>
-                                        <select class="form-control bg-dark text-light border-secondary" 
-                                                id="sonarrQualityProfile" name="SONARR_QUALITY_PROFILE">
-                                            <!-- Populated dynamically -->
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="sonarrLanguageProfile" class="form-label">Language Profile</label>
-                                        <select class="form-control bg-dark text-light border-secondary" 
-                                                id="sonarrLanguageProfile" name="SONARR_LANGUAGE_PROFILE">
-                                            <!-- Populated dynamically -->
-                                        </select>
-                                    </div>
-                                    <div class="col-12">
-                                        <button type="button" class="btn btn-outline-info w-100 test-connection" 
-                                                id="testSonarr">
-                                            <i class="fas fa-plug me-2"></i>Test Connection
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TMDB Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-info mb-3">
-                            <i class="fas fa-database me-2"></i>TMDB Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <small class="text-muted">TMDB key required for Movie and TV Show lookups. <a href="https://www.themoviedb.org/settings/api">https://www.themoviedb.org/settings/api</a></small>
-                                    <div class="col-md-6">
-                                        <label for="tmdbKey" class="form-label">TMDB API Key</label>
-                                        <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                            id="tmdbKey" name="TMDB_KEY" value="{{ config.tmdb.key }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="tmdbToken" class="form-label">TMDB Token</label>
-                                        <input type="password" class="form-control bg-dark text-light border-secondary" 
-                                            id="tmdbToken" name="TMDB_TOKEN" value="{{ config.tmdb.token }}">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- DuckDNS Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-warning mb-3">
-                            <i class="fas fa-globe me-2"></i>DuckDNS Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-12">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="duckdnsEnabled" 
-                                                name="DUCKDNS_ENABLED" {% if config.duckdns.enabled %}checked{% endif %}>
-                                            <label class="form-check-label" for="duckdnsEnabled">
-                                                Enable DuckDNS
-                                            </label>
-                                            <small class="text-muted">Use DuckDNS if you want a persistent domain name for your local webserver IP address.</small>
-                                        </div>                                    
-                                    </div>
-                                    <!-- Collapsible content -->
-                                    <div class="col-12 collapsible-content" id="duckdnsContent" {% if not config.duckdns.enabled %}style="display: none;"{% endif %}>
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label for="duckdnsDomain" class="form-label">Domain</label>
-                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                                    id="duckdnsDomain" name="DUCKDNS_DOMAIN" 
-                                                    value="{{ config.duckdns.domain }}"
-                                                    placeholder="yourdomain (without .duckdns.org)">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="duckdnsToken" class="form-label">Token</label>
-                                                <input type="password" class="form-control bg-dark text-light border-secondary" 
-                                                    id="duckdnsToken" name="DUCKDNS_TOKEN" 
-                                                    value="{{ config.duckdns.token }}">
-                                            </div>
-                                            <div class="col-12">
-                                                <button type="button" class="btn btn-outline-info w-100" id="testDuckDNS">
-                                                    <i class="fas fa-plug me-2"></i>Test Connection
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Auto-Updater Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-warning mb-3">
-                            <i class="fas fa-sync-alt me-2"></i>Auto-Updater Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-12">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="enableAutoUpdate" 
-                                                name="ENABLE_AUTO_UPDATE" {% if config['update']['enabled'] %}checked{% endif %}>
-                                            <label class="form-check-label" for="enableAutoUpdate">
-                                                Enable Auto Update
-                                            </label>
-                                            <small class="text-muted">Check for new releases automatically</small>
-                                        </div>
-                                    </div>
-                                    <!-- Collapsible content -->
-                                    <div class="col-12 collapsible-content" id="autoUpdateContent" {% if not config['update']['enabled'] %}style="display: none;"{% endif %}>
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label for="githubRepo" class="form-label">GitHub Repository</label>
-                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                                    id="githubRepo" name="GITHUB_REPO" value="{{ config['update']['github_repo'] }}">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="updatesFolder" class="form-label">Updates Folder</label>
-                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                                    id="updatesFolder" name="UPDATES_FOLDER" value="{{ config['update']['updates_folder'] }}">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="checkInterval" class="form-label">Check Interval (seconds)</label>
-                                                <input type="number" class="form-control bg-dark text-light border-secondary" 
-                                                    id="checkInterval" name="CHECK_INTERVAL" 
-                                                    value="{{ config['update']['check_interval'] or 3600 }}" 
-                                                    placeholder="3600" 
-                                                    min="300" max="86400">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tunnel Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-primary mb-3">
-                            <i class="fas fa-cloud me-2"></i>Tunnel Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-12">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="tunnelEnabled" 
-                                                name="TUNNEL_ENABLED" {% if config.tunnel.enabled %}checked{% endif %}>
-                                            <label class="form-check-label" for="tunnelEnabled">
-                                                Enable Pinggy Tunnel
-                                            </label>
-                                            <small class="text-muted">Sign up to Pinggy Pro for a permanent domain name so you can access Addarr from anywhere.  <a href="https://dashboard.pinggy.io/domains">https://dashboard.pinggy.io/domains</a></small>
-                                        </div>
-                                    </div>
-                                    <!-- Collapsible content -->
-                                    <div class="col-12 collapsible-content" id="tunnelContent" {% if not config.tunnel.enabled %}style="display: none;"{% endif %}>
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label for="pinggyAuthToken" class="form-label">Pinggy Auth Token</label>
-                                                <input type="password" class="form-control bg-dark text-light border-secondary" 
-                                                    id="pinggyAuthToken" name="PINGGY_AUTH_TOKEN" value="{{ config.tunnel.auth_token }}">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="pinggyReservedSubdomain" class="form-label">Reserved Subdomain</label>
-                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                                    id="pinggyReservedSubdomain" name="PINGGY_RESERVED_SUBDOMAIN" value="{{ config.tunnel.reserved_subdomain }}">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Authentication Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-warning mb-3">
-                            <i class="fas fa-lock me-2"></i>Authentication Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-12">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="authEnabled" 
-                                                name="AUTH_ENABLED" {% if config.auth.enabled %}checked{% endif %}>
-                                            <label class="form-check-label" for="authEnabled">
-                                                Enable Basic Authentication
-                                            </label>
-                                            <small class="text-muted">Require username and password to access Addarr</small>
-                                        </div>
-                                    </div>
-                                    <!-- Collapsible content -->
-                                    <div class="col-12 collapsible-content" id="authContent" {% if not config.auth.enabled %}style="display: none;"{% endif %}>
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label for="authUsername" class="form-label">Username</label>
-                                                <input type="text" class="form-control bg-dark text-light border-secondary" 
-                                                    id="authUsername" name="AUTH_USERNAME" value="{{ config.auth.username }}">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="authPassword" class="form-label">Password</label>
-                                                <input type="password" class="form-control bg-dark text-light border-secondary" 
-                                                    id="authPassword" name="AUTH_PASSWORD" value="{{ config.auth.password }}">
-                                            </div>
-                                            <div class="col-12">
-                                                <div class="alert alert-warning">
-                                                    <small><i class="fas fa-exclamation-triangle me-1"></i> 
-                                                    Make sure to remember your credentials. If you lose them, you'll need to manually edit the .env file.</small>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Application Settings -->
-                    <div class="mb-4">
-                        <h5 class="text-info mb-3">
-                            <i class="fas fa-sliders-h me-2"></i>Application Settings
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-12">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="debugEnabled" 
-                                                name="FLASK_DEBUG" {% if config.app.debug %}checked{% endif %}>
-                                            <label class="form-check-label" for="debugEnabled">
-                                                Enable Debug Mode
-                                            </label>
-                                            <small class="text-muted">When enabled, detailed logs will be recorded</small>
-                                        </div>
-                                    </div>
-                                    <!-- Collapsible content -->
-                                    <div class="col-12 collapsible-content" id="debugContent" {% if not config.app.debug %}style="display: none;"{% endif %}>
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label for="logLevel" class="form-label">Log Level</label>
-                                                <select class="form-control bg-dark text-light border-secondary" 
-                                                        id="logLevel" name="LOG_LEVEL">
-                                                    <option value="DEBUG" {% if config.app.log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
-                                                    <option value="INFO" {% if config.app.log_level == 'INFO' %}selected{% endif %}>INFO</option>
-                                                    <option value="WARNING" {% if config.app.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
-                                                    <option value="ERROR" {% if config.app.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
-                                                </select>
-                                            </div>
-                                            <!-- Add hidden inputs for app settings that aren't in the form but needed -->
-                                            <input type="hidden" name="SERVER_PORT" value="{{ config.app.port }}">
-                                            <input type="hidden" name="APP_VERSION" value="{{ config.app.version }}">
-                                        </div>
-                                    </div>             
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Version Information -->
-                    <div class="mb-4">
-                        <h5 class="text-success mb-3">
-                            <i class="fas fa-code-branch me-2"></i>Version Information
-                        </h5>
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="version-info">
-                                    v{{ config.app.version }} 
-                                    <span class="badge {% if config.update.channel == 'dev' %}badge-warning{% else %}badge-success{% endif %}">
-                                        {{ config.update.channel|upper }}
-                                    </span>
-                                </div>
-                                <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <button type="button" class="btn btn-outline-info w-100" id="checkUpdateBtn">
-                                            <i class="fas fa-sync-alt me-2"></i>Check Updates
-                                        </button>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <button type="button" class="btn btn-outline-info w-100" id="downloadUpdateBtn" style="display: none;">
-                                            <i class="fas fa-download me-2"></i>Download
-                                        </button>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <button type="button" class="btn btn-outline-info w-100" id="listUpdatesBtn" data-bs-dismiss="modal">
-                                            <i class="fas fa-list me-2"></i>View Updates
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Modal Footer - INSIDE THE FORM -->
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-2"></i>Cancel
-                    </button>
-                    <button id="configSubmitBtn" type="submit" class="btn btn-radarr">
-                        <i class="fas fa-save me-2"></i>Save Configuration
-                    </button>
-                </div>
-            </form>
-            <!-- FORM ENDS HERE -->
-            
-        </div>
-    </div>
-</div>
-
+<!-- Log Panel -->
 <div id="logPanel" class="config-panel">
     <div class="config-header">
         <h3>Log Viewer</h3>
         <div class="d-flex align-items-center">
-            <div class="input-group input-group-sm me-2" style="width: 120px;">
+            <div class="input-group input-group-sm me-2 log-lines-group">
                 <span class="input-group-text">Lines:</span>
                 <input type="number" id="logLines" class="form-control" value="500" min="100" max="10000">
             </div>
@@ -505,100 +146,36 @@
     </div>
 </div>
 
+<!-- Debug API Panel -->
 <div id="debugPanel" class="config-panel">
     <div class="config-header">
         <h3>Debug APIs</h3>
         <button class="btn btn-sm btn-outline-info" id="closeDebug">&times;</button>
     </div>
-
     <div class="panel-content">
         <div class="api-debug-container">
-            <!-- Sidebar -->
             <div class="api-sidebar">
-               
                 <ul class="nav nav-pills mb-3" id="endpointTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="moviesTab" data-bs-toggle="pill" data-bs-target="#movies" type="button" role="tab">Movies</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="tvTab" data-bs-toggle="pill" data-bs-target="#series" type="button" role="tab">TV</button>
-                </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="moviesTab" data-bs-toggle="pill" data-bs-target="#movies" type="button" role="tab">Movies</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tvTab" data-bs-toggle="pill" data-bs-target="#series" type="button" role="tab">TV</button>
+                    </li>
                 </ul>
-                
                 <div class="tab-content mt-3">
                     <div class="tab-pane fade show active" id="movies">
-                        <div class="api-endpoint" data-method="GET" data-path="/movie">
-                            <strong>GET /movie</strong>
-                            <small>Get all movies</small>
-                        </div>
-                        <div class="api-endpoint" data-method="GET" data-path="/movie/{id}">
-                            <strong>GET /movie/{id}</strong>
-                            <small>Get specific movie</small>
-                        </div>
-                        <div class="api-endpoint" data-method="POST" data-path="/movie">
-                            <strong>POST /movie</strong>
-                            <small>Add new movie</small>
-                        </div>
+                        <div class="api-endpoint" data-method="GET" data-path="/movie"><strong>GET /movie</strong><small>Get all movies</small></div>
+                        <div class="api-endpoint" data-method="GET" data-path="/movie/{id}"><strong>GET /movie/{id}</strong><small>Get specific movie</small></div>
+                        <div class="api-endpoint" data-method="POST" data-path="/movie"><strong>POST /movie</strong><small>Add new movie</small></div>
                     </div>
-                    
                     <div class="tab-pane fade" id="series">
-                        <div class="api-endpoint" data-method="GET" data-path="/series">
-                            <strong>GET /series</strong>
-                            <small>Get all series</small>
-                        </div>
-                        <div class="api-endpoint" data-method="GET" data-path="/series/{id}">
-                            <strong>GET /series/{id}</strong>
-                            <small>Get specific series</small>
-                        </div>
-                        <div class="api-endpoint" data-method="POST" data-path="/series">
-                            <strong>POST /series</strong>
-                            <small>Add new series</small>
-                        </div>
+                        <div class="api-endpoint" data-method="GET" data-path="/series"><strong>GET /series</strong><small>Get all series</small></div>
+                        <div class="api-endpoint" data-method="GET" data-path="/series/{id}"><strong>GET /series/{id}</strong><small>Get specific series</small></div>
+                        <div class="api-endpoint" data-method="POST" data-path="/series"><strong>POST /series</strong><small>Add new series</small></div>
                     </div>
-                    
-                    <div class="tab-pane fade" id="system">
-                        <div class="api-endpoint" data-method="GET" data-path="/health">
-                            <strong>GET /health</strong>
-                            <small>System health check</small>
-                        </div>
-                        <div class="api-endpoint" data-method="GET" data-path="/system/status">
-                            <strong>GET /system/status</strong>
-                            <small>System status</small>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="profiles" role="tabpanel">
-                        <!-- Radarr -->
-                        <div class="api-endpoint" data-method="GET" data-path="/qualityprofile">
-                            <strong>GET /qualityprofile</strong>
-                            <small>Radarr quality profiles</small>
-                        </div>
-                        
-                        <!-- Sonarr -->
-                        <div class="api-endpoint" data-method="GET" data-path="/languageprofile">
-                            <strong>GET /languageprofile</strong>
-                            <small>Sonarr language profiles</small>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="system" role="tabpanel">
-                        <div class="api-endpoint" data-method="GET" data-path="/rootfolder">
-                            <strong>GET /rootfolder</strong>
-                            <small>List root folders</small>
-                        </div>
-                        <div class="api-endpoint" data-method="GET" data-path="/system/status">
-                            <strong>GET /system/status</strong>
-                            <small>System status</small>
-                        </div>
-                        <div class="api-endpoint" data-method="GET" data-path="/queue">
-                            <strong>GET /queue</strong>
-                            <small>Current download queue</small>
-                        </div>
-                    </div>                
                 </div>
             </div>
-            
-            <!-- Main Content Area -->
             <div class="api-main-content">
                 <div class="api-stable-layout">
                     <div class="api-form-container">
@@ -617,79 +194,50 @@
                                 <div class="col-md-10">
                                     <label for="url" class="form-label">API URL</label>
                                     <div class="input-group api-url-input-group">
-                                        <span class="input-group-text" id="baseUrl">{{ config.radarr.url if service == 'radarr' else config.sonarr.url}}/api/v3</span>
+                                        <span class="input-group-text" id="baseUrl">{{ config.radarr.url }}/api/v3</span>
                                         <input type="text" id="url" name="url" class="form-control" required>
                                     </div>
                                 </div>
                             </div>
-                            
                             <div class="mb-3">
                                 <label for="api_key" class="form-label">API Key</label>
-                                <input type="text" id="api_key" name="api_key" class="form-control" 
-                                    value="{{ config.radarr.api_key if service == 'radarr' else config.sonarr.api_key}}" required>
+                                <input type="text" id="api_key" name="api_key" class="form-control" value="{{ config.radarr.api_key }}" required>
                             </div>
-                            
                             <ul class="nav nav-pills mb-2" id="payloadTabs" role="tablist">
-                            <li class="nav-item">
-                                <button class="nav-link active" id="body-tab" data-bs-toggle="pill" data-bs-target="#body-panel" type="button" role="tab">Body</button>
-                            </li>
-                            <li class="nav-item">
-                                <button class="nav-link" id="headers-tab" data-bs-toggle="pill" data-bs-target="#headers-panel" type="button" role="tab">Headers</button>
-                            </li>
+                                <li class="nav-item"><button class="nav-link active" id="body-tab" data-bs-toggle="pill" data-bs-target="#body-panel" type="button" role="tab">Body</button></li>
+                                <li class="nav-item"><button class="nav-link" id="headers-tab" data-bs-toggle="pill" data-bs-target="#headers-panel" type="button" role="tab">Headers</button></li>
                             </ul>
-
                             <div class="tab-content">
-                            <div class="tab-pane fade show active" id="body-panel" role="tabpanel">
-                                <textarea id="body" name="body" class="form-control" rows="6" placeholder="{ }"></textarea>
+                                <div class="tab-pane fade show active" id="body-panel" role="tabpanel">
+                                    <textarea id="body" name="body" class="form-control" rows="6" placeholder="{ }"></textarea>
+                                </div>
+                                <div class="tab-pane fade" id="headers-panel" role="tabpanel">
+                                    <textarea id="headers" name="headers" class="form-control" rows="6" placeholder='{ "Header-Name": "value" }'></textarea>
+                                </div>
                             </div>
-                            <div class="tab-pane fade" id="headers-panel" role="tabpanel">
-                                <textarea id="headers" name="headers" class="form-control" rows="6" placeholder='{ "Header-Name": "value" }'></textarea>
-                            </div>
-                            </div>
-
-                            
                             <button type="submit" class="btn btn-radarr">Submit Request</button>
                         </form>
                     </div>
-                    
                     {% if error %}
-                        <div class="api-response-container">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h3>Error</h3>
-                            </div>
-                            <div class="alert alert-danger">
-                                <pre>{{ error }}</pre>
-                            </div>
-                        </div>
+                    <div class="api-response-container">
+                        <div class="d-flex justify-content-between align-items-center mb-3"><h3>Error</h3></div>
+                        <div class="alert alert-danger"><pre>{{ error }}</pre></div>
+                    </div>
                     {% endif %}
-                    
                     {% if response %}
-                        <div class="api-response-container">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h3>Response</h3>
-                                <span class="badge bg-{% if status_code == 200 %}success{% else %}danger{% endif %}">
-                                    Status: {{ status_code }}
-                                </span>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <h5>Headers</h5>
-                                <pre>{{ headers | tojson(indent=2) | safe }}</pre>
-                            </div>
-                            
-                            <div>
-                                <h5>Body</h5>
-                                {% if response is string %}
-                                    {% if response.startswith('{') or response.startswith('[') %}
-                                        <pre>{{ response | safe }}</pre>
-                                    {% else %}
-                                        <pre>{{ response }}</pre>
-                                    {% endif %}
-                                {% else %}
-                                    <pre>{{ response | tojson(indent=2) | safe }}</pre>
-                                {% endif %}
-                            </div>
+                    <div class="api-response-container">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h3>Response</h3>
+                            <span class="badge bg-{% if status_code == 200 %}success{% else %}danger{% endif %}">Status: {{ status_code }}</span>
                         </div>
+                        <div class="mb-4"><h5>Headers</h5><pre>{{ headers | tojson(indent=2) | safe }}</pre></div>
+                        <div><h5>Body</h5>
+                            {% if response is string %}
+                                {% if response.startswith('{') or response.startswith('[') %}<pre>{{ response | safe }}</pre>
+                                {% else %}<pre>{{ response }}</pre>{% endif %}
+                            {% else %}<pre>{{ response | tojson(indent=2) | safe }}</pre>{% endif %}
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -698,137 +246,17 @@
     </div>
 </div>
 
-<div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content bg-dark text-light">
-            <div class="modal-header border-secondary">
-                <h5 class="modal-title" id="infoModalLabel">
-                    <i class="fas fa-info-circle me-2"></i>About
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <!-- App Name and Version -->
-                <div class="text-center mb-4">
-                    <img src="/static/images/logo.png" alt="Addarr Logo" height="80" class="mb-3">
-                    <p class="text-muted">Media Management System</p>
-                    <div class="d-flex justify-content-center gap-3">
-                        <span class="badge bg-radarr">Version: <span id="infoVersion">{{ config.app.version}}</span></span>
-                        <span class="badge bg-secondary">Last Updated: <span id="infoLastUpdated">Loading...</span></span>
-                    </div>
-                </div>
-
-                <hr class="border-secondary">
-
-                <!-- Hosting Addresses -->
-                <div class="mb-4">
-                    <h5 class="text-radarr mb-3">
-                        <i class="fas fa-network-wired me-2"></i>Access URLs
-                    </h5>
-                    <div class="row g-2">
-                        <!-- <div class="col-md-6">
-                            <div class="card bg-dark border-secondary">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-desktop me-2"></i>Local Access
-                                    </h6>
-                                    <code class="text-wrap d-block">http://127.0.0.1:{{ config.app.port}}</code>
-                                </div>
-                            </div>
-                        </div> -->
-                        <div class="col-md-6">
-                            <div class="card bg-dark border-secondary">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-wifi me-2"></i>Internal Address
-                                    </h6>
-                                    <code class="text-wrap d-block" id="networkAddress">Loading...</code>
-                                </div>
-                            </div>
-                        </div>
-                        {% if config.duckdns.enabled and config.duckdns.domain %}
-                        <div class="col-md-6">
-                            <div class="card bg-dark border-secondary">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-globe me-2"></i>DuckDNS Address
-                                    </h6>
-                                    <code class="text-wrap d-block">http://{{ config.duckdns.domain}}.duckdns.org:{{ config.app.port}}</code>
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% if config.tunnel.enabled %}
-                        <div class="col-md-6">
-                            <div class="card bg-dark border-secondary">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-cloud me-2"></i>Tunnel Address
-                                    </h6>
-                                    <code class="text-wrap d-block" id="tunnelAddress">Loading...</code>
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <hr class="border-secondary">
-
-                <!-- Recent Changelog -->
-                <div>
-                    <h5 class="text-radarr mb-3">
-                        <i class="fas fa-history me-2"></i>Recent Changes
-                    </h5>
-                    <div class="card bg-dark border-secondary">
-                        <div class="card-body">
-                            <div id="changelogContent" class="changelog-content">
-                                <div class="text-center">
-                                    <div class="spinner-border spinner-border-sm text-radarr me-2" role="status"></div>
-                                    Loading changelog...
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-end mt-2">
-                        <small class="text-muted">
-                            <a href="https://github.com/{{ config['update']['github_repo'] }}/blob/{{ config['update']['channel'] }}/CHANGELOG.md" 
-                               target="_blank" class="text-radarr">
-                                View Full Changelog
-                            </a>
-                        </small>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer border-secondary">
-                <button type="button" class="btn btn-radarr" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-2"></i>Close
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Reusable Notification Modal -->
-<div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content" id="notificationContent">
-            <div class="modal-body text-center py-4">
-                <i class="fas fa-check-circle fa-3x mb-3 text-success" id="notificationIcon"></i>
-                <h6 class="mb-0" id="notificationMessage">Saved Successfully!</h6>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Global Loading Spinner -->
-<div id="globalLoadingSpinner" class="loading-spinner">
-    <div class="spinner-container">
-        <button id="forceCloseSpinner" class="btn-close btn-close-white mt-3" style="display: none;"></button>
-        <div class="spinner-border spinner-radarr" role="status">
-            <span class="visually-hidden">Loading...</span>
+<div id="globalLoadingSpinner" class="loading-spinner show">
+    <div class="loading-spinner__panel">
+        <button id="forceCloseSpinner" class="btn-close btn-close-white force-close-spinner-hidden loading-spinner__close"></button>
+        <div class="loading-spinner__logo" aria-hidden="true">
+            <span class="loading-spinner__triangle loading-spinner__triangle--left"></span>
+            <span class="loading-spinner__triangle loading-spinner__triangle--top"></span>
+            <span class="loading-spinner__triangle loading-spinner__triangle--bottom"></span>
+            <span class="loading-spinner__plus loading-spinner__plus--h"></span>
+            <span class="loading-spinner__plus loading-spinner__plus--v"></span>
         </div>
-        <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
     </div>
 </div>
 
@@ -837,524 +265,353 @@
 </div>
 
 <script>
+const HOME_STATE_KEY = 'addarr.homeState';
 
-// Update fetchRadarrData function
-function fetchRadarrData() {
-    // Fetch root folders
-    fetch(`/api/radarr/rootfolders`)
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById('radarrRootFolder');
-            select.innerHTML = '';
-            
-            // Get the current saved value from the configuration
-            const currentRootFolder = "{{ config.radarr.root_folder }}";
-            
-            data.forEach(folder => {
-                const option = document.createElement('option');
-                option.value = folder.path;
-                option.textContent = folder.path;
-                
-                // Set selected based on current configuration
-                if (folder.path.toString() === currentRootFolder.toString()) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-
-        })
-        .catch(error => console.error('Error loading Radarr root folders:', error));
-    
-    // Fetch quality profiles
-    fetch(`/api/radarr/qualityprofile`)
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById('radarrQualityProfile');
-            select.innerHTML = '';
-            
-            // Get the current saved value from the configuration
-            const currentQualityProfile = "{{ config.radarr.quality_profile_id }}";
-            
-            data.forEach(profile => {
-                console.log(profile);
-                console.log(currentQualityProfile);
-                const option = document.createElement('option');
-                option.value = profile.id;
-                option.textContent = profile.name;
-                
-                // Set selected based on current configuration
-                if (profile.id === currentQualityProfile) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-            
-            // If no option was selected, try to set it explicitly
-            if (currentQualityProfile && select.value !== currentQualityProfile) {
-                select.value = currentQualityProfile;
-            }
-        })
-        .catch(error => console.error('Error loading Radarr quality profiles:', error));
-}
-
-// Update fetchSonarrData function
-function fetchSonarrData() {
-    // Fetch root folders
-    fetch(`/api/sonarr/rootfolder`)
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById('sonarrRootFolder');
-            select.innerHTML = '';
-            
-            // Get the current saved value from the configuration
-            const currentRootFolder = "{{ config.sonarr.root_folder }}";
-            
-            data.forEach(folder => {
-                const option = document.createElement('option');
-                option.value = folder.path;
-                option.textContent = folder.path;
-                
-                // Set selected based on current configuration
-                if (folder.path.toString() === currentRootFolder.toString()) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-            
-        })
-        .catch(error => console.error('Error loading Sonarr root folders:', error));
-    
-    // Fetch quality profiles
-    fetch(`/api/sonarr/qualityprofile`)
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById('sonarrQualityProfile');
-            select.innerHTML = '';
-            
-            // Get the current saved value from the configuration
-            const currentQualityProfile = "{{ config.sonarr.quality_profile_id }}";
-            
-            data.forEach(profile => {
-                const option = document.createElement('option');
-                option.value = profile.id;
-                option.textContent = profile.name;
-                
-                // Set selected based on current configuration
-                if (profile.id.toString() === currentQualityProfile.toString()) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-            
-            // If no option was selected, try to set it explicitly
-            if (currentQualityProfile && select.value !== currentQualityProfile) {
-                select.value = currentQualityProfile;
-            }
-        })
-        .catch(error => console.error('Error loading Sonarr quality profiles:', error));
-    
-    // Fetch language profiles
-    fetch(`/api/sonarr/languageprofile`)
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById('sonarrLanguageProfile');
-            select.innerHTML = '';
-            
-            // Get the current saved value from the configuration
-            const currentLanguageProfile = "{{ config.sonarr.language_profile_id }}";
-            
-            data.forEach(profile => {
-                const option = document.createElement('option');
-                option.value = profile.id;
-                option.textContent = profile.name;
-                
-                // Set selected based on current configuration
-                if (profile.id.toString() === currentLanguageProfile.toString()) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-            
-            // If no option was selected, try to set it explicitly
-            if (currentLanguageProfile && select.value !== currentLanguageProfile) {
-                select.value = currentLanguageProfile;
-            }
-        })
-        .catch(error => console.error('Error loading Sonarr language profiles:', error));
-    }
-
-function loadConfigurationData() {
-    // Load Radarr data
-    fetchRadarrData();
-    // Load Sonarr data
-    fetchSonarrData();
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/sw.js')
-        .then(registration => {
-            console.log('ServiceWorker registration successful');
-        })
-        .catch(err => {
-            console.log('ServiceWorker registration failed: ', err);
-        });
-    });
-    }
-});
-
-// Load settings on panel open
-document.getElementById('configModal').addEventListener('show.bs.collapse', function() {
-    // Load configuration data
-    loadConfigurationData();
-});
-
-document.addEventListener('DOMContentLoaded', function() {
-    const spinner = window.spinner || {
-        show: (msg) => console.log('Loading:', msg),
-        hide: () => console.log('Loading complete')
+function captureHomePageState() {
+    const state = {
+        scrollY: window.scrollY || window.pageYOffset || 0,
+        carousels: {}
     };
 
-    // Set up toggle handlers for each collapsible section
-    setupCollapsibleSection('duckdnsEnabled', 'duckdnsContent');
-    setupCollapsibleSection('enableAutoUpdate', 'autoUpdateContent');
-    setupCollapsibleSection('tunnelEnabled', 'tunnelContent');
-    setupCollapsibleSection('debugEnabled', 'debugContent');
-    setupCollapsibleSection('authEnabled', 'authContent');
+    document.querySelectorAll('.carousel-wrapper').forEach(wrapper => {
+        const carousel = wrapper.querySelector('.carousel');
+        if (!carousel || !carousel.id) return;
+        state.carousels[carousel.id] = wrapper.scrollLeft || 0;
+    });
 
-    function setupCollapsibleSection(checkboxId, contentId) {
-        const checkbox = document.getElementById(checkboxId);
-        const content = document.getElementById(contentId);
-        
-        if (checkbox && content) {
-            // Set initial state
-            toggleContent(checkbox, content);
-            
-            // Add event listener
-            checkbox.addEventListener('change', function() {
-                toggleContent(this, content);
+    sessionStorage.setItem(HOME_STATE_KEY, JSON.stringify(state));
+}
+
+function restoreHomePageState() {
+    const raw = sessionStorage.getItem(HOME_STATE_KEY);
+    if (!raw) return;
+
+    try {
+        const state = JSON.parse(raw);
+        requestAnimationFrame(() => {
+            window.scrollTo(0, Number(state.scrollY) || 0);
+            Object.entries(state.carousels || {}).forEach(([carouselId, scrollLeft]) => {
+                const carousel = document.getElementById(carouselId);
+                const wrapper = carousel ? carousel.parentElement : null;
+                if (wrapper) wrapper.scrollLeft = Number(scrollLeft) || 0;
             });
-        }
-    }
-    
-    function toggleContent(checkbox, content) {
-        if (checkbox.checked) {
-            // Show with smooth animation
-            content.style.display = 'block';
-            setTimeout(() => {
-                content.style.opacity = '1';
-                content.style.transform = 'translateY(0)';
-            }, 10);
-        } else {
-            // Hide with smooth animation
-            content.style.opacity = '0';
-            content.style.transform = 'translateY(-10px)';
-            setTimeout(() => {
-                content.style.display = 'none';
-            }, 300);
-        }
-    }
-
-    // Config panel toggle - Use Bootstrap modal events instead
-    const configModal = document.getElementById('configModal');
-    const configOverlay = document.getElementById('configOverlay');
-
-    if (configModal && configOverlay) {
-        // When modal opens
-        configModal.addEventListener('show.bs.modal', function() {
-            configOverlay.classList.add('open');
-            loadConfigurationData();
+            document.body.classList.remove('home-restoring');
         });
-        
-        // When modal closes (any method - close button, escape key, clicking outside, etc.)
-        configModal.addEventListener('hide.bs.modal', function() {
-            configOverlay.classList.remove('open');
-        });
+    } catch (error) {
+        console.warn('Failed to restore home page state:', error);
+    } finally {
+        sessionStorage.removeItem(HOME_STATE_KEY);
+        document.body.classList.remove('home-restoring');
     }
-
-    const forms = document.querySelectorAll('form');
-    forms.forEach(form => {
-        form.addEventListener('submit', function() {
-            spinner.show('Processing...');
-        });
-    });
-
-    // Add loading to navigation
-    const links = document.querySelectorAll('a[href]:not([target="_blank"]):not([href^="#"])');
-    links.forEach(link => {
-        link.addEventListener('click', function(e) {
-            // Don't intercept if it's the same page or has special handlers
-            if (this.getAttribute('href') && !this.getAttribute('href').startsWith('javascript')) {
-                spinner.show('Loading...');
-            }
-        });
-    });
-});
-
-// Test connection buttons
-document.getElementById('testRadarr').addEventListener('click', function() {
-    testConnection('radarr');
-});
-
-document.getElementById('testSonarr').addEventListener('click', function() {
-    testConnection('sonarr');
-});
-
-// Save configuration with reusable notification modal
-document.getElementById('configForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    const config = {};
-    
-    // Convert FormData to object
-    for (let [key, value] of formData.entries()) {
-        if (this.elements[key] && this.elements[key].type === 'checkbox') {
-            config[key] = this.elements[key].checked;
-        } else {
-            config[key] = value;
-        }
-    }
-    
-    // Handle unchecked checkboxes
-    const checkboxes = this.querySelectorAll('input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-        if (!formData.has(checkbox.name)) {
-            config[checkbox.name] = false;
-        }
-    });
-    
-    // Show loading state
-    const submitButton = document.getElementById('configSubmitBtn');
-    const originalText = submitButton.innerHTML;
-    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Saving...';
-    submitButton.disabled = true;
-    
-    // First save the main configuration
-    fetch('/save_config', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(config)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Close the modal FIRST, before showing notification
-            const configModal = bootstrap.Modal.getInstance(document.getElementById('configModal'));
-            configModal.hide();
-            
-            // Clean up any remaining modal backdrop
-            setTimeout(() => {
-                const backdrops = document.querySelectorAll('.modal-backdrop');
-                backdrops.forEach(backdrop => backdrop.remove());
-                document.body.classList.remove('modal-open');
-                document.body.style.overflow = '';
-                document.body.style.paddingRight = '';
-            }, 100);
-            
-            // Show success notification
-            showNotification('Configuration saved successfully!', 'success');
-                     
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000); // Reload 2 seconds after the notification appears            
-            
-        } else {
-            throw new Error(data.error || 'Failed to save configuration');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Error: ' + error.message, 'error');
-    })
-    .finally(() => {
-        // Restore button state
-        submitButton.innerHTML = originalText;
-        submitButton.disabled = false;
-    });
-});
-
-// Reusable notification function
-function showNotification(message, type = 'success') {
-    const modal = document.getElementById('notificationModal');
-    const content = document.getElementById('notificationContent');
-    const icon = document.getElementById('notificationIcon');
-    const messageEl = document.getElementById('notificationMessage');
-    
-    // Set styles based on type
-    if (type === 'success') {
-        content.className = 'modal-content bg-success text-white';
-        icon.className = 'fas fa-check-circle fa-3x mb-3 text-white';
-    } else {
-        content.className = 'modal-content bg-danger text-white';
-        icon.className = 'fas fa-exclamation-circle fa-3x mb-3 text-white';
-    }
-    
-    // Set message
-    messageEl.textContent = message;
-    
-    // Show modal
-    const modalInstance = new bootstrap.Modal(modal);
-    modalInstance.show();
-    
-    // Auto-hide after 2 seconds for success, 3 for error
-    const hideTime = type === 'success' ? 2000 : 3000;
-    setTimeout(() => {
-        modalInstance.hide();
-    }, hideTime);
 }
 
-let activeApp = '';  // Will be set by tab click
+// Service Worker registration
+document.addEventListener('DOMContentLoaded', () => {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(() => console.log('ServiceWorker registration successful'))
+                .catch(err => console.log('ServiceWorker registration failed: ', err));
+        });
+    }
+});
 
-let moviesTab = document.getElementById('moviesTab');
-if (moviesTab) {
-    document.getElementById('moviesTab').addEventListener('click', function () {
-        activeApp = 'radarr';
-        loadEndpoints('radarr');  // Call your function to show endpoints
-    });
-};
-let tvTab = document.getElementById('tvTab');
-if (tvTab)  {
-    document.getElementById('tvTab').addEventListener('click', function () {
-        activeApp = 'sonarr';
-        loadEndpoints('sonarr');
-    });
-};
-function handleEndpointClick(endpoint) {
-    const baseUrl = activeApp === 'radarr' ? '{{ config.radarr.quality_profile_id}}' : '{{ config.sonarr.url}}';
-    const fullUrl = `${baseUrl}/api/v3/${endpoint}`;
-    document.getElementById('requestUrl').value = fullUrl;
+// Debug panel tab handlers
+let activeApp = '';
+document.addEventListener('DOMContentLoaded', function () {
+    const moviesTab = document.getElementById('moviesTab');
+    if (moviesTab) moviesTab.addEventListener('click', function () { activeApp = 'radarr'; loadEndpoints('radarr'); });
+    const tvTab = document.getElementById('tvTab');
+    if (tvTab) tvTab.addEventListener('click', function () { activeApp = 'sonarr'; loadEndpoints('sonarr'); });
 
-    // Hide endpoint buttons
-    document.getElementById('endpointButtons').classList.add('d-none');
-}
+    document.querySelectorAll('.api-endpoint').forEach(endpoint => {
+        endpoint.addEventListener('click', function () {
+            const baseUrl = activeApp === 'radarr' ? "{{ config.radarr.url }}" : "{{ config.sonarr.url }}";
+            const apiKey  = activeApp === 'radarr' ? "{{ config.radarr.api_key }}" : "{{ config.sonarr.api_key }}";
+            document.getElementById('method').value  = this.dataset.method;
+            document.getElementById('url').value     = this.dataset.path;
+            document.getElementById('api_key').value = apiKey;
+            document.querySelector('#baseUrl').textContent = `${baseUrl}/api/v3`;
+            document.querySelectorAll('#endpointTabs .nav-link').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show', 'active'));
+        });
+    });
+
+    const apiForm = document.getElementById('apiForm');
+    if (apiForm) {
+        apiForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const method  = document.getElementById('method').value;
+            const url     = `${document.querySelector('#baseUrl').textContent}${document.getElementById('url').value}`;
+            const apiKey  = document.getElementById('api_key').value;
+            const body    = document.getElementById('body').value;
+            let headers;
+            try { headers = JSON.parse(document.getElementById('headers')?.value || '{}'); }
+            catch (err) { alert('Invalid headers JSON'); return; }
+            headers['X-Api-Key'] = apiKey;
+            fetch(url, { method, headers, body: ['POST','PUT','DELETE'].includes(method.toUpperCase()) ? body : null })
+                .then(res => res.text())
+                .then(text => alert(`Response:\n${text}`))
+                .catch(err => alert(`Request failed:\n${err}`));
+        });
+    }
+});
+
 function loadEndpoints(appType) {
     const container = document.getElementById('endpointButtons');
+    if (!container) return;
     container.classList.remove('d-none');
-    container.innerHTML = '';  // Clear previous
-
-    const endpoints = appType === 'radarr'
-        ? ['movie', 'queue', 'wanted']  // example endpoints
-        : ['series', 'queue', 'calendar'];
-
+    container.innerHTML = '';
+    const endpoints = appType === 'radarr' ? ['movie','queue','wanted'] : ['series','queue','calendar'];
     endpoints.forEach(ep => {
         const btn = document.createElement('button');
         btn.className = 'btn btn-outline-info m-1';
         btn.textContent = ep;
-        btn.onclick = () => handleEndpointClick(ep);
+        btn.onclick = () => {
+            const baseUrl = activeApp === 'radarr' ? '{{ config.radarr.url }}' : '{{ config.sonarr.url }}';
+            document.getElementById('requestUrl').value = `${baseUrl}/api/v3/${ep}`;
+            container.classList.add('d-none');
+        };
         container.appendChild(btn);
     });
 }
+</script>
 
-document.querySelectorAll('.api-endpoint').forEach(endpoint => {
-    endpoint.addEventListener('click', function () {
-        const method = this.dataset.method;
-        const path = this.dataset.path;
+<script>
+// Fetch and display recently downloaded content
+async function loadRecentlyDownloaded() {
+    const tmdbEnabled = {{ 'true' if config.tmdb.enabled else 'false' }};
+    const readarrEnabled = {{ 'true' if config.readarr.enabled else 'false' }};
+    if (tmdbEnabled) {
+        showCarouselSkeleton('trendingSection', 'trendingCarousel', 6);
+    }
+    showCarouselSkeleton('moviesSection', 'moviesCarousel', 6);
+    showCarouselSkeleton('tvSection', 'tvCarousel', 6);
+    if (readarrEnabled) {
+        showCarouselSkeleton('booksSection', 'booksCarousel', 6);
+    }
 
-        const baseUrl = activeApp === 'radarr' ? "{{ config.radarr.url}}" : "{{ config.sonarr.url}}";
-        const apiKey = activeApp === 'radarr' ? "{{ config.radarr.api_key}}" : "{{ config.sonarr.api_key}}";
+    const initialLoaders = [
+        loadRecentlyDownloadedSection('/api/recently-downloaded/movies', 'moviesSection', 'moviesCarousel', 'movie'),
+        loadRecentlyDownloadedSection('/api/recently-downloaded/tv', 'tvSection', 'tvCarousel', 'tv')
+    ];
 
-        // Set form fields
-        document.getElementById('method').value = method;
-        document.getElementById('url').value = path;
-        document.getElementById('api_key').value = apiKey;
-        document.querySelector('#baseUrl').textContent = `${baseUrl}/api/v3`;
+    if (tmdbEnabled) {
+        initialLoaders.unshift(loadRecentlyDownloadedSection('/api/home/trending', 'trendingSection', 'trendingCarousel', 'trending-movie'));
+    }
 
-        // Deactivate pills
-        document.querySelectorAll('#endpointTabs .nav-link').forEach(btn => btn.classList.remove('active'));
+    if (readarrEnabled) {
+        initialLoaders.push(loadRecentlyDownloadedSection('/api/recently-downloaded/books', 'booksSection', 'booksCarousel', 'book'));
+    }
 
-        // Hide endpoint area
-        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('show', 'active'));
-    });
-});
+    await Promise.allSettled(initialLoaders);
+    restoreHomePageState();
+}
 
-document.getElementById('apiForm').addEventListener('submit', function (e) {
-    e.preventDefault();
+function withQueryParam(url, key, value) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+}
 
-    const method = document.getElementById('method').value;
-    const url = `${document.querySelector('#baseUrl').textContent}${document.getElementById('url').value}`;
-    const apiKey = document.getElementById('api_key').value;
-    const body = document.getElementById('body').value;
-    const headersRaw = document.getElementById('headers')?.value || "{}";
+async function loadRecentlyDownloadedSection(url, sectionId, carouselId, type) {
+    const cachedUrl = withQueryParam(url, 'cached_only', '1');
+    const refreshUrl = withQueryParam(url, 'refresh', '1');
+    const fetchOptions = window._bg?.signal ? { signal: window._bg.signal } : {};
 
-    let headers;
+    let showedCachedItems = false;
+
     try {
-        headers = JSON.parse(headersRaw);
+        const cachedResp = await fetch(cachedUrl, fetchOptions);
+        const cachedData = await cachedResp.json();
+        if (cachedData.items && cachedData.items.length > 0) {
+            populateCarousel(carouselId, cachedData.items, type, cachedData.source);
+            document.getElementById(sectionId).style.display = 'block';
+            showedCachedItems = true;
+        }
     } catch (err) {
-        alert("Invalid headers JSON");
-        return;
+        if (err.name === 'AbortError') return;
+        console.warn(`Cached ${type} load skipped:`, err);
     }
 
-    headers['X-Api-Key'] = apiKey;
+    const refreshPromise = fetch(refreshUrl, fetchOptions)
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.items && data.items.length > 0) {
+                populateCarousel(carouselId, data.items, type, data.source);
+                document.getElementById(sectionId).style.display = 'block';
+            } else {
+                hideCarouselSection(sectionId, carouselId);
+            }
+        })
+        .catch(err => {
+            if (err.name === 'AbortError') return;
+            console.error(`Error refreshing recently downloaded ${type}:`, err);
+            if (!showedCachedItems) {
+                hideCarouselSection(sectionId, carouselId);
+            }
+        });
 
-    fetch(url, {
-        method,
-        headers,
-        body: ['POST', 'PUT', 'DELETE'].includes(method.toUpperCase()) ? body : null
-    })
-    .then(res => res.text())
-    .then(text => {
-        alert(`Response:\n${text}`);
-    })
-    .catch(err => alert(`Request failed:\n${err}`));
-});
+    if (!showedCachedItems) {
+        await refreshPromise;
+    }
+}
 
-document.getElementById('testDuckDNS').addEventListener('click', function() {
-    const domain = document.getElementById('duckdnsDomain').value;
-    const token = document.getElementById('duckdnsToken').value;
-    const button = document.getElementById('testDuckDNS');
-    
-    if (!domain || !token) {
-        alert('Please enter DuckDNS domain and token first');
-        return;
+function showCarouselSkeleton(sectionId, carouselId, count = 6) {
+    const section = document.getElementById(sectionId);
+    const carousel = document.getElementById(carouselId);
+    if (!section || !carousel) return;
+
+    section.style.display = 'block';
+    section.classList.add('is-loading');
+    carousel.innerHTML = Array.from({ length: count }).map(() => `
+        <div class="carousel-item carousel-item--skeleton" aria-hidden="true">
+            <div class="carousel-poster carousel-skeleton-block"></div>
+            <div class="carousel-info">
+                <div class="carousel-skeleton-line carousel-skeleton-line--title"></div>
+                <div class="carousel-skeleton-line carousel-skeleton-line--subtitle"></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function hideCarouselSection(sectionId, carouselId) {
+    const section = document.getElementById(sectionId);
+    const carousel = document.getElementById(carouselId);
+    if (carousel) carousel.innerHTML = '';
+    if (section) {
+        section.classList.remove('is-loading');
+        section.style.display = 'none';
     }
-    
-    button.disabled = true;
-    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...';
-    
-    // First check if the domain is valid
-    if (!domain.match(/^[a-z0-9-]+$/i)) {
-        button.innerHTML = '<i class="fas fa-times"></i> Invalid domain';
-        button.classList.add('btn-danger');
-        setTimeout(() => {
-            button.innerHTML = 'Test Connection';
-            button.classList.remove('btn-danger');
-            button.disabled = false;
-        }, 3000);
-        return;
-    }
-    
-    // Test with a simple IP check request
-    fetch(`https://www.duckdns.org/update?domains=${domain}&token=${token}&ip=check`, {
-        // Add no-cors mode to avoid CORS issues
-        mode: 'no-cors'
-    })
-    .then(() => {
-        // Since we're using no-cors, we can't read the response directly
-        // But if we get here, the request was sent
-        button.innerHTML = '<i class="fas fa-check"></i> Connection OK';
-        button.classList.add('btn-success');
-    })
-    .catch(error => {
-        button.innerHTML = '<i class="fas fa-times"></i> Connection Failed';
-        button.classList.add('btn-danger');
-        console.error('Error testing DuckDNS connection:', error);
-    })
-    .finally(() => {
-        setTimeout(() => {
-            button.innerHTML = 'Test Connection';
-            button.classList.remove('btn-success', 'btn-danger');
-            button.disabled = false;
-        }, 3000);
+}
+
+function populateCarousel(carouselId, items, type, source) {
+    const carousel = document.getElementById(carouselId);
+    if (!carousel) return;
+    const section = carousel.closest('.recently-downloaded-section');
+    if (section) section.classList.remove('is-loading');
+
+    carousel.innerHTML = items.map(item => {
+        let link = null;  // null = non-clickable for Plex
+        let title = item.title;
+        let subtitle = '';
+        let imageSrc = item.poster || '/static/images/apple-touch-icon.png';
+
+        // Determine link based on type and source (source passed as parameter, not from item)
+        if (type === 'trending-movie') {
+            subtitle = item.year || 'Unknown';
+            if (item.tmdbId) {
+                link = `/manage?view=movie&open=${item.tmdbId}&source=home&plexId=tmdb-${encodeURIComponent(item.tmdbId)}&plexTitle=${encodeURIComponent(item.title || '')}&plexYear=${encodeURIComponent(item.year || '')}`;
+            }
+        } else if (type === 'movie') {
+            subtitle = item.year || 'Unknown';
+            if (item.tmdbId && item.tmdbId !== null) {
+                // Has TMDB ID (from Radarr, or enriched from Plex): direct link to movie
+                link = `/manage?view=movie&open=${item.tmdbId}&source=home&plexId=${encodeURIComponent(item.id || '')}&plexTitle=${encodeURIComponent(item.title || '')}&plexYear=${encodeURIComponent(item.year || '')}`;
+            } else {
+                // No TMDB ID found: navigate to manage page where user can search
+                link = `/manage?view=movie`;
+            }
+        } else if (type === 'tv') {
+            subtitle = `${item.seasons} season${item.seasons !== 1 ? 's' : ''}`;
+            if (item.tvdbId && item.tvdbId !== null) {
+                // Has TVDB ID (from Sonarr, or enriched from Plex): direct link to TV show
+                link = `/manage?view=tv&open=${item.tvdbId}&source=home&plexId=${encodeURIComponent(item.id || '')}&plexTitle=${encodeURIComponent(item.title || '')}&plexYear=${encodeURIComponent(item.year || '')}`;
+            } else if (item.sonarrId && item.sonarrId !== null) {
+                // Fallback to Sonarr's internal series id when TVDB is unavailable
+                link = `/manage?view=tv&open=${item.sonarrId}&source=home&openSource=sonarr&plexId=${encodeURIComponent(item.id || '')}&plexTitle=${encodeURIComponent(item.title || '')}&plexYear=${encodeURIComponent(item.year || '')}`;
+            } else {
+                // No TVDB ID found: navigate to manage page where user can search
+                link = `/manage?view=tv`;
+            }
+        } else if (type === 'book' && (source === 'readarr' || source === 'local')) {
+            // For local books: use local DB ID as primary identifier
+            // For Readarr books: use foreign book ID as primary identifier
+            const openId = source === 'local' ? (item.id || item.foreignBookId) : (item.foreignBookId || item.id);
+            const openForeignId = item.foreignBookId || '';
+            const openInternalId = item.id || '';
+            if (openId) {
+                link = `/manage-books?open=${encodeURIComponent(openId)}&source=home&openForeign=${encodeURIComponent(openForeignId)}&openInternal=${encodeURIComponent(openInternalId)}`;
+            }
+            subtitle = item.author || 'Unknown Author';
+        }
+
+        // Build the element - use div for non-clickable, a for clickable
+        const element = link
+            ? `<a href="${link}" class="carousel-item" title="${title}">`
+            : `<div class="carousel-item" title="${title}" style="cursor: default;">`;
+
+        const closeTag = link ? '</a>' : '</div>';
+
+        return `
+            ${element}
+                <img src="${imageSrc}" alt="${title}" class="carousel-poster" onerror="this.src='/static/images/apple-touch-icon.png'">
+                <div class="carousel-info">
+                    <div class="carousel-title">${title}</div>
+                    ${subtitle ? `<div class="carousel-subtitle">${subtitle}</div>` : ''}
+                    ${item.rating && item.rating !== 'N/A' ? `<div class="carousel-rating">★ ${item.rating}</div>` : ''}
+                </div>
+            ${closeTag}
+        `;
+    }).join('');
+}
+
+// Handle carousel navigation
+function setupCarouselNavigation() {
+    document.querySelectorAll('.carousel-nav').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const carouselId = btn.dataset.carousel;
+            const carousel = document.getElementById(carouselId);
+            if (!carousel) return;
+
+            const wrapper = carousel.parentElement;
+            const scrollAmount = 200;
+
+            if (btn.classList.contains('carousel-nav-prev')) {
+                wrapper.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+            } else if (btn.classList.contains('carousel-nav-next')) {
+                wrapper.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+            }
+        });
     });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modules = window.appModuleAvailability || {};
+    const setupMode = !modules.radarr && !modules.sonarr && !modules.readarr;
+    const hero = document.getElementById('homeHero');
+    const heroCopy = document.getElementById('homeHeroCopy');
+    const searchForm = document.getElementById('homeSearchForm');
+    if (!hero || !heroCopy || !searchForm) return;
+
+    hero.classList.toggle('setup-hero', setupMode);
+    heroCopy.textContent = setupMode
+        ? 'Addarr is ready to be configured. Open the menu, then tap the cog to connect your services and start searching.'
+        : '';
+    searchForm.classList.toggle('d-none', setupMode);
+
+    // Load recently downloaded content when page loads
+    if (!setupMode) {
+        if (window.trackGlobalLoading) {
+            window.trackGlobalLoading(loadRecentlyDownloaded(), 'Loading library...');
+        } else {
+            loadRecentlyDownloaded();
+        }
+        // Setup carousel navigation after carousels are populated
+        setTimeout(setupCarouselNavigation, 100);
+    }
+
+    document.addEventListener('click', function(event) {
+        const trigger = event.target.closest('.carousel-item[href]');
+        if (!trigger) return;
+        captureHomePageState();
+    });
+
 });
 </script>
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>    
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 
 </body>
 </html>

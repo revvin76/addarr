@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>arrdash: Prowlarr Search</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="/static/css/styles.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/static/images/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
+    <link rel="shortcut icon" href="/static/images/favicon.ico" />
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a1a" />
+    <style>
+        .prowlarr-accent { color: #ff6b35; }
+        .result-row { cursor: pointer; transition: background 0.15s; }
+        .result-row:hover { background: rgba(255, 107, 53, 0.08) !important; }
+        .indexer-badge { font-size: 0.7rem; }
+        .size-col { white-space: nowrap; }
+        .seeders { color: #5ed640; }
+        .leechers { color: #e74c3c; }
+        .add-btn { white-space: nowrap; }
+        #searchResults thead th { position: sticky; top: 0; background: #222; z-index: 2; }
+        .table-wrapper { max-height: 70vh; overflow-y: auto; }
+        .category-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .cat-radarr { background: rgba(106, 183, 89, 0.2); color: #6ab759; border: 1px solid #6ab759; }
+        .cat-sonarr { background: rgba(0, 204, 255, 0.15); color: #00ccff; border: 1px solid #00ccff; }
+        .cat-readarr { background: rgba(192, 57, 43, 0.2); color: #e74c3c; border: 1px solid #c0392b; }
+        .cat-games  { background: rgba(142, 68, 173, 0.2); color: #9b59b6; border: 1px solid #8e44ad; }
+        .cat-other  { background: rgba(100, 100, 100, 0.2); color: #aaa; border: 1px solid #555; }
+        .cat-selected { outline: 2px solid white; }
+        .no-qbit-note { font-size: 0.8rem; color: #aaa; }
+    </style>
+</head>
+{% set current_page = 'prowlarr' %}
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="d-flex align-items-center mb-3">
+            <i class="fas fa-search fa-lg prowlarr-accent me-2"></i>
+            <h4 class="mb-0" style="color: #ff6b35;">Prowlarr Search</h4>
+        </div>
+
+        <!-- Category toggle -->
+        <div class="mb-3 d-flex flex-wrap gap-1" id="categoryToggle" role="group" aria-label="Category filter">
+            <input type="radio" class="btn-check" name="catFilter" id="cat-all"   value=""    autocomplete="off" checked>
+            <label class="btn btn-sm btn-outline-secondary" for="cat-all">All</label>
+
+            <input type="radio" class="btn-check" name="catFilter" id="cat-movie" value="2000" autocomplete="off">
+            <label class="btn btn-sm btn-outline-success"   for="cat-movie"><i class="fas fa-film me-1"></i>Movies</label>
+
+            <input type="radio" class="btn-check" name="catFilter" id="cat-tv"    value="5000" autocomplete="off">
+            <label class="btn btn-sm btn-outline-info"      for="cat-tv"><i class="fas fa-tv me-1"></i>TV</label>
+
+            <input type="radio" class="btn-check" name="catFilter" id="cat-book"  value="7000" autocomplete="off">
+            <label class="btn btn-sm btn-outline-danger"    for="cat-book"><i class="fas fa-book me-1"></i>Books</label>
+
+            <input type="radio" class="btn-check" name="catFilter" id="cat-apps"  value="4000" autocomplete="off">
+            <label class="btn btn-sm btn-outline-warning"   for="cat-apps"><i class="fas fa-desktop me-1"></i>Apps</label>
+        </div>
+
+        <!-- Search bar -->
+        <div class="row mb-3">
+            <div class="col-md-8">
+                <form id="prowlarrSearchForm" class="d-flex gap-2">
+                    <input type="text" id="prowlarrQuery" class="form-control bg-dark text-light border-secondary"
+                           placeholder="Search across all indexers..." autocomplete="off" required>
+                    <button type="submit" class="btn btn-primary px-4" id="searchBtn">
+                        <i class="fas fa-search me-1"></i>Search
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Status bar -->
+        <div id="statusBar" class="text-muted small mb-2" style="display:none;"></div>
+
+        <!-- Results table -->
+        <div id="resultsContainer" style="display:none;">
+            <div class="table-wrapper rounded border border-secondary">
+                <table class="table table-dark table-sm table-hover mb-0" id="searchResults">
+                    <thead>
+                        <tr>
+                            <th style="width:35%">Title</th>
+                            <th>Indexer</th>
+                            <th class="size-col">Size</th>
+                            <th class="text-center"><i class="fas fa-arrow-up seeders" title="Seeders"></i></th>
+                            <th class="text-center"><i class="fas fa-arrow-down leechers" title="Leechers"></i></th>
+                            <th>Age</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody"></tbody>
+                </table>
+            </div>
+            <p class="text-muted small mt-1" id="resultCount"></p>
+        </div>
+
+        <!-- Empty state -->
+        <div id="emptyState" style="display:none;">
+            <div class="alert alert-secondary">No results found.</div>
+        </div>
+    </div>
+
+    <!-- Add torrent modal -->
+    <div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-light border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="addModalLabel"><i class="fas fa-plus-circle me-2"></i>Add to qBittorrent</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-3" id="addModalTitle"></p>
+                    {% if qbit_enabled %}
+                    <label class="form-label fw-semibold">Category</label>
+                    <div class="d-flex flex-wrap gap-2 mb-3" id="categoryPicker">
+                        <button type="button" class="category-pill cat-radarr" data-cat="radarr">
+                            <i class="fas fa-film me-1"></i>radarr
+                        </button>
+                        <button type="button" class="category-pill cat-sonarr" data-cat="tv-sonarr">
+                            <i class="fas fa-tv me-1"></i>tv-sonarr
+                        </button>
+                        {% if readarr_enabled %}
+                        <button type="button" class="category-pill cat-readarr" data-cat="readarr">
+                            <i class="fas fa-book me-1"></i>readarr
+                        </button>
+                        {% endif %}
+                        <button type="button" class="category-pill cat-games" data-cat="games">
+                            <i class="fas fa-gamepad me-1"></i>games
+                        </button>
+                        <button type="button" class="category-pill cat-other" data-cat="">
+                            <i class="fas fa-folder me-1"></i>uncategorised
+                        </button>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning no-qbit-note">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        qBittorrent is not configured. Add <code>QBIT_URL</code>, <code>QBIT_USERNAME</code>, and <code>QBIT_PASSWORD</code> in Settings to enable direct download.
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    {% if qbit_enabled %}
+                    <button type="button" class="btn btn-primary" id="confirmAddBtn">
+                        <i class="fas fa-download me-1"></i>Add Download
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    let currentTorrentUrl = '';
+    let selectedCategory = '';
+    const addModal = new bootstrap.Modal(document.getElementById('addModal'));
+
+    // Format bytes to human-readable size
+    function formatSize(bytes) {
+        if (!bytes || bytes === 0) return '—';
+        const gb = bytes / (1024 ** 3);
+        if (gb >= 1) return gb.toFixed(2) + ' GB';
+        const mb = bytes / (1024 ** 2);
+        if (mb >= 1) return mb.toFixed(1) + ' MB';
+        return Math.round(bytes / 1024) + ' KB';
+    }
+
+    // Format publish date to age string
+    function formatAge(publishDate) {
+        if (!publishDate) return '—';
+        const diff = Date.now() - new Date(publishDate).getTime();
+        const days = Math.floor(diff / 86400000);
+        if (days === 0) return 'Today';
+        if (days === 1) return '1d';
+        if (days < 30) return `${days}d`;
+        const months = Math.floor(days / 30);
+        if (months < 12) return `${months}mo`;
+        return `${Math.floor(months / 12)}y`;
+    }
+
+    // Search form submit
+    document.getElementById('prowlarrSearchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const query = document.getElementById('prowlarrQuery').value.trim();
+        if (!query) return;
+        doSearch(query);
+    });
+
+    function doSearch(query) {
+        const btn = document.getElementById('searchBtn');
+        const statusBar = document.getElementById('statusBar');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const emptyState = document.getElementById('emptyState');
+        const resultsBody = document.getElementById('resultsBody');
+        const resultCount = document.getElementById('resultCount');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Searching...';
+        statusBar.style.display = 'block';
+        statusBar.textContent = `Searching all indexers for "${query}"…`;
+        resultsContainer.style.display = 'none';
+        emptyState.style.display = 'none';
+        resultsBody.innerHTML = '';
+
+        const selectedCat = document.querySelector('input[name="catFilter"]:checked')?.value || '';
+        const catParam = selectedCat ? `&categories=${encodeURIComponent(selectedCat)}` : '';
+        fetch(`/api/prowlarr/search?q=${encodeURIComponent(query)}${catParam}`)
+            .then(r => r.json())
+            .then(data => {
+                const results = data.results || [];
+                statusBar.textContent = `Found ${results.length} result${results.length !== 1 ? 's' : ''}`;
+
+                if (results.length === 0) {
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                results.forEach((item, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'result-row';
+                    const seeders = item.seeders ?? item.leechers ?? null;
+                    const leechers = item.leechers ?? null;
+                    const seederText = seeders !== null ? `<span class="seeders">${seeders}</span>` : '—';
+                    const leecherText = leechers !== null ? `<span class="leechers">${leechers}</span>` : '—';
+                    tr.innerHTML = `
+                        <td class="align-middle" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(item.title || '')}">
+                            ${escHtml(item.title || '—')}
+                        </td>
+                        <td class="align-middle"><span class="badge bg-secondary indexer-badge">${escHtml(item.indexer || '—')}</span></td>
+                        <td class="align-middle size-col">${formatSize(item.size)}</td>
+                        <td class="align-middle text-center">${seederText}</td>
+                        <td class="align-middle text-center">${leecherText}</td>
+                        <td class="align-middle">${formatAge(item.publishDate)}</td>
+                        <td class="align-middle text-end">
+                            <button class="btn btn-sm btn-outline-primary add-btn"
+                                    data-url="${escHtml(item.downloadUrl || item.magnetUrl || item.guid || '')}"
+                                    data-title="${escHtml(item.title || '')}">
+                                <i class="fas fa-plus me-1"></i>Add
+                            </button>
+                        </td>
+                    `;
+                    resultsBody.appendChild(tr);
+                });
+
+                resultCount.textContent = `${results.length} result${results.length !== 1 ? 's' : ''}`;
+                resultsContainer.style.display = 'block';
+
+                // Wire up Add buttons
+                resultsBody.querySelectorAll('.add-btn').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        currentTorrentUrl = this.dataset.url;
+                        document.getElementById('addModalTitle').textContent = this.dataset.title;
+                        selectedCategory = '';
+                        document.querySelectorAll('#categoryPicker .category-pill').forEach(p => p.classList.remove('cat-selected'));
+                        addModal.show();
+                    });
+                });
+            })
+            .catch(err => {
+                statusBar.textContent = `Error: ${err.message}`;
+                statusBar.style.color = '#e74c3c';
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search me-1"></i>Search';
+            });
+    }
+
+    // Category picker
+    document.getElementById('categoryPicker')?.addEventListener('click', function(e) {
+        const pill = e.target.closest('.category-pill');
+        if (!pill) return;
+        document.querySelectorAll('#categoryPicker .category-pill').forEach(p => p.classList.remove('cat-selected'));
+        pill.classList.add('cat-selected');
+        selectedCategory = pill.dataset.cat;
+    });
+
+    // Confirm add
+    document.getElementById('confirmAddBtn')?.addEventListener('click', function() {
+        if (!currentTorrentUrl) return;
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding…';
+
+        fetch('/api/prowlarr/download', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ url: currentTorrentUrl, category: selectedCategory })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                addModal.hide();
+                showToast('Download added successfully!', 'success');
+            } else {
+                showToast(`Failed: ${data.message || 'Unknown error'}`, 'danger');
+            }
+        })
+        .catch(err => showToast(`Error: ${err.message}`, 'danger'))
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-download me-1"></i>Add Download';
+        });
+    });
+
+    function escHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type} position-fixed bottom-0 end-0 m-3`;
+        toast.style.zIndex = '9999';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3500);
+    }
+    </script>
+</body>
+</html>

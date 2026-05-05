@@ -91,6 +91,9 @@ instance/
 .env
 *.local
 
+metadata/*.*
+metadata/thumb_cache/*.*
+metadata/img_cache/*.*
 updates/
 !updates/.gitkeep
 HOWTO.txt
@@ -99,3 +102,10 @@ ssh*
 addarr.log
 .git/
 static/image_cache/*.*
+
+ruflo/
+ruflo/*.*
+
+.claudeignore
+_scratchpad/
+_scratchpad/*.*

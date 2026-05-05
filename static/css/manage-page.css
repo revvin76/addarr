@@ -1,0 +1,63 @@
+/* Manage Page — status, badges, and controls overlay */
+
+/* Status section sits inside search-result-content */
+.media-status-section {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 0.4rem;
+    margin-top: 0.4rem;
+}
+
+/* Status Badge */
+.status-badge {
+    font-size: 0.7rem !important;
+    padding: 0.25rem 0.5rem !important;
+    white-space: nowrap;
+}
+
+/* Extra Badges Container */
+.media-extra-badges {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.media-extra-badges .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap;
+}
+
+/* Manage Controls */
+.manage-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.manage-controls .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    height: 28px;
+    display: flex;
+    align-items: center;
+}
+
+.manage-controls .delete-btn {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.manage-controls .delete-btn:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* Badge colours */
+.badge.bg-success   { background-color: #28a745 !important; color: white !important; }
+.badge.bg-warning   { background-color: #ffc107 !important; color: #111  !important; }
+.badge.bg-info      { background-color: #17a2b8 !important; color: white !important; }
+.badge.bg-secondary { background-color: #6c757d !important; color: white !important; }
+.badge.bg-danger    { background-color: #dc3545 !important; color: white !important; }

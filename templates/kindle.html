@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>arrdash Books</title>
+    <style>
+        /* ── No transitions — prevents e-ink full-page refresh ── */
+        *, *::before, *::after {
+            box-sizing: border-box; margin: 0; padding: 0;
+            animation: none !important;
+            transition: none !important;
+        }
+
+        /* ── Theme variables ── */
+        :root {
+            --bg:          #fff;
+            --text:        #111;
+            --text2:       #555;
+            --border:      #ccc;
+            --card-bg:     #f4f4f4;
+            --hdr-bg:      #fff;
+            --btn-bg:      #fff;
+            --btn-border:  #555;
+            --chip-active-bg:   #111;
+            --chip-active-text: #fff;
+            --overlay-bg:  #fff;
+        }
+        [data-theme="dark"] {
+            --bg:          #111;
+            --text:        #eee;
+            --text2:       #aaa;
+            --border:      #444;
+            --card-bg:     #1e1e1e;
+            --hdr-bg:      #1a1a1a;
+            --btn-bg:      #222;
+            --btn-border:  #666;
+            --chip-active-bg:   #eee;
+            --chip-active-text: #111;
+            --overlay-bg:  #1a1a1a;
+        }
+
+        html, body {
+            height: 100%; width: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        /* ────────────────────────────────────────────────────────
+           HEADER  — 20% of viewport height
+        ──────────────────────────────────────────────────────── */
+        #header {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            height: 20vh;
+            background: var(--hdr-bg);
+            border-bottom: 2px solid var(--border);
+            display: flex; flex-direction: column;
+            justify-content: space-evenly;
+            padding: 0 14px;
+        }
+
+        #hdr-title {
+            font-size: 1.05rem; font-weight: bold; color: var(--text);
+            display: flex; align-items: center; gap: 8px;
+        }
+        #hdrCount {
+            font-size: 0.75rem; font-weight: normal; opacity: 0.6;
+        }
+
+        #hdr-row {
+            display: flex; gap: 8px; align-items: center;
+        }
+
+        #searchInput {
+            flex: 1; min-width: 0;
+            font-size: 16px;
+            padding: 8px 10px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            background: var(--btn-bg);
+            color: var(--text);
+            -webkit-appearance: none;
+            outline: none;
+        }
+
+        .hdr-btn {
+            background: var(--btn-bg);
+            border: 2px solid var(--btn-border);
+            color: var(--text);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            min-height: 42px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .hdr-btn:active { opacity: 0.6; }
+
+        #darkBtn {
+            background: var(--btn-bg);
+            border: 2px solid var(--btn-border);
+            color: var(--text);
+            border-radius: 4px;
+            padding: 0 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            min-height: 42px;
+            min-width: 42px;
+            text-align: center;
+            flex-shrink: 0;
+            line-height: 42px;
+        }
+        #darkBtn:active { opacity: 0.6; }
+
+        /* ────────────────────────────────────────────────────────
+           BOOK GRID  — between header (20vh) and bottom bar (54px)
+        ──────────────────────────────────────────────────────── */
+        #booksGrid {
+            position: fixed;
+            top: 20vh;
+            bottom: 54px;
+            left: 0; right: 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            background: var(--bg);
+        }
+
+        .book-card {
+            cursor: pointer;
+            overflow: hidden;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+        }
+        /* Remove right border on 3rd column */
+        .book-card:nth-child(3n)   { border-right: none; }
+        /* Remove bottom border on 2nd row (last row) */
+        .book-card:nth-child(n+4)  { border-bottom: none; }
+        .book-card:active { opacity: 0.65; }
+
+        .book-card-empty {
+            background: var(--bg);
+            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+        .book-card-empty:nth-child(3n)  { border-right: none; }
+        .book-card-empty:nth-child(n+4) { border-bottom: none; }
+
+        .book-cover {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* Small "AZW3 ready" badge */
+        .azw3-badge {
+            position: absolute; bottom: 5px; right: 5px;
+            background: rgba(0,0,0,0.65);
+            color: #fff;
+            font-size: 0.55rem;
+            font-family: Arial, sans-serif;
+            padding: 2px 5px;
+            border-radius: 3px;
+            letter-spacing: 0.03em;
+        }
+
+        /* ────────────────────────────────────────────────────────
+           BOTTOM BAR  — black, white top edge
+        ──────────────────────────────────────────────────────── */
+        #bottomBar {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+            height: 54px;
+            background: #000;
+            border-top: 3px solid #fff;
+            display: flex; align-items: center;
+            padding: 0 12px;
+        }
+
+        #backBtn {
+            color: #fff;
+            font-size: 0.82rem;
+            text-decoration: none;
+            white-space: nowrap;
+            flex-shrink: 0;
+            padding: 6px 0;
+        }
+        #backBtn:active { opacity: 0.7; }
+
+        #pageNav {
+            flex: 1;
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+        }
+
+        .nav-btn {
+            background: none;
+            border: 2px solid #fff;
+            color: #fff;
+            border-radius: 4px;
+            padding: 4px 14px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            min-height: 36px;
+        }
+        .nav-btn:disabled { opacity: 0.25; cursor: default; }
+        .nav-btn:active { background: #333; }
+
+        #pageInfo {
+            color: #ccc;
+            font-size: 0.78rem;
+            white-space: nowrap;
+            min-width: 54px;
+            text-align: center;
+        }
+
+        /* Right placeholder (reserved) */
+        #barRight { flex-shrink: 0; width: 90px; }
+
+        /* ────────────────────────────────────────────────────────
+           FILTER OVERLAY  — slides up from header bottom
+        ──────────────────────────────────────────────────────── */
+        #filterOverlay {
+            display: none;
+            position: fixed;
+            top: 20vh; bottom: 54px;
+            left: 0; right: 0;
+            z-index: 200;
+            background: var(--overlay-bg);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            border-top: 2px solid var(--border);
+        }
+        #filterOverlay.open { display: block; }
+
+        .fo-section {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+        .fo-label {
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text2);
+            margin-bottom: 8px;
+        }
+        .fo-chips {
+            display: flex; flex-wrap: wrap; gap: 6px;
+        }
+        .fo-chip {
+            font-size: 0.75rem;
+            padding: 6px 13px;
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            background: var(--btn-bg);
+            color: var(--text);
+            cursor: pointer;
+            min-height: 34px;
+        }
+        .fo-chip:active { opacity: 0.6; }
+        .fo-chip.active {
+            background: var(--chip-active-bg);
+            color: var(--chip-active-text);
+            border-color: var(--chip-active-bg);
+        }
+
+        .fo-input {
+            width: 100%;
+            font-size: 15px;
+            padding: 8px 10px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            background: var(--btn-bg);
+            color: var(--text);
+            -webkit-appearance: none;
+            outline: none;
+        }
+
+        .fo-actions {
+            display: flex; gap: 10px;
+            padding: 14px;
+        }
+        .fo-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 0.9rem;
+            border: 2px solid var(--btn-border);
+            border-radius: 4px;
+            background: var(--btn-bg);
+            color: var(--text);
+            cursor: pointer;
+            min-height: 46px;
+        }
+        .fo-btn:active { opacity: 0.6; }
+        .fo-btn.primary {
+            background: var(--chip-active-bg);
+            color: var(--chip-active-text);
+            border-color: var(--chip-active-bg);
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────── -->
+<div id="header">
+    <div id="hdr-title">
+        &#128218; arrdash Books
+        <span id="hdrCount"></span>
+    </div>
+    <div id="hdr-row">
+        <input type="text" id="searchInput"
+               placeholder="Search title, author, genre&hellip;"
+               autocomplete="off" autocorrect="off"
+               autocapitalize="off" spellcheck="false">
+        <button class="hdr-btn" onclick="toggleFilters()">&#9776; Filters</button>
+        <button id="darkBtn" onclick="toggleDark()">&#9788;</button>
+    </div>
+</div>
+
+<!-- ── Book grid ────────────────────────────────────────────── -->
+<div id="booksGrid"></div>
+
+<!-- ── Bottom bar ──────────────────────────────────────────── -->
+<div id="bottomBar">
+    <a href="/" id="backBtn">&#8592; Back to arrdash</a>
+    <div id="pageNav">
+        <button class="nav-btn" id="prevBtn" onclick="changePage(-1)" disabled>&#8249;</button>
+        <span id="pageInfo"></span>
+        <button class="nav-btn" id="nextBtn" onclick="changePage(1)"  disabled>&#8250;</button>
+    </div>
+    <div id="barRight"></div>
+</div>
+
+<!-- ── Filter overlay ───────────────────────────────────────── -->
+<div id="filterOverlay">
+    <!-- Genre -->
+    <div class="fo-section">
+        <div class="fo-label">Genre</div>
+        <div class="fo-chips" id="genreChips">
+            <button class="fo-chip active" data-v="all">All</button>
+            {% for g in genres %}
+            <button class="fo-chip" data-v="{{ g|e }}">{{ g|e }}</button>
+            {% endfor %}
+        </div>
+    </div>
+    <!-- Year -->
+    <div class="fo-section">
+        <div class="fo-label">Year</div>
+        <div class="fo-chips" id="yearChips">
+            <button class="fo-chip active" data-v="all">All</button>
+            {% for y in years %}
+            <button class="fo-chip" data-v="{{ y }}">{{ y }}</button>
+            {% endfor %}
+        </div>
+    </div>
+    <!-- Author -->
+    <div class="fo-section">
+        <div class="fo-label">Author</div>
+        <input type="text" class="fo-input" id="authorInput"
+               placeholder="Filter by author&hellip;"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <!-- Title -->
+    <div class="fo-section">
+        <div class="fo-label">Title</div>
+        <input type="text" class="fo-input" id="titleInput"
+               placeholder="Filter by title&hellip;"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <!-- Size -->
+    <div class="fo-section">
+        <div class="fo-label">File Size</div>
+        <div class="fo-chips" id="sizeChips">
+            <button class="fo-chip active" data-v="all">All</button>
+            <button class="fo-chip" data-v="small">Small (&lt;5 MB)</button>
+            <button class="fo-chip" data-v="medium">Medium (5–20 MB)</button>
+            <button class="fo-chip" data-v="large">Large (&gt;20 MB)</button>
+        </div>
+    </div>
+    <!-- Actions -->
+    <div class="fo-actions">
+        <button class="fo-btn" onclick="resetFilters()">Reset</button>
+        <button class="fo-btn primary" onclick="applyAndClose()">Apply</button>
+    </div>
+</div>
+
+<script>
+/* ── Book data from server ─────────────────────────────────────────────────── */
+var ALL_BOOKS = [
+    {% for book in books %}
+    {
+        id:       {{ book.id }},
+        title:    {{ (book.title or book.filename or '')|tojson }},
+        author:   {{ (book.author  or '')|tojson }},
+        genre:    {{ (book.genre   or '')|tojson }},
+        year:     {{ book.year     or 'null' }},
+        size:     {{ book.file_size or 0 }},
+        azw3:     {{ 'true' if book.has_azw3 else 'false' }},
+        tl:       {{ ((book.title  or book.filename or '')|lower)|tojson }},
+        al:       {{ ((book.author or '')|lower)|tojson }},
+        gl:       {{ ((book.genre  or '')|lower)|tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+var PER_PAGE   = 6;
+var curPage    = 0;
+var filtered   = ALL_BOOKS.slice();
+var filterOpen = false;
+
+/* active filter state */
+var fSearch = '', fTitle = '', fAuthor = '';
+var fGenre  = 'all', fYear = 'all', fSize = 'all';
+
+/* ── HTML escape ─────────────────────────────────────────────────────────── */
+function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Dark-mode ───────────────────────────────────────────────────────────── */
+var dark = false;
+try { dark = (localStorage.getItem('k_dark') === '1'); } catch(e) {}
+function _applyTheme() {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    document.getElementById('darkBtn').innerHTML = dark ? '&#9790;' : '&#9788;';
+}
+_applyTheme();
+function toggleDark() {
+    dark = !dark;
+    _applyTheme();
+    try { localStorage.setItem('k_dark', dark ? '1' : '0'); } catch(e) {}
+}
+
+/* ── Grid rendering ──────────────────────────────────────────────────────── */
+function renderGrid() {
+    var grid  = document.getElementById('booksGrid');
+    var start = curPage * PER_PAGE;
+    var page  = filtered.slice(start, start + PER_PAGE);
+    var html  = '';
+
+    for (var i = 0; i < PER_PAGE; i++) {
+        var b = page[i];
+        if (!b) { html += '<div class="book-card book-card-empty"></div>'; continue; }
+        html += '<div class="book-card" onclick="openBook(' + b.id + ')">' +
+                '<img class="book-cover"' +
+                ' src="/api/book/cover/' + b.id + '?w=260&h=390"' +
+                ' alt="' + esc(b.title) + '"' +
+                ' onerror="this.onerror=null;this.src=\'/static/images/apple-touch-icon.png\'">' +
+                (b.azw3 ? '<span class="azw3-badge">AZW3</span>' : '') +
+                '</div>';
+    }
+
+    grid.innerHTML = html;
+
+    var total = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+    document.getElementById('pageInfo').textContent = (curPage + 1) + ' / ' + total;
+    document.getElementById('prevBtn').disabled = (curPage === 0);
+    document.getElementById('nextBtn').disabled = ((curPage + 1) >= total);
+    document.getElementById('hdrCount').textContent =
+        filtered.length === ALL_BOOKS.length
+            ? '(' + ALL_BOOKS.length + ')'
+            : '(' + filtered.length + ' / ' + ALL_BOOKS.length + ')';
+}
+
+function openBook(id) { window.location.href = '/kindle/book/' + id; }
+
+function changePage(dir) {
+    var total = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+    var next  = curPage + dir;
+    if (next < 0 || next >= total) return;
+    curPage = next;
+    renderGrid();
+}
+
+/* ── Filter logic ────────────────────────────────────────────────────────── */
+function _compute() {
+    fSearch = document.getElementById('searchInput').value.toLowerCase().trim();
+    fAuthor = document.getElementById('authorInput').value.toLowerCase().trim();
+    fTitle  = document.getElementById('titleInput').value.toLowerCase().trim();
+
+    filtered = ALL_BOOKS.filter(function(b) {
+        if (fSearch && b.tl.indexOf(fSearch) === -1 &&
+                       b.al.indexOf(fSearch) === -1 &&
+                       b.gl.indexOf(fSearch) === -1) return false;
+        if (fTitle  && b.tl.indexOf(fTitle)  === -1) return false;
+        if (fAuthor && b.al.indexOf(fAuthor) === -1) return false;
+        if (fGenre !== 'all' && b.gl.indexOf(fGenre.toLowerCase()) === -1) return false;
+        if (fYear  !== 'all' && String(b.year) !== String(fYear)) return false;
+        if (fSize  !== 'all') {
+            var mb = b.size / 1048576;
+            if (fSize === 'small'  && mb >= 5)          return false;
+            if (fSize === 'medium' && (mb < 5 || mb >= 20)) return false;
+            if (fSize === 'large'  && mb < 20)          return false;
+        }
+        return true;
+    });
+    curPage = 0;
+    renderGrid();
+}
+
+function applyAndClose() {
+    _compute();
+    if (filterOpen) toggleFilters();
+}
+
+function resetFilters() {
+    fGenre = 'all'; fYear = 'all'; fSize = 'all';
+    document.getElementById('searchInput').value = '';
+    document.getElementById('authorInput').value = '';
+    document.getElementById('titleInput').value  = '';
+    _setChip('genreChips', 'all');
+    _setChip('yearChips',  'all');
+    _setChip('sizeChips',  'all');
+    _compute();
+    if (filterOpen) toggleFilters();
+}
+
+function toggleFilters() {
+    filterOpen = !filterOpen;
+    document.getElementById('filterOverlay').className = filterOpen ? 'open' : '';
+}
+
+/* ── Chip helper ─────────────────────────────────────────────────────────── */
+function _setChip(id, val) {
+    var btns = document.getElementById(id).getElementsByTagName('button');
+    for (var i = 0; i < btns.length; i++) {
+        btns[i].className = btns[i].getAttribute('data-v') === val ? 'fo-chip active' : 'fo-chip';
+    }
+}
+
+function _wireChips(id, setter) {
+    document.getElementById(id).addEventListener('click', function(e) {
+        var btn = e.target;
+        if (btn.tagName !== 'BUTTON') return;
+        var v = btn.getAttribute('data-v');
+        setter(v);
+        _setChip(id, v);
+    });
+}
+_wireChips('genreChips', function(v) { fGenre = v; });
+_wireChips('yearChips',  function(v) { fYear  = v; });
+_wireChips('sizeChips',  function(v) { fSize  = v; });
+
+/* Search box: trigger on Enter */
+document.getElementById('searchInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.keyCode === 13) { _compute(); }
+});
+
+/* ── Hardware page-turn keys ─────────────────────────────────────────────── */
+document.addEventListener('keydown', function(e) {
+    if (filterOpen) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown'  || e.key === 'PageDown') changePage(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp'    || e.key === 'PageUp')   changePage(-1);
+});
+
+/* ── Swipe ───────────────────────────────────────────────────────────────── */
+var _sx = 0;
+document.addEventListener('touchstart', function(e) { _sx = e.touches[0].clientX; }, {passive:true});
+document.addEventListener('touchend',   function(e) {
+    if (filterOpen) return;
+    var dx = e.changedTouches[0].clientX - _sx;
+    if (Math.abs(dx) > 60) changePage(dx < 0 ? 1 : -1);
+});
+
+/* ── Init ────────────────────────────────────────────────────────────────── */
+renderGrid();
+</script>
+</body>
+</html>

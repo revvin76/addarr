@@ -3,212 +3,240 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Media - Addarr</title>
+    <title>Manage {{ view_label }} - arrdash</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/styles.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
-
-    // Lazy loading configuration
-    let lazyLoadConfig = {
-        batchSize: 20,
-        currentBatch: 0,
-        isLoading: false,
-        observer: null
-    };
-
-    // Initialize lazy loading
-    function initLazyLoading() {
-        const mediaItems = document.querySelectorAll('.media-item');
-        if (mediaItems.length === 0) return;
-
-        // Load first batch immediately
-        loadNextBatch();
-
-        // Set up intersection observer for infinite scroll
-        if ('IntersectionObserver' in window) {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting && !lazyLoadConfig.isLoading) {
-                        loadNextBatch();
-                    }
-                });
-            }, {
-                rootMargin: '100px 0px' // Load 100px before entering viewport
-            });
-
-            // Observe the last item to trigger loading more
-            if (mediaItems.length > 0) {
-                observer.observe(mediaItems[mediaItems.length - 1]);
-            }
-
-            lazyLoadConfig.observer = observer;
-        } else {
-            // Fallback: load all if IntersectionObserver not supported
-            console.warn('IntersectionObserver not supported, loading all images');
-            loadAllImages();
+    function startProgressiveLoading(initialBatches = 1) {
+        const items = [...document.querySelectorAll('.media-item')];
+        if (!items.length) {
+            return {
+                initial: Promise.resolve(),
+                complete: Promise.resolve()
+            };
         }
-    }
-
-    function loadNextBatch() {
-        if (lazyLoadConfig.isLoading) return;
-        
-        lazyLoadConfig.isLoading = true;
-        const mediaItems = document.querySelectorAll('.media-item');
-        const startIndex = lazyLoadConfig.currentBatch * lazyLoadConfig.batchSize;
-        const endIndex = startIndex + lazyLoadConfig.batchSize;
-
-        console.log(`Loading batch ${lazyLoadConfig.currentBatch + 1}: items ${startIndex}-${endIndex}`);
-
-        for (let i = startIndex; i < endIndex && i < mediaItems.length; i++) {
-            const item = mediaItems[i];
-            loadImageForItem(item);
-        }
-
-        lazyLoadConfig.currentBatch++;
-        lazyLoadConfig.isLoading = false;
-
-        // Update observer to watch the new last item
-        if (lazyLoadConfig.observer && endIndex < mediaItems.length) {
-            lazyLoadConfig.observer.observe(mediaItems[endIndex - 1]);
-        }
-    }
-
-    function loadImageForItem(item) {
-        const img = item.querySelector('.manage-result-thumbnail');
-        if (!img) return;
-
-        const dataSrc = img.getAttribute('data-src');
-        if (dataSrc && !img.src.includes(dataSrc)) {
-            img.src = dataSrc;
-        }
-    }
-
-    function loadAllImages() {
-        const images = document.querySelectorAll('.manage-result-thumbnail[data-src]');
-        images.forEach(img => {
-            img.src = img.getAttribute('data-src');
+        let batchStart = 0;
+        const BATCH = 16;
+        const IMAGE_TIMEOUT_MS = 1800;
+        let loadedBatches = 0;
+        let resolveInitial;
+        const initial = new Promise(resolve => {
+            resolveInitial = resolve;
         });
+
+        function loadBatch() {
+            const slice = items.slice(batchStart, batchStart + BATCH);
+            if (!slice.length) {
+                if (resolveInitial) {
+                    resolveInitial();
+                    resolveInitial = null;
+                }
+                return Promise.resolve();
+            }
+            batchStart += BATCH;
+
+            const promises = slice.flatMap(item =>
+                [...item.querySelectorAll('img[data-src]')].map(img => {
+                    const src = img.getAttribute('data-src');
+                    if (!src || img.dataset.loaded === 'true') return Promise.resolve();
+                    return new Promise(resolve => {
+                        let settled = false;
+                        const finish = () => {
+                            if (settled) return;
+                            settled = true;
+                            img.dataset.loaded = 'true';
+                            resolve();
+                        };
+                        const timer = setTimeout(finish, IMAGE_TIMEOUT_MS);
+                        img.onload = () => {
+                            clearTimeout(timer);
+                            finish();
+                        };
+                        img.onerror = () => {
+                            clearTimeout(timer);
+                            finish();
+                        };
+                        img.src = src;
+                    });
+                })
+            );
+
+            return Promise.all(promises).then(() => {
+                loadedBatches += 1;
+                if (resolveInitial && loadedBatches >= initialBatches) {
+                    resolveInitial();
+                    resolveInitial = null;
+                }
+                return loadBatch();
+            });
+        }
+
+        const complete = loadBatch();
+        return { initial, complete };
     }
-    
+
+    function buildAzNav() {
+        const letters = document.getElementById('azLetters');
+        if (!letters) return;
+        const used = new Set();
+        document.querySelectorAll('.media-item[data-title]').forEach(item => {
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
+            const c = t.charAt(0);
+            if (/[0-9]/.test(c)) used.add('0');
+            else if (/[a-z]/i.test(c)) used.add(c.toLowerCase());
+        });
+        const chars = ['0', ...'abcdefghijklmnopqrstuvwxyz'];
+        letters.innerHTML = chars.map(c => {
+            const label = c === '0' ? '0-9' : c.toUpperCase();
+            const active = used.has(c);
+            return `<button class="az-btn" ${active ? `onclick="scrollToMediaLetter('${c}')"` : 'disabled'}>${label}</button>`;
+        }).join('');
+    }
+
+    function toggleAzNav() {
+        const isOpen = document.getElementById('azLetters').classList.toggle('open');
+        document.getElementById('azToggle').classList.toggle('az-active', isOpen);
+    }
+
+    function scrollToMediaLetter(letter) {
+        for (const item of document.querySelectorAll('.media-item[data-title]')) {
+            if (item.style.display === 'none') continue;
+            const t = (item.dataset.title || '').replace(/^(the |a |an )\s+/i, '').trim();
+            const c = t.charAt(0).toLowerCase();
+            const match = letter === '0' ? /[0-9]/.test(c) : c === letter;
+            if (match) {
+                document.getElementById('azLetters').classList.remove('open');
+                document.getElementById('azToggle').classList.remove('az-active');
+                item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+        }
+    }
     </script>
 </head>
+<body class="manage-library-page{% if source_home and open_id %} manage-library-page--home-launch app-header-hidden{% endif %}" data-manage-view="{{ manage_view }}" data-home-launch="{{ 'true' if source_home and open_id else 'false' }}">
+    <div id="globalLoadingSpinner" class="loading-spinner show">
+        <div class="loading-spinner__panel">
+            <button id="forceCloseSpinner" class="btn-close btn-close-white force-close-spinner-hidden loading-spinner__close"></button>
+            <div class="loading-spinner__logo" aria-hidden="true">
+                <span class="loading-spinner__triangle loading-spinner__triangle--left"></span>
+                <span class="loading-spinner__triangle loading-spinner__triangle--top"></span>
+                <span class="loading-spinner__triangle loading-spinner__triangle--bottom"></span>
+                <span class="loading-spinner__plus loading-spinner__plus--h"></span>
+                <span class="loading-spinner__plus loading-spinner__plus--v"></span>
+            </div>
+        </div>
+    </div>
+    {% include 'partials/navbar.html' %}
 
-<body>
-    <!-- Logo and Header -->
-    <div class="container-fluid bg-dark py-2">
-        <div class="container d-flex align-items-center">
-            <a href="/" class="d-flex align-items-center text-decoration-none me-auto">
-                <img src="/static/images/logo.png" alt="Addarr Logo" height="40" class="me-2">
-            </a>
-            
-            <div class="d-flex gap-2">
+    <div class="page-sticky-controls manage-library-controls" id="stickyControls">
+        <div class="container manage-library-controls__inner">
+            <input type="hidden" id="mediaFilter" value="{{ manage_view }}">
 
-                <a href="/" class="btn btn-outline-radarr me-2"><i class="fas fa-arrow-left"></i></a>
+            <div class="manage-library-tabs" role="tablist" aria-label="{{ view_label }} filters">
+                <button class="manage-library-tab is-active" type="button" data-manage-filter="all">All</button>
+                <button class="manage-library-tab" type="button" data-manage-filter="missing">Missing</button>
+                <button class="manage-library-tab" type="button" data-manage-filter="available">
+                    {% if manage_view == 'movie' %}Available{% else %}Complete{% endif %}
+                </button>
+                <button class="manage-library-tab" type="button" data-manage-filter="unmonitored">Unmonitored</button>
+            </div>
 
-                <!-- Authentication Button -->
-                {% if config.auth.enabled %}
-                    {% if session.get('authenticated') %}
-                        <a href="/logout" class="btn btn-outline-radarr me-2" title="Logout">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </a>
+            <div class="manage-library-searchbar">
+                <span class="manage-library-searchbar__icon"><i class="fas fa-magnifying-glass"></i></span>
+                <input type="text"
+                       id="searchInput"
+                       class="manage-library-searchbar__input"
+                       placeholder="Search the {{ media_total }} {{ 'movies' if manage_view == 'movie' else 'shows' }} in your library">
+                <button type="button" class="manage-library-searchbar__clear" id="clearSearch" disabled aria-label="Clear search">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="manage-library-toolbar">
+                <button class="btn btn-outline-secondary btn-sm flex-shrink-0" id="azToggle" type="button" onclick="toggleAzNav()">
+                    <i class="fas fa-arrow-down-a-z me-1"></i>A-Z
+                </button>
+                <div id="azLetters" class="flex-grow-1"></div>
+                <button id="backToTop" class="btn btn-outline-secondary btn-sm btn-back-to-top" type="button"
+                        title="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="manage-library-main">
+        <div class="container manage-library-shell">
+            <section class="manage-library-list" id="mediaGrid" aria-label="{{ view_label }} library">
+                {% for item in media %}
+                    {% if item.media_type == 'movie' %}
+                        {% set external_id = item.tmdbId %}
+                        {% set file_state = 'available' if item.hasFile else 'missing' %}
+                        {% set meta_secondary = item.quality or item.certification or item.status or 'Library' %}
+                        {% set runtime_label = (item.runtime ~ 'm') if item.runtime else '' %}
                     {% else %}
-                        <a href="/login" class="btn btn-outline-warning me-2" title="Login">
-                            <i class="fas fa-sign-in-alt"></i>
-                        </a>
+                        {% set external_id = item.tvdbId %}
+                        {% set ep_total = item.statistics.episodeCount or 0 %}
+                        {% set ep_got = item.statistics.episodeFileCount or 0 %}
+                        {% set file_state = 'available' if ep_total > 0 and ep_got >= ep_total else 'missing' %}
+                        {% set meta_secondary = item.status or ((item.statistics.seasonCount or 0) ~ ' seasons') %}
+                        {% set runtime_label = (ep_got ~ '/' ~ ep_total ~ ' eps') if ep_total else ((item.statistics.seasonCount or 0) ~ ' seasons') %}
                     {% endif %}
-                {% endif %}                
-            </div>
-        </div>
-    </div>
 
-    <div class="container mt-4">
+                    <article class="media-item {{ item.media_type }}-item result-item results-listing results-listing--{{ item.media_type }}"
+                             data-title="{{ item.title|lower }}"
+                             data-id="{{ external_id }}"
+                             data-internal-id="{{ item.id }}"
+                             data-media-type="{{ item.media_type }}"
+                             data-missing-files="{{ 'true' if item.media_type == 'movie' and not item.hasFile else 'false' }}"
+                             data-missing-episodes="{{ 'true' if item.media_type == 'tv' and file_state == 'missing' else 'false' }}"
+                             data-filter-state="{{ file_state }}"
+                             data-monitored="{{ 'true' if item.monitored else 'false' }}"
+                             onclick="showManageDetails('{{ item.media_type }}', '{{ external_id }}', {{ item.id }})">
 
-        <!-- Filter and Search Controls -->
-        <div class="row mb-4">
-            <div class="col-md-6 mb-2">
-                <div class="input-group">
-                    <span class="btn btn-primary input-group-text">
-                        <i class="fas fa-filter"></i>
-                    </span>
-                    <select id="mediaFilter" class="form-select">
-                        <option value="all">All Media</option>
-                        <option value="movie">Movies Only</option>
-                        <option value="tv">TV Shows Only</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="input-group">
-                    <input type="text" id="searchInput" class="form-control" placeholder="Search media...">
-                    <!-- Clear button -->
-                    <button type="button" class="btn btn-outline-danger" id="clearSearch" disabled>
-                        <i class="fas fa-times"></i>
-                    </button> 
-                    <button class="btn btn-primary" id="searchButton">
-                        <i class="fas fa-search"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Media Grid -->
-        <div class="row" id="mediaGrid">
-            {% for item in media %}
-                <div class="col-12 mb-3 media-item {% if item.media_type == 'movie' %}movie-item{% else %}tv-item{% endif %}" 
-                    data-title="{{ item.title|lower }}" 
-                    data-id="{% if item.media_type == 'movie' %}{{ item.tmdbId }}{% else %}{{ item.tvdbId }}{% endif %}" 
-                    onclick="showManageDetails('{{ item.media_type }}', {% if item.media_type == 'movie' %}{{ item.tmdbId }}{% else %}{{ item.tvdbId }}{% endif %}, {{ item.id }})">
-                    
-                    <div class="manage-result-card h-100 d-flex {% if item.media_type == 'movie' %}movie-card{% else %}tv-card{% endif %}">
-                            <!-- Watermark Icon -->
-                        <div class="watermark-icon position-absolute">
-                            {% if item.media_type == 'movie' %}
-                                <i class="fas fa-film"></i>
-                            {% else %}
-                                <i class="fas fa-tv"></i>
-                            {% endif %}
+                        <div class="results-listing__poster-wrap">
+                            <img data-src="{% if item.remotePoster %}{{ item.remotePoster | imgproxy(220, 330, item.title) }}{% else %}/static/images/apple-touch-icon.png{% endif %}"
+                                 src="/static/images/placeholder.png"
+                                 class="results-listing__poster manage-result-thumbnail"
+                                 alt="{{ item.title }}"
+                                 onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
                         </div>
 
-                        <!-- Thumbnail container - smaller on left -->
-                        <div class="manage-result-thumbnail-container me-3" style="width: 100px; flex-shrink: 0;">
-                            <img data-src="{% if item.images %}{% for image in item.images %}{% if image.coverType == 'poster' %}{{ image.remoteUrl }}{% endif %}{% endfor %}{% endif %}{% if not item.images or not item.images|selectattr('coverType', 'equalto', 'poster')|list %}/static/images/apple-touch-icon.png{% endif %}" 
-                                src="/static/images/placeholder.png"  
-                                class="manage-result-thumbnail h-100 w-100 object-fit-cover"
-                                alt="{{ item.title }}"
-                                onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                        </div>
-                        
-                        <!-- Card content - on right of thumbnail -->
-                        <div class="manage-result-content flex-grow-1 d-flex flex-column justify-content-between">
-                            <div>
-                                <h5 class="text-white mb-1">
-                                    {{ item.title }}
-                                </h5>
-                                <div class="d-flex align-items-center mb-1">
-                                    <span class="text-xs me-2">{{ item.year }}</span>
-                                    {% if item.certification %}
-                                    <span class="badge bg-dark text-white me-2">{{ item.certification }}</span>
-                                    {% endif %}
-                                    <span class="text-xs">
-                                        {% if item.media_type == 'movie' %}
-                                            {{ item.runtime }} min
-                                        {% else %}
-                                            {{ item.statistics.seasonCount }} seasons
-                                        {% endif %}
-                                    </span>
-                                </div>
-                                <p class="text-xs mb-2 line-clamp-2">{{ item.overview|truncate(120) }}</p>
+                        <div class="results-listing__body">
+                            <div class="results-listing__head">
+                                <h2 class="results-listing__title">{{ item.title }}</h2>
+                                <button class="results-listing__menu" type="button" aria-label="Open {{ item.title }} details"
+                                        onclick="event.stopPropagation(); showManageDetails('{{ item.media_type }}', '{{ external_id }}', {{ item.id }})">
+                                    <i class="fas fa-ellipsis-vertical"></i>
+                                </button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
 
-    <!-- Modal for confirmation -->
+                            <div class="results-listing__meta">
+                                <span class="results-listing__year">{{ item.year or 'Unknown' }}</span>
+                                <span class="results-listing__status {{ 'is-library' if file_state == 'available' else 'is-missing' }}">
+                                    {{ 'Available' if file_state == 'available' else 'Missing' }}
+                                </span>
+                            </div>
+
+                            <p class="results-listing__overview">
+                                {% if item.media_type == 'movie' %}
+                                    {{ runtime_label or 'Runtime unavailable' }}
+                                {% else %}
+                                    {{ (item.statistics.episodeFileCount or 0) ~ '/' ~ (item.statistics.episodeCount or 0) ~ ' episodes' }}
+                                {% endif %}
+                                {% if item.certification %}
+                                    · {{ item.certification }}
+                                {% endif %}
+                            </p>
+                        </div>
+                    </article>
+                {% endfor %}
+            </section>
+        </div>
+    </main>
+
     <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -227,7 +255,6 @@
         </div>
     </div>
 
-    <!-- Modal for details -->
     <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -236,90 +263,105 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="detailsContent">
-                Loading...
+                    Loading...
                 </div>
-                <!-- <div class="modal-footer">
-                    <button class="btn btn-danger" id="deleteShowBtn">Delete Show</button>
-                    <button class="btn btn-warning" id="deleteAllFilesBtn">Delete All Files</button>
-                    <button class="btn btn-primary" id="searchAllMissingBtn">Search All Missing</button>
-                </div> -->
             </div>
         </div>
-    </div>
-
-    <div class="d-flex justify-content-center">
-        <div class="spinner-border spinner-radarr" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    </div>
-
-    <div id="backToTop" class="back-to-top">
-        <i class="fas fa-chevron-up"></i>
     </div>
 
     <div id="overlay-backdrop" class="overlay-backdrop"></div>
     <div id="modal-overlay-backdrop" class="overlay-backdrop modal-overlay-backdrop"></div>
-    <div class="spinner-border spinner-radarr" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>  
-    
-    <!-- Global Loading Spinner -->
-    <div id="globalLoadingSpinner" class="loading-spinner">
-        <div class="spinner-container">
-            <button id="forceCloseSpinner" class="btn-close btn-close-white mt-3" style="display: none;"></button>
-            <div class="spinner-border spinner-radarr" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
-        </div>
-    </div>  
-    
+
     <script>
-    // Register service worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/static/sw.js')
-            .then(registration => {
-                console.log('ServiceWorker registration successful');
-            })
-            .catch(err => {
-                console.log('ServiceWorker registration failed: ', err);
-            });
+            .then(() => console.log('ServiceWorker registration successful'))
+            .catch(err => console.log('ServiceWorker registration failed: ', err));
         });
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded, initializing manage page...');
-        
-        initializeMediaGrid();
-        
-        // Initialize lazy loading first
-        initLazyLoading();
-        
-        // Initialize clear search
-        initializeClearSearch();
-        
-        // Set up event listeners for filtering and search
-        const mediaFilter = document.getElementById('mediaFilter');
-        const searchButton = document.getElementById('searchButton');
-        
-        if (mediaFilter) {
-            mediaFilter.addEventListener('change', updateMediaDisplay);
-        }
-        
-        if (searchButton) {
-            searchButton.addEventListener('click', updateMediaDisplay);
-        }
-        
-        // Initial display update
-        updateMediaDisplay();
-});
+        const params = new URLSearchParams(window.location.search);
+        const openId = params.get('open');
+        const launchSource = params.get('source');
+        const openSource = params.get('openSource') || '';
+        const homeContext = {
+            plexId: params.get('plexId') || '',
+            plexTitle: params.get('plexTitle') || '',
+            plexYear: params.get('plexYear') || ''
+        };
+        const openType = params.get('view') || params.get('type') || '{{ manage_view }}';
+        const isHomeLaunch = launchSource === 'home' && !!openId;
 
+        if (!isHomeLaunch) {
+            // Normal manage page behavior
+            initializeClearSearch();
+            buildAzNav();
+            const progressiveLoad = startProgressiveLoading(1);
+            if (window.trackGlobalLoading) {
+                window.trackGlobalLoading(progressiveLoad.initial, 'Loading thumbnails...');
+            } else {
+                progressiveLoad.initial.catch(() => {});
+            }
+
+            document.querySelectorAll('[data-manage-filter]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('[data-manage-filter]').forEach(tab => tab.classList.remove('is-active'));
+                    this.classList.add('is-active');
+                    updateMediaDisplay();
+                });
+            });
+
+            updateMediaDisplay();
+        }
+
+        window.addEventListener('scroll', function() {
+            const backToTop = document.getElementById('backToTop');
+            if (backToTop) {
+                backToTop.classList.toggle('show', window.pageYOffset > 200);
+            }
+        });
+
+        if (isHomeLaunch) {
+            const card = document.querySelector(`.media-item[data-id="${openId}"]`)
+                || (openSource === 'sonarr' ? document.querySelector(`.media-item[data-internal-id="${openId}"]`) : null);
+            let releaseLaunchGate = null;
+            if (window.trackGlobalLoading) {
+                window.trackGlobalLoading(new Promise(resolve => {
+                    releaseLaunchGate = resolve;
+                }), 'Loading details...');
+            }
+            const modalEl = document.getElementById('detailsModal');
+            if (modalEl) {
+                modalEl.addEventListener('hidden.bs.modal', function onHomeLaunchClose() {
+                    modalEl.removeEventListener('hidden.bs.modal', onHomeLaunchClose);
+                    window.location.href = '/';
+                });
+            }
+
+            setTimeout(() => {
+                if (card) {
+                    const mtype = card.dataset.mediaType || openType;
+                    const iid = card.dataset.internalId || card.dataset.dbId || '';
+                    const posterEl = card.querySelector('.results-listing__poster');
+                    const enrichedContext = Object.assign({}, homeContext, {
+                        posterSrc: posterEl?.dataset?.src || posterEl?.getAttribute('data-src') || posterEl?.currentSrc || posterEl?.src || '',
+                        backdropSrc: posterEl?.dataset?.src || posterEl?.getAttribute('data-src') || posterEl?.currentSrc || posterEl?.src || ''
+                    });
+                    showManageDetails(mtype, openId, parseInt(iid) || iid, openSource, enrichedContext);
+                } else {
+                    showManageDetails(openType, openId, openId, openSource, homeContext);
+                }
+                if (releaseLaunchGate) {
+                    releaseLaunchGate();
+                }
+            }, 100);
+        }
+    });
     </script>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>    
-
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

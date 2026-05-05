@@ -1,0 +1,111 @@
+EXACT CHANGES MADE TO C:\addarr\DEV\routes.py
+==============================================
+
+Total Lines Changed: 9
+Total Fixes: 8 code changes + 1 import addition
+
+FILE: C:\addarr\DEV\routes.py
+
+========== CHANGE 1: Import Statement ==========
+LINE: 16
+TYPE: Addition (after line 15: "import io, requests as req")
+
+ADDED:
+from urllib.parse import quote
+
+
+========== CHANGE 2: Movies Endpoint - Radarr Fallback ==========
+LINE: 2269
+TYPE: URL Encoding Fix
+
+BEFORE:
+'poster': f"/api/img?url={requests.utils.quote(m.get('remotePoster', ''))}&w=150&h=225&t={requests.utils.quote(m.get('title', ''))}" if m.get('remotePoster') else '/static/images/apple-touch-icon.png',
+
+AFTER:
+'poster': f"/api/img?url={quote(m.get('remotePoster', ''))}&w=150&h=225&t={quote(m.get('title', ''))}" if m.get('remotePoster') else '/static/images/apple-touch-icon.png',
+
+CHANGE: requests.utils.quote(...) → quote(...)  (2 replacements on line)
+
+
+========== CHANGE 3: Movies Endpoint - Plex Fallback - API Params ==========
+LINE: 2287
+TYPE: Add limit parameter
+
+BEFORE:
+                    params={'type': 1},  # type=1 for movies
+
+AFTER:
+                    params={'type': 1, 'limit': 20},  # type=1 for movies, limit to 20
+
+
+========== CHANGE 4: Movies Endpoint - Plex Fallback - URL Encoding ==========
+LINE: 2302
+TYPE: URL Encoding Fix
+
+BEFORE:
+                            'poster': f"/api/img?url={requests.utils.quote(poster_url)}&w=150&h=225&t={requests.utils.quote(video.get('title', ''))}" if poster_url else '/static/images/apple-touch-icon.png',
+
+AFTER:
+                            'poster': f"/api/img?url={quote(poster_url)}&w=150&h=225&t={quote(video.get('title', ''))}" if poster_url else '/static/images/apple-touch-icon.png',
+
+CHANGE: requests.utils.quote(...) → quote(...)  (2 replacements on line)
+
+
+========== CHANGE 5: TV Endpoint - Sonarr Fallback ==========
+LINE: 2332
+TYPE: URL Encoding Fix
+
+BEFORE:
+                            'poster': f"/api/img?url={requests.utils.quote(s.get('remotePoster', ''))}&w=150&h=225&t={requests.utils.quote(s.get('title', ''))}" if s.get('remotePoster') else '/static/images/apple-touch-icon.png',
+
+AFTER:
+                            'poster': f"/api/img?url={quote(s.get('remotePoster', ''))}&w=150&h=225&t={quote(s.get('title', ''))}" if s.get('remotePoster') else '/static/images/apple-touch-icon.png',
+
+CHANGE: requests.utils.quote(...) → quote(...)  (2 replacements on line)
+
+
+========== CHANGE 6: TV Endpoint - Plex Fallback - API Params ==========
+LINE: 2351
+TYPE: Add limit parameter
+
+BEFORE:
+                    params={'type': 2},  # type=2 for TV shows
+
+AFTER:
+                    params={'type': 2, 'limit': 20},  # type=2 for TV shows, limit to 20
+
+
+========== CHANGE 7: TV Endpoint - Plex Fallback - URL Encoding ==========
+LINE: 2365
+TYPE: URL Encoding Fix
+
+BEFORE:
+                            'poster': f"/api/img?url={requests.utils.quote(poster_url)}&w=150&h=225&t={requests.utils.quote(video.get('title', ''))}" if poster_url else '/static/images/apple-touch-icon.png',
+
+AFTER:
+                            'poster': f"/api/img?url={quote(poster_url)}&w=150&h=225&t={quote(video.get('title', ''))}" if poster_url else '/static/images/apple-touch-icon.png',
+
+CHANGE: requests.utils.quote(...) → quote(...)  (2 replacements on line)
+
+
+========== CHANGE 8: Books Endpoint - Readarr ==========
+LINE: 2402
+TYPE: URL Encoding Fix
+
+BEFORE:
+                    'poster': f"/api/img?url={requests.utils.quote(b.get('remoteCover', ''))}&w=150&h=225&t={requests.utils.quote(b.get('title', ''))}" if b.get('remoteCover') else '/static/images/apple-touch-icon.png',
+
+AFTER:
+                    'poster': f"/api/img?url={quote(b.get('remoteCover', ''))}&w=150&h=225&t={quote(b.get('title', ''))}" if b.get('remoteCover') else '/static/images/apple-touch-icon.png',
+
+CHANGE: requests.utils.quote(...) → quote(...)  (2 replacements on line)
+
+
+========== SUMMARY ==========
+Import Additions: 1
+Parameter Additions: 2 (limit=20 on Plex calls)
+URL Encoding Fixes: 5 (one per endpoint fallback)
+Total quote() replacements: 12 (from requests.utils.quote)
+
+All changes have been verified and applied to C:\addarr\DEV\routes.py
+No instances of requests.utils.quote remain in the file.

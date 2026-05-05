@@ -111,27 +111,33 @@ class UpdateManager:
     
     def _update_checker(self):
         """Memory-optimized background update checker"""
+        # Run an immediate check on startup without waiting the full interval
+        try:
+            if self.config.app.debug:
+                logging.info("Automated update check running (startup)...")
+            update_info = self._check_github_for_updates()
+            if update_info.get('update_available'):
+                self._handle_available_update(update_info)
+            self.set_env('LAST_CHECKED', str(time.time()))
+        except Exception as e:
+            logging.error(f"Update checker startup error: {str(e)}")
+
         while self.running and not self._stop_event.is_set():
             try:
-                current_time = time.time()
-                last_checked = self.config.update.last_checked
-                check_interval = self.config.update.check_interval
-                
-                if current_time - last_checked >= check_interval:
-                    if self.config.app.debug:
-                        logging.info("Automated update check running...")
-                    
-                    update_info = self._check_github_for_updates()
-                    if update_info.get('update_available'):
-                        self._handle_available_update(update_info)
-                    
-                    # Update last_checked - you'll need to implement this
-                    # self.set_env('LAST_CHECKED', str(current_time))
-                
-                # Use wait with timeout for quicker shutdown
-                if self._stop_event.wait(timeout=check_interval):
+                # Wait for the configured interval (or until stop is signalled)
+                if self._stop_event.wait(timeout=self.config.update.check_interval):
                     break
-                
+
+                current_time = time.time()
+                if self.config.app.debug:
+                    logging.info("Automated update check running...")
+
+                update_info = self._check_github_for_updates()
+                if update_info.get('update_available'):
+                    self._handle_available_update(update_info)
+
+                self.set_env('LAST_CHECKED', str(current_time))
+
             except Exception as e:
                 logging.error(f"Update checker error: {str(e)}")
                 # Shorter sleep on error, but check stop event
@@ -207,7 +213,7 @@ class UpdateManager:
             
             logging.info(f"Checking PROD releases: {url}")
             headers = {
-                'User-Agent': 'Addarr-Update-Checker',
+                'User-Agent': 'arrdash-Update-Checker',
                 'Accept': 'application/vnd.github.v3+json'
             }
             
@@ -247,7 +253,7 @@ class UpdateManager:
             url = f"https://api.github.com/repos/{self.config.update.github_repo}/branches/dev"
             
             headers = {
-                'User-Agent': 'Addarr-Update-Checker',
+                'User-Agent': 'arrdash-Update-Checker',
                 'Accept': 'application/vnd.github.v3+json'
             }
             
@@ -293,6 +299,21 @@ class UpdateManager:
             logging.error(f"Error checking DEV updates: {str(e)}")
             return {'update_available': False, 'error': str(e), 'channel': 'dev'}
                
+    def download_update(self):
+        """Public method: check for the latest version then download it.
+        Called by the in-app Download Update button (routes.py /api/update/download)."""
+        try:
+            update_info = self._check_github_for_updates()
+            if not update_info.get('update_available'):
+                return {'success': False, 'error': 'No update available', 'update_info': update_info}
+            latest_version = update_info.get('latest_version')
+            if not latest_version:
+                return {'success': False, 'error': 'Could not determine latest version'}
+            return self._download_update(latest_version)
+        except Exception as e:
+            logging.error(f"download_update error: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
     def _download_update(self, version):
         """Download update with improved DEV branch support"""
         try:
@@ -310,12 +331,12 @@ class UpdateManager:
                 # Download from release
                 download_url = f"https://github.com/{repo}/archive/refs/tags/v{version}.zip"
                 # Use simple filename for PROD
-                filename = f"addarr_{version}.zip"
+                filename = f"arrdash_prod_{version}.zip"
             else:
                 # Download from dev branch
                 download_url = f"https://github.com/{repo}/archive/refs/heads/dev.zip"
                 # For DEV, use the exact version string for filename
-                filename = f"addarr_dev_{version}.zip"
+                filename = f"arrdash_dev_{version}.zip"
             
             logging.info(f"🔗 Download URL: {download_url}")
             logging.info(f"📁 Target filename: {filename}")
@@ -491,7 +512,7 @@ class UpdateManager:
             # Files and directories to preserve (not overwrite)
             preserve_items = [
                 '.env',
-                'addarr.log',
+                'arrdash.log',
                 'updates',
                 '__pycache__',
                 'instance'
@@ -549,7 +570,7 @@ class UpdateManager:
         
         # Simulate file operations
         updates_folder = self.ensure_updates_folder()
-        mock_update_file = os.path.join(updates_folder, f"addarr_{version}.zip")
+        mock_update_file = os.path.join(updates_folder, f"arrdash_uat_{version}.zip")
         
         if os.path.exists(mock_update_file):
             # Create a mock applied marker
@@ -653,7 +674,7 @@ class UpdateManager:
             logging.info(f"📁 All files in updates folder: {all_files}")
             
             for filename in os.listdir(updates_folder):
-                if filename.startswith('addarr_') and filename.endswith('.zip'):
+                if filename.startswith('arrdash') and filename.endswith('.zip'):
                     file_path = os.path.join(updates_folder, filename)
                     if not os.path.exists(file_path):
                         continue
@@ -662,19 +683,19 @@ class UpdateManager:
                     
                     logging.info(f"📄 Processing file: {filename}")
                     
-                    # Handle the exact filename pattern: addarr_dev_1.0.0-dev-694ba95.zip
-                    if filename.startswith('addarr_dev_'):
-                        # Remove 'addarr_dev_' prefix (11 chars) and '.zip' suffix (4 chars)
-                        # filename: "addarr_dev_1.0.0-dev-694ba95.zip" -> version: "1.0.0-dev-694ba95"
-                        version = filename[11:-4]  # FIXED: Changed from 12 to 11
+                    # Handle the exact filename pattern: arrdash_dev_1.0.0-dev-694ba95.zip
+                    if filename.startswith('arrdash_dev_'):
+                        # Remove 'arrdash_dev_' prefix (12 chars) and '.zip' suffix (4 chars)
+                        # filename: "arrdash_dev_1.0.0-dev-694ba95.zip" -> version: "1.0.0-dev-694ba95"
+                        version = filename[12:-4]  # FIXED: Changed from 13 to 12
                         logging.info(f"🔧 DEV file detected, version: {version}")
-                    elif filename.startswith('addarr_prod_'):
-                        # PROD branch format: addarr_prod_1.0.0.zip  
-                        version = filename[12:-4]  # Remove 'addarr_prod_' (12 chars) and '.zip' (4 chars)
+                    elif filename.startswith('arrdash_prod_'):
+                        # PROD branch format: arrdash_prod_1.0.0.zip  
+                        version = filename[12:-4]  # Remove 'arrdash_prod_' (12 chars) and '.zip' (4 chars)
                     else:
-                        # Legacy format: addarr_1.0.0.zip
-                        version = filename[7:-4]  # Remove 'addarr_' (7 chars) and '.zip' (4 chars)
-                    
+                        # Legacy format: arrdash_1.0.0.zip
+                        version = filename[12:-4]  # Remove 'arrdash_' (12 chars) and '.zip' (4 chars)
+
                     update_files.append({
                         'filename': filename,
                         'version': version,  # This should now be "1.0.0-dev-694ba95"
