@@ -6,7 +6,7 @@ let currentShowId = null; // track show id for delete/search actions
  * The server normalises TMDB /original/ → /w342/ before fetching, so
  * downloads are ~10× smaller while still looking sharp at card sizes.
  * Local and relative URLs (starting with '/') are returned unchanged.
- * The optional title appears in addarr.log so cache events are readable.
+ * The optional title appears in arrdash.log so cache events are readable.
  *
  * @param {string} url   - Remote image URL
  * @param {number} w     - Target display width  (default 174)
@@ -32,11 +32,15 @@ const installButton = document.getElementById('install-button'); // Add this but
 const _bg = {
     controller:  new AbortController(),
     resumeQueue: [],
+    navigating: false,
     get signal() { return this.controller.signal; }
 };
 // Expose to inline page scripts (trending.html, manage-books.html)
 window._bg = _bg;
-window._registerBgResume = fn => _bg.resumeQueue.push(fn);
+window._registerBgResume = fn => {
+    if (_bg.navigating) return;
+    _bg.resumeQueue.push(fn);
+};
 
 const _detailsScrollLock = {
     y: 0,
@@ -64,7 +68,13 @@ function _pauseBackgroundFetches() {
     _bg.controller.abort();
     _bg.controller = new AbortController();   // fresh controller for next use
 }
+function _stopBackgroundWorkForNavigation() {
+    _bg.navigating = true;
+    _bg.resumeQueue.length = 0;
+    _pauseBackgroundFetches();
+}
 function _resumeBackgroundFetches() {
+    if (_bg.navigating) return;
     const fns = _bg.resumeQueue.splice(0);
     fns.forEach(fn => { try { fn(); } catch(e) { console.error('[bg resume]', e); } });
 }
@@ -85,6 +95,20 @@ document.addEventListener('DOMContentLoaded', () => {
 function initAutoHideHeader() {
     const topbar = document.getElementById('appTopbar');
     if (!topbar) return;
+    const params = new URLSearchParams(window.location.search);
+    const source = params.get('source');
+    const path = window.location.pathname || '';
+    const isHomeLaunchSurface = source === 'home' && (
+        path.includes('/manage') ||
+        path.includes('/manage-books') ||
+        path.includes('/search') ||
+        path.includes('/results')
+    );
+
+    if (isHomeLaunchSurface) {
+        document.body.classList.add('app-header-hidden');
+        return;
+    }
 
     let lastY = window.scrollY || 0;
     let ticking = false;
@@ -535,16 +559,18 @@ function showManageDetails(mediaType, externalId, internalId, lookupSource = '',
     const modalTitle = document.getElementById('detailsModalLabel');
     const overlay = document.getElementById('overlay-backdrop');
     modalEl._homeLaunchContext = homeContext || modalEl._homeLaunchContext || null;
-    
-    // Show overlay
-    overlay.style.display = 'block';
+    const deferModalOpen = !!homeContext;
     
     setDetailsModalVariant(mediaType);
-    document.getElementById('detailsContent').innerHTML = renderDetailLoadingSkeleton(mediaType);
     
     // Set modal title based on media type
     const typeLabel = mediaType === 'tv' ? 'TV Show' : mediaType === 'book' ? 'Book' : 'Movie';
     modalTitle.textContent = `${typeLabel} Details`;
+
+    const showManageModalChrome = () => {
+        overlay.style.display = 'block';
+        modal.show();
+    };
     
     // Add event listener to hide overlay when modal is closed
     const hideModalHandler = function() {
@@ -553,22 +579,24 @@ function showManageDetails(mediaType, externalId, internalId, lookupSource = '',
     };
     
     modalEl.addEventListener('hidden.bs.modal', hideModalHandler);
-    
-    // Show the modal
-    modal.show();
+
+    if (!deferModalOpen) {
+        document.getElementById('detailsContent').innerHTML = renderDetailLoadingSkeleton(mediaType);
+        showManageModalChrome();
+    }
 
     const cacheKey = `${mediaType}:${lookupSource || 'default'}:${externalId}`;
     const cachedDetail = _detailCache.manage[cacheKey];
     const tmdbCacheKey = mediaType === 'movie' ? `movie:${externalId}` : '';
     const cachedTmdb = tmdbCacheKey ? _detailCache.tmdb[tmdbCacheKey] : null;
 
-    if (cachedDetail) {
+    if (cachedDetail && !deferModalOpen) {
         populateManageModalDetails(cachedDetail, mediaType, internalId, cachedTmdb || null);
     }
-    
+
     // Fetch details from your backend
     const lookupQuery = lookupSource ? `&source=${encodeURIComponent(lookupSource)}` : '';
-    fetch(`/get_media_details?type=${mediaType}&id=${externalId}${lookupQuery}`)
+    const detailPromise = fetch(`/get_media_details?type=${mediaType}&id=${externalId}${lookupQuery}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -594,6 +622,9 @@ function showManageDetails(mediaType, externalId, internalId, lookupSource = '',
             }
             _detailCache.manage[cacheKey] = data;
             populateManageModalDetails(data, mediaType, internalId, tmdbData);
+            if (deferModalOpen && !modalEl.classList.contains('show')) {
+                showManageModalChrome();
+            }
         })
         .catch(error => {
             console.error('Error fetching details:', error);
@@ -601,7 +632,15 @@ function showManageDetails(mediaType, externalId, internalId, lookupSource = '',
                 <div class="alert alert-danger">
                     Error loading details: ${error.message}
                 </div>`;
+            if (deferModalOpen && !modalEl.classList.contains('show')) {
+                showManageModalChrome();
+            }
         });
+
+    const shouldBlockGlobalLoader = !!homeContext && !!window.trackGlobalLoading;
+    if (shouldBlockGlobalLoader) {
+        window.trackGlobalLoading(detailPromise, 'Loading details...');
+    }
 }
 
 function renderDetailLoadingSkeleton(mediaType) {
@@ -706,15 +745,64 @@ function buildDetailTrailerSection(trailerKey, title) {
         </section>`;
 }
 
+function buildDetailOverviewSection(overview, sectionKey = 'default') {
+    const safeOverview = overview || 'No overview available.';
+    const needsToggle = safeOverview.length > 260;
+    const targetId = `detailOverview_${sectionKey}`;
+    return `
+        <section class="movie-detail__section movie-detail__section--overview">
+            <div class="movie-detail__section-head">
+                <h3 class="movie-detail__section-title">Overview</h3>
+                ${needsToggle ? `
+                <button type="button"
+                        class="movie-detail__overview-toggle"
+                        aria-expanded="false"
+                        aria-controls="${targetId}"
+                        onclick="toggleDetailOverview(this, '${targetId}')">
+                    <i class="fas fa-chevron-down"></i>
+                </button>` : ''}
+            </div>
+            <div class="movie-detail__overview-body ${needsToggle ? 'is-collapsed' : ''}" id="${targetId}">
+                <p class="movie-detail__overview">${safeOverview}</p>
+            </div>
+        </section>`;
+}
+
+function buildDetailInfoGrid(items) {
+    if (!Array.isArray(items) || !items.length) return '';
+    return `
+        <div class="movie-detail__info-grid">
+            ${items.map(item => `
+                <div class="movie-detail__info-item ${item.full ? 'movie-detail__info-item--full' : ''}">
+                    <span class="movie-detail__info-label">${item.label}</span>
+                    <strong class="movie-detail__info-value ${item.code ? 'movie-detail__info-value--code' : ''}">${item.value}</strong>
+                </div>
+            `).join('')}
+        </div>`;
+}
+
+function toggleDetailOverview(button, targetId) {
+    const body = document.getElementById(targetId);
+    if (!body) return;
+    const isCollapsed = body.classList.contains('is-collapsed');
+    body.classList.toggle('is-collapsed', !isCollapsed);
+    body.classList.toggle('is-expanded', isCollapsed);
+    button.setAttribute('aria-expanded', isCollapsed ? 'true' : 'false');
+    button.classList.toggle('is-expanded', isCollapsed);
+}
+
 function renderBookDetails(mediaData, fullData, mediaType, internalId) {
     const detailsContent = document.getElementById('detailsContent');
+    const secondaryActionsId = `bookDetailActions_${internalId || mediaData.id || mediaData.internal_id || 'temp'}`;
+    const author = typeof mediaData.author === 'object'
+        ? (mediaData.author?.authorName || mediaData.author?.name || 'Unknown Author')
+        : (mediaData.author || 'Unknown Author');
 
     const posterImage = mediaData.images?.find(img => img.coverType === 'poster' || img.coverType === 'cover');
     const posterSource = posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png';
     const posterUrl = imgProxy(posterSource, 300, 450, mediaData.title);
     const backdropUrl = imgProxy(posterSource || '/static/images/apple-touch-icon.png', 1280, 720, mediaData.title);
 
-    const author = mediaData.author?.authorName || 'Unknown Author';
     const releaseYear = mediaData.releaseDate ? mediaData.releaseDate.substring(0, 4) : 'N/A';
     const pageCount = mediaData.pageCount ? `${mediaData.pageCount} pages` : '';
     const overview = mediaData.overview || 'No description available.';
@@ -727,6 +815,15 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
     const addedDate = mediaData.added ? formatReadableDate(mediaData.added) : 'Unknown';
     const formatLabel = mediaData.format || mediaData.fileType || 'Library';
     const hasMetadataEditor = typeof window.triggerImport === 'function';
+    const canRelinkBook = !!mediaData.id;
+    const overviewSection = buildDetailOverviewSection(overview, `book_${internalId || mediaData.id || mediaData.foreignBookId || 'detail'}`);
+    const infoGrid = buildDetailInfoGrid([
+        { label: 'Author', value: author },
+        { label: 'Published', value: mediaData.releaseDate ? mediaData.releaseDate.substring(0, 10) : 'Unknown' },
+        { label: 'Pages', value: mediaData.pageCount || 'Unknown' },
+        { label: 'Added', value: addedDate },
+        { label: 'Path', value: pathLabel, code: true, full: true }
+    ]);
 
     // Bookmark info from localStorage (key matches epub reader's BM_KEY)
     const bmId   = internalId || mediaData.id;
@@ -786,67 +883,31 @@ function renderBookDetails(mediaData, fullData, mediaType, internalId) {
                     </div>
                 </div>
 
+                ${overviewSection}
+
+                ${infoGrid}
+
+                <div class="movie-detail__divider"></div>
+
                 <div class="movie-detail__actions movie-detail__actions--book">
                     ${onDisk && mediaData.id ? `
-                    <a href="/read/local/${mediaData.id}" target="_blank" class="movie-detail__action movie-detail__action--button" style="flex-grow: 1;" title="Read this book (${monitored ? 'Monitored' : 'Unmonitored'})">
+                    <a href="/read/local/${mediaData.id}" target="_blank" class="movie-detail__action movie-detail__action--button movie-detail__action--book-primary" title="Read this book (${monitored ? 'Monitored' : 'Unmonitored'})">
                         <i class="fas fa-book-open me-2"></i>Read Now
-                        ${pageCount ? `<br><small style="font-size: 0.85rem; opacity: 0.8;">${pageCount}${formatLabel ? ' · ' + formatLabel : ''} · ${monitored ? 'Monitored' : 'Unmonitored'}</small>` : ''}
                     </a>` : `
-                    <div class="movie-detail__action movie-detail__action--stat" style="flex-grow: 1; text-align: center;" title="Status: ${monitored ? 'Monitored' : 'Unmonitored'}">
+                    <div class="movie-detail__action movie-detail__action--stat movie-detail__action--book-primary movie-detail__action--stacked" title="Status: ${monitored ? 'Monitored' : 'Unmonitored'}">
                         <i class="fas ${onDisk ? 'fa-check-circle' : 'fa-exclamation-circle'} me-2"></i>
                         ${onDisk ? 'Ready to Read' : 'Not Downloaded'}
-                        ${pageCount ? `<br><small style="font-size: 0.85rem; opacity: 0.7;">${pageCount}${formatLabel ? ' · ' + formatLabel : ''} · ${monitored ? 'Monitored' : 'Unmonitored'}</small>` : ''}
                     </div>`}
                     ${hasMetadataEditor ? `
                     <button type="button" class="movie-detail__action movie-detail__action--button" onclick="openBookMetadataEditorFromDetails()">
                         <i class="fas fa-pen-to-square me-2"></i>Edit Metadata
                     </button>` : ''}
+
                 </div>
 
                 ${bmBadge ? `<div class="movie-detail__bookmark-row">${bmBadge}</div>` : ''}
 
-                <div class="movie-detail__divider"></div>
 
-                <div class="movie-detail__file-card">
-                    <div class="movie-detail__file-row">
-                        <div class="movie-detail__file-status ${onDisk ? 'is-present' : 'is-missing'}">
-                            <i class="fas ${onDisk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
-                        </div>
-                        <div class="movie-detail__file-main">
-                            <div class="movie-detail__file-name">${pathLabel}</div>
-                            <div class="movie-detail__file-meta">
-                                <span class="movie-detail__file-size">${sizeOnDisk}</span>
-                                ${mediaData.releaseDate ? `<span>${mediaData.releaseDate.substring(0, 10)}</span>` : ''}
-                                <span>${addedDate}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <p class="movie-detail__overview">${overview}</p>
-
-                <div class="movie-detail__info-grid">
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Author</span>
-                        <strong class="movie-detail__info-value">${author}</strong>
-                    </div>
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Published</span>
-                        <strong class="movie-detail__info-value">${mediaData.releaseDate ? mediaData.releaseDate.substring(0, 10) : 'Unknown'}</strong>
-                    </div>
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Pages</span>
-                        <strong class="movie-detail__info-value">${mediaData.pageCount || 'Unknown'}</strong>
-                    </div>
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Added</span>
-                        <strong class="movie-detail__info-value">${addedDate}</strong>
-                    </div>
-                    <div class="movie-detail__info-item movie-detail__info-item--full">
-                        <span class="movie-detail__info-label">Path</span>
-                        <strong class="movie-detail__info-value movie-detail__info-value--code">${pathLabel}</strong>
-                    </div>
-                </div>
             </div>
         </section>
     `;
@@ -859,13 +920,53 @@ function openBookMetadataEditorFromDetails() {
 
     const modalEl = document.getElementById('detailsModal');
     const card = modalEl ? modalEl._bookCard : null;
-    if (!card) return;
+    const directFilePath = modalEl?._bookFilePath || card?.dataset.filePath || '';
+    const dbId = modalEl?._bookId || card?.dataset.dbId || null;
 
-    const filePath = card.dataset.filePath;
-    const dbId = card.dataset.dbId || null;
-    if (!filePath) return;
+    if (directFilePath) {
+        window.triggerImport(directFilePath, dbId);
+        return;
+    }
 
-    window.triggerImport(filePath, dbId);
+    if (!dbId) {
+        console.warn('[openBookMetadataEditorFromDetails] No file path or DB ID available');
+        return;
+    }
+
+    fetch(`/api/books/local/${dbId}`)
+        .then(parseApiResponse)
+        .then(({ ok, data }) => {
+            if (!ok) throw new Error(data.error || 'Failed to load local book');
+            const resolvedPath = data.file_path || data.path || '';
+            if (!resolvedPath) {
+                throw new Error('No local file path available');
+            }
+            window.triggerImport(resolvedPath, data.id || dbId);
+        })
+        .catch(error => {
+            console.warn('[openBookMetadataEditorFromDetails] API failed:', error.message);
+
+            // Fallback 1: try to use file path from card
+            if (card?.dataset?.filePath) {
+                console.log('[openBookMetadataEditorFromDetails] Falling back to card file path');
+                window.triggerImport(card.dataset.filePath, dbId);
+                return;
+            }
+
+            // Fallback 2: check if a file path exists in modal data
+            const modalData = modalEl?.innerText || '';
+            if (modalData) {
+                console.log('[openBookMetadataEditorFromDetails] Checking for file path in modal...');
+            }
+
+            // If all else fails, show user message
+            if (dbId) {
+                alert('Could not locate book file. The book may have been moved or deleted. Please check that the file still exists in your library.');
+            } else {
+                alert('Could not identify the book. Please try clicking the book card again.');
+            }
+            console.error('[openBookMetadataEditorFromDetails] Could not resolve file path. DB ID:', dbId, 'Card:', !!card, 'Error:', error);
+        });
 }
 
 function getDefaultMovieAddPrefs(mediaId) {
@@ -1004,10 +1105,16 @@ function renderMovieDetails(mediaData, fullData, mediaType, internalId, tmdbData
 
     const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
     const backdropImage = mediaData.images?.find(img => img.coverType === 'fanart' || img.coverType === 'backdrop');
-    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 320, 480, mediaData.title);
+    const cachedPoster = homeContext?.posterSrc && !homeContext.posterSrc.includes('/static/images/placeholder.png')
+        ? homeContext.posterSrc
+        : '';
+    const cachedBackdrop = homeContext?.backdropSrc && !homeContext.backdropSrc.includes('/static/images/placeholder.png')
+        ? homeContext.backdropSrc
+        : '';
+    const posterUrl = cachedPoster || imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 320, 480, mediaData.title);
     const fallbackBackdrop = backdropImage?.remoteUrl || backdropImage?.url || '';
     const tmdbBackdrop = tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/original${tmdbData.backdrop_path}` : '';
-    const backdropUrl = imgProxy(tmdbBackdrop || fallbackBackdrop || posterImage?.remoteUrl || posterImage?.url || '/static/images/apple-touch-icon.png', 1280, 720, mediaData.title);
+    const backdropUrl = cachedBackdrop || cachedPoster || imgProxy(tmdbBackdrop || fallbackBackdrop || posterImage?.remoteUrl || posterImage?.url || '/static/images/apple-touch-icon.png', 1280, 720, mediaData.title);
 
     const runtime = mediaData.runtime ? `${Math.floor(mediaData.runtime / 60)}h ${mediaData.runtime % 60}m` : 'N/A';
     const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
@@ -1029,6 +1136,14 @@ function renderMovieDetails(mediaData, fullData, mediaType, internalId, tmdbData
     const secondaryActionsId = `movieDetailActions_${resolvedInternalId || 'temp'}`;
     const hasMissing = !fullData.on_disk;
     const showSearchButtons = radarrAvailable && fullData.monitored && hasMissing;
+    const overviewSection = buildDetailOverviewSection(overview, `movie_${resolvedInternalId || mediaData.tmdbId || mediaData.id || 'detail'}`);
+    const infoGrid = buildDetailInfoGrid([
+        { label: 'Studio', value: studio },
+        { label: 'Added', value: addedDate },
+        { label: 'Status', value: fullData.on_disk ? 'Downloaded' : (mediaData.status || 'Missing') },
+        { label: 'Quality', value: quality },
+        { label: 'Path', value: mediaData.path || 'N/A', code: true, full: true }
+    ]);
 
     const html = `
         <section class="movie-detail">
@@ -1061,6 +1176,17 @@ function renderMovieDetails(mediaData, fullData, mediaType, internalId, tmdbData
                         </div>
                     </div>
                 </div>
+
+                ${overviewSection}
+
+                ${genres.length ? `
+                <div class="movie-detail__genres">
+                    ${genres.map(genre => `<span class="movie-detail__genre-chip">${typeof genre === 'string' ? genre : genre.name}</span>`).join('')}
+                </div>` : ''}
+
+                ${infoGrid}
+
+                <div class="movie-detail__divider"></div>
 
                 <div class="movie-detail__actions">
                     <button class="movie-detail__action movie-detail__action--icon monitor-toggle"
@@ -1147,21 +1273,12 @@ function renderMovieDetails(mediaData, fullData, mediaType, internalId, tmdbData
                     </div>
                 </div>
 
-                <div class="movie-detail__divider"></div>
-
                 <div class="movie-detail__file-card">
                     <div class="movie-detail__file-row">
                         <div class="movie-detail__file-status ${fullData.on_disk ? 'is-present' : 'is-missing'}">
                             <i class="fas ${fullData.on_disk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
                         </div>
-                        <div class="movie-detail__file-main">
-                            <div class="movie-detail__file-name">${relativePath}</div>
-                            <div class="movie-detail__file-meta">
-                                <span class="movie-detail__file-size">${fileSize}</span>
-                                <span class="movie-detail__file-quality">${quality}</span>
-                                <span>${addedDate}</span>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
 
@@ -1177,28 +1294,6 @@ function renderMovieDetails(mediaData, fullData, mediaType, internalId, tmdbData
                     <div>
                         <span class="movie-detail__release-label">Physical Release</span>
                         <strong class="movie-detail__release-value">${physicalRelease}</strong>
-                    </div>
-                </div>
-
-                <p class="movie-detail__overview">${overview}</p>
-
-                ${genres.length ? `
-                <div class="movie-detail__genres">
-                    ${genres.map(genre => `<span class="movie-detail__genre-chip">${typeof genre === 'string' ? genre : genre.name}</span>`).join('')}
-                </div>` : ''}
-
-                <div class="movie-detail__info-grid">
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Studio</span>
-                        <strong class="movie-detail__info-value">${studio}</strong>
-                    </div>
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Added</span>
-                        <strong class="movie-detail__info-value">${addedDate}</strong>
-                    </div>
-                    <div class="movie-detail__info-item movie-detail__info-item--full">
-                        <span class="movie-detail__info-label">Path</span>
-                        <strong class="movie-detail__info-value movie-detail__info-value--code">${mediaData.path || 'N/A'}</strong>
                     </div>
                 </div>
 
@@ -1244,9 +1339,15 @@ function renderTVDetails(mediaData, fullData, mediaType, internalId, tmdbData = 
     
     const posterImage = mediaData.images?.find(img => img.coverType === 'poster');
     const backdropImage = mediaData.images?.find(img => img.coverType === 'fanart' || img.coverType === 'backdrop');
-    const posterUrl = imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 300, 450, mediaData.title);
+    const cachedPoster = homeContext?.posterSrc && !homeContext.posterSrc.includes('/static/images/placeholder.png')
+        ? homeContext.posterSrc
+        : '';
+    const cachedBackdrop = homeContext?.backdropSrc && !homeContext.backdropSrc.includes('/static/images/placeholder.png')
+        ? homeContext.backdropSrc
+        : '';
+    const posterUrl = cachedPoster || imgProxy(posterImage?.remoteUrl || posterImage?.url || '/static/images/favicon.png', 300, 450, mediaData.title);
     const tmdbBackdrop = tmdbData?.backdrop_path ? `https://image.tmdb.org/t/p/original${tmdbData.backdrop_path}` : '';
-    const backdropUrl = imgProxy(tmdbBackdrop || backdropImage?.remoteUrl || backdropImage?.url || posterImage?.remoteUrl || posterImage?.url || '/static/images/apple-touch-icon.png', 1280, 720, mediaData.title);
+    const backdropUrl = cachedBackdrop || cachedPoster || imgProxy(tmdbBackdrop || backdropImage?.remoteUrl || backdropImage?.url || posterImage?.remoteUrl || posterImage?.url || '/static/images/apple-touch-icon.png', 1280, 720, mediaData.title);
     const fileSize = mediaData.sizeOnDisk ? formatFileSize(mediaData.sizeOnDisk) : 'N/A';
     const quality = mediaData.seriesType || 'Standard';
     const stats = mediaData.statistics || {};
@@ -1266,6 +1367,14 @@ function renderTVDetails(mediaData, fullData, mediaType, internalId, tmdbData = 
     const seasonsCount = stats.seasonCount || mediaData.seasons?.filter(season => season.seasonNumber > 0).length || 0;
     const overview = mediaData.overview || tmdbData?.overview || 'No overview available.';
     const genres = (tmdbData?.genres || mediaData.genres || []).map(genre => typeof genre === 'string' ? genre : genre.name);
+    const overviewSection = buildDetailOverviewSection(overview, `tv_${resolvedInternalId || mediaData.tvdbId || mediaData.id || 'detail'}`);
+    const infoGrid = buildDetailInfoGrid([
+        { label: 'Network', value: network },
+        { label: 'Series Type', value: quality },
+        { label: 'Episodes', value: `${downloadedEpisodes}/${totalEpisodes}` },
+        { label: 'Monitored', value: fullData.monitored ? 'Yes' : 'No' },
+        { label: 'Path', value: mediaData.path || 'N/A', code: true, full: true }
+    ]);
     
     const html = `
         <section class="movie-detail movie-detail--tv">
@@ -1299,6 +1408,17 @@ function renderTVDetails(mediaData, fullData, mediaType, internalId, tmdbData = 
                         </div>
                     </div>
                 </div>
+
+                ${overviewSection}
+
+                ${genres.length ? `
+                <div class="movie-detail__genres">
+                    ${genres.map(genre => `<span class="movie-detail__genre-chip">${genre}</span>`).join('')}
+                </div>` : ''}
+
+                ${infoGrid}
+
+                <div class="movie-detail__divider"></div>
 
                 <div class="movie-detail__actions movie-detail__actions--tv">
                     <button class="movie-detail__action movie-detail__action--icon monitor-toggle"
@@ -1378,20 +1498,10 @@ function renderTVDetails(mediaData, fullData, mediaType, internalId, tmdbData = 
                     </div>
                 </div>
 
-                <div class="movie-detail__divider"></div>
-
                 <div class="movie-detail__file-card">
                     <div class="movie-detail__file-row">
                         <div class="movie-detail__file-status ${fullData.on_disk ? 'is-present' : 'is-missing'}">
                             <i class="fas ${fullData.on_disk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
-                        </div>
-                        <div class="movie-detail__file-main">
-                            <div class="movie-detail__file-name">${mediaData.path || 'No library path available'}</div>
-                            <div class="movie-detail__file-meta">
-                                <span class="movie-detail__file-size">${fileSize}</span>
-                                <span>${downloadedEpisodes}/${totalEpisodes} episodes</span>
-                                <span>${completionPercent}% complete</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1408,36 +1518,6 @@ function renderTVDetails(mediaData, fullData, mediaType, internalId, tmdbData = 
                     <div>
                         <span class="movie-detail__release-label">Status</span>
                         <strong class="movie-detail__release-value">${statusLabel}</strong>
-                    </div>
-                </div>
-
-                <p class="movie-detail__overview">${overview}</p>
-
-                ${genres.length ? `
-                <div class="movie-detail__genres">
-                    ${genres.map(genre => `<span class="movie-detail__genre-chip">${genre}</span>`).join('')}
-                </div>` : ''}
-
-                <div class="movie-detail__info-grid">
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Network</span>
-                        <strong class="movie-detail__info-value">${network}</strong>
-                    </div>
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Series Type</span>
-                        <strong class="movie-detail__info-value">${quality}</strong>
-                    </div>
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Episodes</span>
-                        <strong class="movie-detail__info-value">${downloadedEpisodes}/${totalEpisodes}</strong>
-                    </div>
-                    <div class="movie-detail__info-item">
-                        <span class="movie-detail__info-label">Monitored</span>
-                        <strong class="movie-detail__info-value">${fullData.monitored ? 'Yes' : 'No'}</strong>
-                    </div>
-                    <div class="movie-detail__info-item movie-detail__info-item--full">
-                        <span class="movie-detail__info-label">Path</span>
-                        <strong class="movie-detail__info-value movie-detail__info-value--code">${mediaData.path || 'N/A'}</strong>
                     </div>
                 </div>
 
@@ -1525,6 +1605,13 @@ function hideMovieOnlineMatches() {
     if (container) container.style.display = 'none';
 }
 
+function hideBookOnlineMatches() {
+    const container = document.getElementById('bookOnlineMatchContainer');
+    const results = document.getElementById('bookOnlineMatchResults');
+    if (results) results.innerHTML = '';
+    if (container) container.style.display = 'none';
+}
+
 function renderTvOnlineMatches(results) {
     const container = document.getElementById('tvOnlineMatchContainer');
     const resultsEl = document.getElementById('tvOnlineMatchResults');
@@ -1555,6 +1642,7 @@ function renderTvOnlineMatches(results) {
                         data-sonarr="${String(result.sonarrId || '').replace(/"/g, '&quot;')}"
                         data-title="${String(result.title || '').replace(/"/g, '&quot;')}"
                         data-year="${String(result.year || '').replace(/"/g, '&quot;')}"
+                        data-poster="${String(result.poster || '').replace(/"/g, '&quot;')}"
                         onclick="applyTvOnlineMatch(this)">
                     Use Match
                 </button>
@@ -1593,12 +1681,49 @@ function renderMovieOnlineMatches(results) {
                         data-tmdb="${String(result.tmdbId || '').replace(/"/g, '&quot;')}"
                         data-title="${String(result.title || '').replace(/"/g, '&quot;')}"
                         data-year="${String(result.year || '').replace(/"/g, '&quot;')}"
+                        data-poster="${String(result.poster || '').replace(/"/g, '&quot;')}"
                         onclick="applyMovieOnlineMatch(this)">
                     Use Match
                 </button>
             </div>
         </div>
     `).join('');
+    container.style.display = 'block';
+}
+
+function renderBookOnlineMatches(results) {
+    const container = document.getElementById('bookOnlineMatchContainer');
+    const resultsEl = document.getElementById('bookOnlineMatchResults');
+    if (!container || !resultsEl) return;
+
+    if (!Array.isArray(results) || !results.length) {
+        resultsEl.innerHTML = '<div class="text-muted text-center py-3">No matching books found.</div>';
+        container.style.display = 'block';
+        return;
+    }
+
+    resultsEl.innerHTML = results.map((result, index) => `
+        <div class="border rounded p-2 mb-2 bg-dark-subtle">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="d-flex gap-2 flex-grow-1">
+                    <img src="${result.cover_preview_url || result.cover_url || '/static/images/apple-touch-icon.png'}"
+                         alt="${result.title || 'Book'}"
+                         class="tv-online-match-poster"
+                         onerror="this.src='/static/images/apple-touch-icon.png'">
+                    <div class="flex-grow-1 interactive-release-copy">
+                        <div class="text-light fw-semibold">${result.title || 'Unknown book'}</div>
+                        <div class="text-muted small">${result.author || 'Unknown author'}${result.year ? ` • ${result.year}` : ''}</div>
+                        <div class="text-muted small">${result.source || 'Unknown source'}${result.genre_str ? ` • ${result.genre_str}` : ''}</div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-primary flex-shrink-0"
+                        onclick="applyBookOnlineMatch(${index})">
+                    Use Match
+                </button>
+            </div>
+        </div>
+    `).join('');
+    window._bookOnlineMatchResults = results;
     container.style.display = 'block';
 }
 
@@ -1664,6 +1789,33 @@ async function refreshMovieOnlineMatches() {
     }
 }
 
+async function refreshBookOnlineMatches() {
+    const modalEl = document.getElementById('detailsModal');
+    const dbId = modalEl?._bookId || modalEl?._bookCard?.dataset?.dbId || null;
+    const container = document.getElementById('bookOnlineMatchContainer');
+    const resultsEl = document.getElementById('bookOnlineMatchResults');
+    if (!dbId || !container || !resultsEl) return;
+
+    resultsEl.innerHTML = '<div class="text-center text-muted py-3">Loading matches...</div>';
+    container.style.display = 'block';
+
+    try {
+        const response = await fetch(`/api/books/search-online/${dbId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to search books');
+        }
+        renderBookOnlineMatches(data.results || []);
+    } catch (error) {
+        resultsEl.innerHTML = `<div class="text-danger text-center py-3">${error.message}</div>`;
+        container.style.display = 'block';
+    }
+}
+
 async function applyTvOnlineMatch(button) {
     const modalEl = document.getElementById('detailsModal');
     const context = modalEl ? modalEl._homeLaunchContext : null;
@@ -1682,7 +1834,10 @@ async function applyTvOnlineMatch(button) {
                 title: context.plexTitle,
                 year: context.plexYear,
                 tvdb_id: tvdbId,
-                sonarr_id: sonarrId
+                sonarr_id: sonarrId,
+                poster: button.dataset.poster || '',
+                matched_title: button.dataset.title || '',
+                matched_year: button.dataset.year || ''
             })
         });
         const data = await response.json();
@@ -1713,7 +1868,10 @@ async function applyMovieOnlineMatch(button) {
                 plex_id: context.plexId,
                 title: context.plexTitle,
                 year: context.plexYear,
-                tmdb_id: tmdbId
+                tmdb_id: tmdbId,
+                poster: button.dataset.poster || '',
+                matched_title: button.dataset.title || '',
+                matched_year: button.dataset.year || ''
             })
         });
         const data = await response.json();
@@ -1723,6 +1881,36 @@ async function applyMovieOnlineMatch(button) {
 
         hideMovieOnlineMatches();
         showManageDetails('movie', tmdbId, tmdbId, '', context);
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function applyBookOnlineMatch(index) {
+    const modalEl = document.getElementById('detailsModal');
+    const dbId = modalEl?._bookId || modalEl?._bookCard?.dataset?.dbId || null;
+    const matches = window._bookOnlineMatchResults || [];
+    const match = matches[index];
+    if (!dbId || !match) return;
+
+    try {
+        const response = await fetch(`/api/books/relink/${dbId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ match })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to update linked book');
+        }
+
+        hideBookOnlineMatches();
+        if (modalEl?._bookCard && typeof patchBookCard === 'function') {
+            patchBookCard(modalEl._bookCard, data.book);
+        }
+        if (typeof _renderBookDetailModal === 'function') {
+            _renderBookDetailModal(data.book, modalEl?._bookCard || null);
+        }
     } catch (error) {
         alert(error.message);
     }
@@ -3494,7 +3682,7 @@ function showUpdateAppliedNotification(updateData) {
     // Check if Bootstrap is available
     if (typeof bootstrap === 'undefined') {
         console.warn('Bootstrap not available for update notification');
-        alert(`Addarr has been updated to version ${updateData.latest_version}! Some changes may require a page refresh.`);
+        alert(`arrdash has been updated to version ${updateData.latest_version}! Some changes may require a page refresh.`);
         
         // Dismiss the notification
         fetch('/api/update/dismiss', { method: 'POST' })
@@ -3515,7 +3703,7 @@ function showUpdateAppliedNotification(updateData) {
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-success">
-                            <h6 class="alert-heading">Addarr has been updated!</h6>
+                            <h6 class="alert-heading">arrdash has been updated!</h6>
                             <p class="mb-0">The application has been updated to version <strong>${updateData.latest_version}</strong>.</p>
                         </div>
                         <p class="mb-0">Some changes may require a page refresh to take effect.</p>
@@ -4177,77 +4365,352 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Loading spinner utility
+window._pendingGlobalLoadingTasks = window._pendingGlobalLoadingTasks || [];
+window.trackGlobalLoading = window.trackGlobalLoading || function(promise, message = '') {
+    if (window.spinner) {
+        return window.spinner.trackPromise(promise, message);
+    }
+    if (promise && typeof promise.finally === 'function') {
+        window._pendingGlobalLoadingTasks.push({ promise, message });
+    }
+    return Promise.resolve(promise);
+};
+
 class LoadingSpinner {
     constructor() {
         this.spinner = document.getElementById('globalLoadingSpinner');
-        this.message = document.getElementById('loadingMessage');
+        this.pendingTokens = new Set();
+        this.navigationLock = false;
+        this.tokenCounter = 0;
         this.init();
     }
 
     init() {
-        // Create spinner if it doesn't exist
-        if (!this.spinner) {
-            this.createSpinner();
-        }
-        
+        // Always create/update spinner with new SVG version
+        this.createSpinner();
+
         // Set up event listeners for PWA compatibility
         this.setupEventListeners();
     }
 
     createSpinner() {
-        const spinnerHTML = `
-            <div id="globalLoadingSpinner" class="loading-spinner">
-                <div class="spinner-container">
-                    <div class="spinner-border spinner-radarr" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
-                </div>
-            </div>
+        const spinnerSVG = `
+            <svg class="loading-spinner__canvas" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <g id="sideShape">
+                            <mask id="sideMask" maskUnits="userSpaceOnUse" x="0" y="0" width="700" height="500">
+                                <rect width="700" height="500" fill="white" />
+                                <circle cx="119" cy="219" r="158" fill="black" />
+                                <rect x="132" y="265" width="517" height="111" transform="rotate(-30 132 269)" fill="black" />
+                            </mask>
+                            <g mask="url(#sideMask)" fill="white">
+                                <circle cx="161" cy="343" r="113" />
+                                <circle cx="572" cy="165" r="60" />
+                                <rect x="146" y="243" width="464" height="96" transform="rotate(-30 149 373)" />
+                            </g>
+                        </g>
+                    </defs>
+                    <circle cx="300" cy="300" r="3" fill="black" />
+                    <g id="triangleGroup">
+                        <polygon id="triangleShape" fill="none" stroke="#0066ff00" stroke-width="2" points="300,300 300,300 300,300" />
+                    </g>
+                    <g id="shapesGroup">
+                        <g id="side1Group">
+                            <rect id="side1" x="0" y="0" width="40" height="80" fill="#45b649" opacity="0" />
+                            <use href="#sideShape" />
+                        </g>
+                        <g id="side2Group">
+                            <rect id="side2" x="0" y="0" width="40" height="80" fill="#45b649" opacity="0" />
+                            <use href="#sideShape" />
+                        </g>
+                        <g id="side3Group">
+                            <rect id="side3" x="0" y="0" width="40" height="80" fill="#45b649" opacity="0" />
+                            <use href="#sideShape" />
+                        </g>
+                    </g>
+                    <g id="centerPlus" style="pointer-events: none;">
+                        <rect x="225" y="282.5" width="150" height="35" fill="#45b649" rx="10"/>
+                        <rect x="282.5" y="225" width="35" height="150" fill="#45b649" rx="10"/>
+                    </g>
+                </svg>
         `;
-        document.body.insertAdjacentHTML('beforeend', spinnerHTML);
+
+        // Find or create the spinner container
         this.spinner = document.getElementById('globalLoadingSpinner');
-        this.message = document.getElementById('loadingMessage');
+        if (this.spinner) {
+            // Replace the old content with the new SVG
+            this.spinner.innerHTML = spinnerSVG;
+        } else {
+            // If it doesn't exist, create the container and add SVG
+            const spinnerHTML = `<div id="globalLoadingSpinner" class="loading-spinner show">${spinnerSVG}</div>`;
+            document.body.insertAdjacentHTML('beforeend', spinnerHTML);
+            this.spinner = document.getElementById('globalLoadingSpinner');
+        }
+
+        this.startAnimation();
+    }
+
+    startAnimation() {
+        if (!this.spinner) {
+            console.warn('Spinner element not found, cannot start animation');
+            return;
+        }
+
+        const CENTER = { x: 300, y: 300 };
+        const RECT_WIDTH = 40;
+
+        let shapeConfig = {
+            maskCx: 119, maskCy: 219, maskCr: 158,
+            maskRx: 132, maskRy: 265, maskRw: 517, maskRh: 111, maskRrot: -30,
+            shapeC1x: 161, shapeC1y: 343, shapeC1r: 113,
+            shapeC2x: 572, shapeC2y: 165, shapeC2r: 60,
+            shapeRx: 146, shapeRy: 243, shapeRw: 464, shapeRh: 96, shapeRrot: -30,
+            shapeFillColor: '#ffffff', shapeOpacity: 1
+        };
+
+        let keyframes = [
+            { triangleSize: 115, triangleRotation: 60, rectLength: 200, shapeScale: 7.8, shapeRotation: -60, shapeOffsetX: -8, shapeOffsetY: 27, plusWidth: 40, plusLength: 40, time: 0.0 },
+            { triangleSize: 180, triangleRotation: 60, rectLength: 200, shapeScale: 7.8, shapeRotation: -60, shapeOffsetX: -8, shapeOffsetY: 27, plusWidth: 40, plusLength: 40, time: 0.3 },
+            { triangleSize: 180, triangleRotation: 180, rectLength: 200, shapeScale: 7.8, shapeRotation: -60, shapeOffsetX: -8, shapeOffsetY: 27, plusWidth: 40, plusLength: 40, time: 0.8 },
+            { triangleSize: 180, triangleRotation: 180, rectLength: 200, shapeScale: 7.8, shapeRotation: -60, shapeOffsetX: -8, shapeOffsetY: 27, plusWidth: 40, plusLength: 40, time: 1.0 },
+            { triangleSize: 115, triangleRotation: 180, rectLength: 200, shapeScale: 7.8, shapeRotation: -60, shapeOffsetX: -8, shapeOffsetY: 27, plusWidth: 40, plusLength: 40, time: 1.5 }
+        ];
+
+        const updateSideShapeSVG = () => {
+            const maskCircles = this.spinner.querySelectorAll('#sideMask circle');
+            maskCircles.forEach(el => {
+                el.setAttribute('cx', shapeConfig.maskCx);
+                el.setAttribute('cy', shapeConfig.maskCy);
+                el.setAttribute('r', shapeConfig.maskCr);
+            });
+
+            const maskRects = this.spinner.querySelectorAll('#sideMask rect:last-of-type');
+            maskRects.forEach(el => {
+                el.setAttribute('x', shapeConfig.maskRx);
+                el.setAttribute('y', shapeConfig.maskRy);
+                el.setAttribute('width', shapeConfig.maskRw);
+                el.setAttribute('height', shapeConfig.maskRh);
+                el.setAttribute('transform', `rotate(${shapeConfig.maskRrot} ${shapeConfig.maskRx} ${shapeConfig.maskRy})`);
+            });
+
+            const c1s = this.spinner.querySelectorAll('#sideShape > g[mask] circle:first-of-type');
+            c1s.forEach(el => {
+                el.setAttribute('cx', shapeConfig.shapeC1x);
+                el.setAttribute('cy', shapeConfig.shapeC1y);
+                el.setAttribute('r', shapeConfig.shapeC1r);
+            });
+
+            const c2s = this.spinner.querySelectorAll('#sideShape > g[mask] circle:last-of-type');
+            c2s.forEach(el => {
+                el.setAttribute('cx', shapeConfig.shapeC2x);
+                el.setAttribute('cy', shapeConfig.shapeC2y);
+                el.setAttribute('r', shapeConfig.shapeC2r);
+            });
+
+            const rects = this.spinner.querySelectorAll('#sideShape > g[mask] rect');
+            rects.forEach(el => {
+                el.setAttribute('x', shapeConfig.shapeRx);
+                el.setAttribute('y', shapeConfig.shapeRy);
+                el.setAttribute('width', shapeConfig.shapeRw);
+                el.setAttribute('height', shapeConfig.shapeRh);
+                el.setAttribute('transform', `rotate(${shapeConfig.shapeRrot} ${shapeConfig.shapeRx + shapeConfig.shapeRw/2} ${shapeConfig.shapeRy + shapeConfig.shapeRh/2})`);
+            });
+
+            const gs = this.spinner.querySelectorAll('#sideShape > g[mask]');
+            gs.forEach(el => {
+                el.setAttribute('fill', shapeConfig.shapeFillColor);
+                el.setAttribute('opacity', shapeConfig.shapeOpacity);
+            });
+        };
+
+        const updateVisualization = (state) => {
+            const centerPlus = this.spinner.querySelector('#centerPlus');
+            if (centerPlus) {
+                const halfWidth = state.plusWidth / 2;
+                const halfLength = state.plusLength / 2;
+                const vertLine = centerPlus.querySelector('rect:first-child');
+                const horizLine = centerPlus.querySelector('rect:last-child');
+                if (vertLine) {
+                    vertLine.setAttribute('y', 300 - halfLength);
+                    vertLine.setAttribute('height', state.plusLength);
+                }
+                if (horizLine) {
+                    horizLine.setAttribute('x', 300 - halfWidth);
+                    horizLine.setAttribute('width', state.plusWidth);
+                }
+            }
+
+            const corners = [];
+            for (let i = 0; i < 3; i++) {
+                const angle = (i * 120 + state.triangleRotation) * Math.PI / 180;
+                const x = CENTER.x + state.triangleSize * Math.cos(angle);
+                const y = CENTER.y + state.triangleSize * Math.sin(angle);
+                corners.push({ x, y, angle: (i * 120 + state.triangleRotation) % 360 });
+            }
+
+            const triangleShape = this.spinner.querySelector('#triangleShape');
+            if (triangleShape) {
+                triangleShape.setAttribute('points', corners.map(c => `${c.x},${c.y}`).join(' '));
+            }
+
+            corners.forEach((corner, i) => {
+                const edgeX = CENTER.x + (corner.x - CENTER.x) * 0.7;
+                const edgeY = CENTER.y + (corner.y - CENTER.y) * 0.7;
+                const rectRotation = corner.angle;
+                const groupId = `side${i + 1}Group`;
+                const group = this.spinner.querySelector(`#${groupId}`);
+                if (group) {
+                    const transformStr = `translate(${edgeX - RECT_WIDTH/2}, ${edgeY - state.rectLength/2}) rotate(${rectRotation} ${RECT_WIDTH/2} ${state.rectLength/2})`;
+                    group.setAttribute('transform', transformStr);
+                    const sideRect = this.spinner.querySelector(`#side${i + 1}`);
+                    if (sideRect) sideRect.setAttribute('height', state.rectLength);
+
+                    const useElement = group.querySelector('use');
+                    if (useElement) {
+                        const baseScale = 40 / 650;
+                        const totalScale = baseScale * state.shapeScale;
+                        const centerX = RECT_WIDTH / 2 + state.shapeOffsetX;
+                        const centerY = state.rectLength / 2 + state.shapeOffsetY;
+                        const shapeTransform = `translate(${centerX}, ${centerY}) rotate(${state.shapeRotation}) scale(${totalScale}) translate(-325, -250)`;
+                        useElement.setAttribute('transform', shapeTransform);
+                    }
+                }
+            });
+        };
+
+        const interpolateState = (t) => {
+            if (keyframes.length === 0) return keyframes[0];
+            if (keyframes.length === 1) return { ...keyframes[0] };
+
+            let kf1 = keyframes[0];
+            let kf2 = keyframes[keyframes.length - 1];
+
+            for (let i = 0; i < keyframes.length - 1; i++) {
+                if (t >= keyframes[i].time && t <= keyframes[i + 1].time) {
+                    kf1 = keyframes[i];
+                    kf2 = keyframes[i + 1];
+                    break;
+                }
+            }
+
+            const totalTime = kf2.time - kf1.time;
+            const elapsed = t - kf1.time;
+            const progress = totalTime === 0 ? 0 : Math.max(0, Math.min(1, elapsed / totalTime));
+
+            return {
+                triangleSize: kf1.triangleSize + (kf2.triangleSize - kf1.triangleSize) * progress,
+                triangleRotation: kf1.triangleRotation + (kf2.triangleRotation - kf1.triangleRotation) * progress,
+                rectLength: kf1.rectLength + (kf2.rectLength - kf1.rectLength) * progress,
+                shapeScale: kf1.shapeScale + (kf2.shapeScale - kf1.shapeScale) * progress,
+                shapeRotation: kf1.shapeRotation + (kf2.shapeRotation - kf1.shapeRotation) * progress,
+                shapeOffsetX: kf1.shapeOffsetX + (kf2.shapeOffsetX - kf1.shapeOffsetX) * progress,
+                shapeOffsetY: kf1.shapeOffsetY + (kf2.shapeOffsetY - kf1.shapeOffsetY) * progress,
+                plusWidth: kf1.plusWidth + (kf2.plusWidth - kf1.plusWidth) * progress,
+                plusLength: kf1.plusLength + (kf2.plusLength - kf1.plusLength) * progress,
+                time: t
+            };
+        };
+
+        // Apply initial configuration
+        updateSideShapeSVG();
+        updateVisualization(keyframes[0]);
+
+        this.animationStartTime = Date.now();
+
+        // Store the animation loop so we can restart it
+        const animationLoop = () => {
+            const elapsed = (Date.now() - this.animationStartTime) / 1000;
+            const totalDuration = keyframes[keyframes.length - 1].time;
+            const loopedTime = elapsed % totalDuration;
+
+            const state = interpolateState(loopedTime);
+            updateVisualization(state);
+            requestAnimationFrame(animationLoop);
+        };
+
+        animationLoop();
     }
 
     setupEventListeners() {
-        // Multiple ways to detect when page is ready in PWA
-        document.addEventListener('DOMContentLoaded', () => this.hide());
-        window.addEventListener('load', () => this.hide());
-        
-        // For single page app behavior in PWA
+        if (document.readyState === 'complete') {
+            this.markPageReady();
+        } else {
+            window.addEventListener('load', () => this.markPageReady(), { once: true });
+        }
+
         window.addEventListener('pageshow', (event) => {
             if (event.persisted) {
-                // Page was restored from cache (PWA behavior)
-                this.hide();
+                this.navigationLock = false;
+                this.markPageReady();
             }
         });
-
-        // Safety timeout - always hide after 15 seconds max
-        setTimeout(() => this.hide(), 15000);
     }
 
-    show(message = 'Loading...') {
-        if (this.spinner && this.message) {
-            this.message.textContent = message;
+    show(message = '') {
+        if (this.spinner) {
             this.spinner.classList.add('show');
             document.body.style.overflow = 'hidden';
-            
-            // Auto-hide safety for PWA (in case page doesn't trigger load events)
-            setTimeout(() => {
-                if (this.spinner.classList.contains('show')) {
-                    console.warn('Loading spinner timeout - forcing hide');
-                    this.hide();
-                }
-            }, 10000); // 10 second safety timeout
+            this.animationStartTime = Date.now();
         }
     }
 
     hide() {
-        if (this.spinner) {
-            this.spinner.classList.remove('show');
-            document.body.style.overflow = '';
+        if (this.spinner && this.spinner.classList.contains('show')) {
+            // Add hiding class for fade-out transition
+            this.spinner.classList.add('hiding');
+
+            // Wait for fade-out animation to complete before fully hiding
+            setTimeout(() => {
+                if (this.spinner) {
+                    this.spinner.classList.remove('show');
+                    this.spinner.classList.remove('hiding');
+                    document.body.style.overflow = '';
+                }
+            }, 600); // Match the CSS transition duration
         }
+    }
+
+    beginTask(message = '') {
+        const token = `spinner-task-${++this.tokenCounter}`;
+        this.pendingTokens.add(token);
+        this.show(message);
+        return token;
+    }
+
+    endTask(token) {
+        if (!token) return;
+        this.pendingTokens.delete(token);
+        this.syncVisibility();
+    }
+
+    trackPromise(promise, message = '') {
+        if (!promise || typeof promise.finally !== 'function') {
+            return Promise.resolve(promise);
+        }
+        const token = this.beginTask(message);
+        return promise.finally(() => this.endTask(token));
+    }
+
+    markPageReady() {
+        this.endTask('page-load');
+    }
+
+    lockForNavigation(message = '') {
+        this.navigationLock = true;
+        this.show(message);
+    }
+
+    unlockNavigation() {
+        this.navigationLock = false;
+        this.syncVisibility();
+    }
+
+    syncVisibility() {
+        if (this.navigationLock || this.pendingTokens.size > 0) {
+            this.show();
+            return;
+        }
+        this.hide();
     }
 }
 
@@ -4255,119 +4718,105 @@ class LoadingSpinner {
 document.addEventListener('DOMContentLoaded', function() {
 
     window.spinner = new LoadingSpinner();
-    
+    window.trackGlobalLoading = function(promise, message = '') {
+        return window.spinner.trackPromise(promise, message);
+    };
+
+    window.spinner.pendingTokens.add('page-load');
+    window.spinner.show();
+
+    if (window._pendingGlobalLoadingTasks.length) {
+        window._pendingGlobalLoadingTasks.forEach(({ promise, message }) => {
+            window.spinner.trackPromise(promise, message);
+        });
+        window._pendingGlobalLoadingTasks = [];
+    }
+
     // Set up navigation and form handlers
     setupNavigationHandlers();
-    
-    // Initial hide to ensure it's not stuck
-    setTimeout(() => window.spinner.hide(), 1000);
-
-
-    // Handle search form submissions
-    const searchForms = document.querySelectorAll('form[action*="search"]');
-    searchForms.forEach(form => {
-        form.addEventListener('submit', function(e) {
-            spinner.show('Searching...');
-        });
-    });
-
-    // Handle navigation clicks
-    const navLinks = document.querySelectorAll('a[href]:not([target="_blank"])');
-    navLinks.forEach(link => {
-        if (link.getAttribute('href') && !link.getAttribute('href').startsWith('#')) {
-            link.addEventListener('click', function(e) {
-                // Don't show spinner for same-page anchors
-                if (!this.getAttribute('href').startsWith('#')) {
-                    spinner.show('Loading page...');
-                }
-            });
-        }
-    });
-
-    // Handle manage page item clicks
-    const manageItems = document.querySelectorAll('.media-item, .result-item');
-    manageItems.forEach(item => {
-        item.addEventListener('click', function() {
-            spinner.show('Loading details...');
-        });
-    });
-
-    // Hide spinner when page is fully loaded
-    window.addEventListener('load', () => {
-        setTimeout(() => spinner.hide(), 500);
-    });
-
-    // Also hide spinner if there's an error
-    window.addEventListener('error', () => spinner.hide());
 });
 
 function setupNavigationHandlers() {
     const spinner = window.spinner;
+    const startNavigationTransition = (message) => {
+        _stopBackgroundWorkForNavigation();
+        spinner.lockForNavigation(message);
+    };
     
     // Handle form submissions
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
         form.addEventListener('submit', function(e) {
             const action = this.getAttribute('action') || '';
+            const target = this.getAttribute('target') || '';
+
+            if (target === '_blank' || this.dataset.noSpinner === 'true') {
+                return;
+            }
+
             let message = 'Processing...';
-            
             if (action.includes('search')) {
                 message = 'Searching...';
             }
-            
-            spinner.show(message);
+
+            setTimeout(() => {
+                if (!e.defaultPrevented) {
+                    startNavigationTransition(message);
+                }
+            }, 0);
         });
     });
 
-    // Handle navigation clicks - but only for same-origin links
+    const shouldTriggerNavigationSpinner = (event, link) => {
+        if (!link) return false;
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return false;
+        if (link.hasAttribute('download') || link.target === '_blank') return false;
+        if (link.dataset.bsToggle || link.getAttribute('role') === 'button') return false;
+        if (event.defaultPrevented || event.button !== 0) return false;
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+
+        const url = new URL(link.href, window.location.href);
+        if (url.origin !== window.location.origin) return false;
+        if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return false;
+
+        return true;
+    };
+
     const links = document.querySelectorAll('a[href]:not([target="_blank"])');
     links.forEach(link => {
-        const href = link.getAttribute('href');
-        
-        // Only handle links that navigate to new pages (not anchors or javascript)
-        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
-            link.addEventListener('click', function(e) {
-                // Don't intercept if it's the same page or has special handlers
-                if (this.getAttribute('href') !== window.location.pathname) {
-                    spinner.show('Loading...');
-                    
-                    // For PWA, also set up a timeout to hide if navigation doesn't happen
-                    setTimeout(() => {
-                        // If we're still on the same page after 2 seconds, hide spinner
-                        if (window.location.pathname === new URL(this.href, window.location.origin).pathname) {
-                            spinner.hide();
-                        }
-                    }, 2000);
+        link.addEventListener('click', function(event) {
+            if (!shouldTriggerNavigationSpinner(event, this)) return;
+
+            startNavigationTransition('Loading page...');
+
+            // Safety release if custom JS cancels navigation after the click.
+            setTimeout(() => {
+                if (document.visibilityState === 'visible' && !_bg.navigating) {
+                    spinner.unlockNavigation();
                 }
-            });
-        }
-    });
-
-    // Handle manage page item clicks
-    const manageItems = document.querySelectorAll('.media-item, .result-item, .search-result-card');
-    manageItems.forEach(item => {
-        item.addEventListener('click', function() {
-            spinner.show('Loading details...');
-            
-            // Safety timeout for modal loads
-            setTimeout(() => spinner.hide(), 5000);
+            }, 8000);
         });
     });
 
-    // Listen for modal events to hide spinner when modals open
-    document.addEventListener('show.bs.modal', () => {
-        spinner.hide();
-    });
+    document.addEventListener('pointerdown', function(event) {
+        const link = event.target.closest('a[href]:not([target="_blank"])');
+        if (!link) return;
+        if (!shouldTriggerNavigationSpinner(event, link)) return;
+        _stopBackgroundWorkForNavigation();
+    }, true);
 
-    // Listen for AJAX completion (if using fetch/XHR)
-    const originalFetch = window.fetch;
-    window.fetch = function(...args) {
-        const promise = originalFetch.apply(this, args);
-        promise.finally(() => {
-            setTimeout(() => spinner.hide(), 100);
-        });
-        return promise;
-    };
+    document.addEventListener('touchstart', function(event) {
+        const link = event.target.closest('a[href]:not([target="_blank"])');
+        if (!link) return;
+        if (link.dataset.bsToggle || link.getAttribute('role') === 'button') return;
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+        if (link.hasAttribute('download') || link.target === '_blank') return;
+        const url = new URL(link.href, window.location.href);
+        if (url.origin !== window.location.origin) return;
+        _stopBackgroundWorkForNavigation();
+    }, { capture: true, passive: true });
 }
 
 // Make spinner available globally
@@ -4383,39 +4832,28 @@ class PWALoadingHelper {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('message', (event) => {
                 if (event.data && event.data.type === 'CONTENT_LOADED') {
-                    window.spinner.hide();
+                    window.spinner.markPageReady();
                 }
             });
         }
 
         // Handle beforeunload for page transitions
         window.addEventListener('beforeunload', () => {
-            window.spinner.show('Loading...');
+            _stopBackgroundWorkForNavigation();
+            window.spinner.lockForNavigation('Loading...');
+        });
+
+        window.addEventListener('pagehide', () => {
+            _stopBackgroundWorkForNavigation();
         });
 
         // Handle page restoration from cache (PWA behavior)
         window.addEventListener('pageshow', (event) => {
+            _bg.navigating = false;
             if (event.persisted) {
-                // Page was restored from bfcache
-                setTimeout(() => window.spinner.hide(), 100);
+                setTimeout(() => window.spinner.unlockNavigation(), 100);
             }
         });
-
-        // Add manual close button as fallback
-        const forceCloseBtn = document.getElementById('forceCloseSpinner');
-        if (forceCloseBtn) {
-            forceCloseBtn.addEventListener('click', () => {
-                window.spinner.hide();
-            });
-            
-            // Show close button after 8 seconds if spinner is still visible
-            setInterval(() => {
-                const spinner = document.getElementById('globalLoadingSpinner');
-                if (spinner && spinner.classList.contains('show')) {
-                    forceCloseBtn.style.display = 'block';
-                }
-            }, 8000);
-        }
     }
 }
 

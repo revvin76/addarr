@@ -1,4 +1,4 @@
-# Addarr 🎬📺📚
+# arrdash 🎬📺📚
 
 A self-hosted Flask web app that acts as a unified front-end for your **Radarr**, **Sonarr**, and **Readarr** instances. Search, add, and manage movies, TV shows, and books from a single responsive interface — on any device, from anywhere.
 
@@ -6,9 +6,9 @@ A self-hosted Flask web app that acts as a unified front-end for your **Radarr**
 
 ---
 
-## What Addarr Does
+## What arrdash Does
 
-Instead of logging into Radarr, Sonarr, and Readarr separately, Addarr gives you one place to:
+Instead of logging into Radarr, Sonarr, and Readarr separately, arrdash gives you one place to:
 
 - **Search** movies, TV shows, and books simultaneously
 - **Add** them to your library with one tap
@@ -21,7 +21,7 @@ Instead of logging into Radarr, Sonarr, and Readarr separately, Addarr gives you
 
 ## Prerequisites
 
-Before setting up Addarr, you need at least one of the following running and accessible:
+Before setting up arrdash, you need at least one of the following running and accessible:
 
 | Service | Purpose | Default Port |
 |---------|---------|-------------|
@@ -43,8 +43,8 @@ You also need:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/revvin76/addarr.git
-cd addarr
+git clone https://github.com/revvin76/arrdash.git
+cd arrdash
 ```
 
 ### 2. Install Python dependencies
@@ -61,13 +61,13 @@ cp demo_env .env
 
 Then edit `.env` with your details (see [Configuration](#configuration) below).
 
-### 4. Start Addarr
+### 4. Start arrdash
 
 ```bash
 python app.py
 ```
 
-Addarr will start on port `5000` by default. Open `http://localhost:5000` in your browser.
+arrdash will start on port `5000` by default. Open `http://localhost:5000` in your browser.
 
 ---
 
@@ -77,7 +77,7 @@ All configuration is done in the `.env` file. You can also manage most settings 
 
 ### Required — Media Services
 
-Configure whichever services you use. Addarr works fine with just one.
+Configure whichever services you use. arrdash works fine with just one.
 
 ```env
 # Radarr (movies)
@@ -152,7 +152,7 @@ AUTH_USERNAME=admin
 AUTH_PASSWORD=your_secure_password
 ```
 
-Adds HTTP basic authentication to the entire app. Recommended when exposing Addarr remotely.
+Adds HTTP basic authentication to the entire app. Recommended when exposing arrdash remotely.
 
 ### Optional — Remote Access
 
@@ -164,7 +164,7 @@ DUCKDNS_TOKEN=your_duckdns_token
 DUCKDNS_ENABLED=true
 ```
 
-**Pinggy tunnel** (secure HTTPS tunnel — access Addarr from anywhere without port forwarding):
+**Pinggy tunnel** (secure HTTPS tunnel — access arrdash from anywhere without port forwarding):
 
 ```env
 TUNNEL_ENABLED=true
@@ -177,13 +177,13 @@ Both are visible on the **Service Links** page once configured.
 ### Optional — Auto-updater
 
 ```env
-GITHUB_REPO=revvin76/addarr
+GITHUB_REPO=revvin76/arrdash
 CHECK_INTERVAL=3600         # seconds between update checks
 ENABLE_AUTO_UPDATE=true
 UPDATE_CHANNEL=prod         # prod or dev
 ```
 
-Addarr checks GitHub for new releases and shows a notification when one is available. Updates can be applied from the About panel.
+arrdash checks GitHub for new releases and shows a notification when one is available. Updates can be applied from the About panel.
 
 ### Flask / App settings
 
@@ -194,7 +194,7 @@ LOG_LEVEL=INFO              # DEBUG, INFO, WARNING, ERROR
 FLASK_DEBUG=false
 ```
 
-> **Important:** Change `FLASK_SECRET_KEY` to a random string before exposing Addarr to a network.
+> **Important:** Change `FLASK_SECRET_KEY` to a random string before exposing arrdash to a network.
 
 ---
 
@@ -202,7 +202,7 @@ FLASK_DEBUG=false
 
 ### Search
 
-Type anything in the search box on the home screen. Addarr queries Radarr (movies), Sonarr (TV), and optionally Readarr/Apify (books) simultaneously and interleaves results. Each card shows:
+Type anything in the search box on the home screen. arrdash queries Radarr (movies), Sonarr (TV), and optionally Readarr/Apify (books) simultaneously and interleaves results. Each card shows:
 
 - Poster, title, year, rating
 - Library status badge — **In Library**, **Not Added**, **On Disk**, **Missing**, or **Partial**
@@ -246,7 +246,7 @@ Monitor active qBittorrent downloads without opening the qBittorrent web UI. Sho
 
 ### Prowlarr Search
 
-Search all your configured indexers directly from Addarr. Filter by category (Movies / TV / Books / Apps). Results open in your configured download client.
+Search all your configured indexers directly from arrdash. Filter by category (Movies / TV / Books / Apps). Results open in your configured download client.
 
 ### Service Links
 
@@ -256,7 +256,7 @@ Dashboard showing quick-access links to all your configured services (Radarr, So
 
 ## Caching
 
-Addarr maintains a local `metadata/` directory for caching:
+arrdash maintains a local `metadata/` directory for caching:
 
 | Cache file | Contents | Expires |
 |-----------|---------|--------|
@@ -273,7 +273,7 @@ Static metadata (posters, titles, descriptions) is written once and never re-fet
 
 ## Progressive Web App (PWA)
 
-Addarr is installable as a PWA on any device:
+arrdash is installable as a PWA on any device:
 
 - **iPhone/iPad:** Safari → Share → Add to Home Screen
 - **Android:** Chrome → ⋮ menu → Install App
@@ -293,17 +293,17 @@ Once installed it behaves like a native app — full screen, home screen icon, n
 
 ## Troubleshooting
 
-**Addarr starts but I can't find my Radarr quality profile ID**
+**arrdash starts but I can't find my Radarr quality profile ID**
 Go to `http://your-radarr-host:7878/api/v3/qualityprofile?apikey=YOUR_KEY` — each profile object has an `id` field.
 
 **Search returns no results**
-Check that your Radarr/Sonarr URLs are reachable from the machine running Addarr, not just from your browser. Use the Settings panel → Test Connection buttons.
+Check that your Radarr/Sonarr URLs are reachable from the machine running arrdash, not just from your browser. Use the Settings panel → Test Connection buttons.
 
 **Book covers not showing**
-Covers for library books route through Addarr's image proxy (`/api/readarr/cover`). Make sure Addarr can reach your Readarr instance at `READARR_URL`. Covers from Apify/Goodreads search load directly from the web and don't need the proxy.
+Covers for library books route through arrdash's image proxy (`/api/readarr/cover`). Make sure arrdash can reach your Readarr instance at `READARR_URL`. Covers from Apify/Goodreads search load directly from the web and don't need the proxy.
 
 **EPUB reader shows blank page**
-Ensure the book file path is accessible to Readarr and that Readarr's `bookFile` endpoint returns a valid path. Check `addarr.log` for errors from the `/api/book/file/<id>` route.
+Ensure the book file path is accessible to Readarr and that Readarr's `bookFile` endpoint returns a valid path. Check `arrdash.log` for errors from the `/api/book/file/<id>` route.
 
 **Bookmark badge not showing on Manage Books**
 The badge is read from your browser's `localStorage`. It appears when you switch back to the Manage Books tab after reading. If it still doesn't show, try refreshing the page.
@@ -315,14 +315,14 @@ Pinggy free tunnels change address on each restart. A reserved subdomain require
 
 ## Logs
 
-Application logs are written to `addarr.log` in the project root and are also viewable in-app at `/logs`. Set `LOG_LEVEL=DEBUG` in `.env` for verbose output.
+Application logs are written to `arrdash.log` in the project root and are also viewable in-app at `/logs`. Set `LOG_LEVEL=DEBUG` in `.env` for verbose output.
 
 ---
 
 ## Project Structure
 
 ```
-addarr/
+arrdash/
 ├── app.py              # Application entry point, startup logic
 ├── routes.py           # All Flask route definitions
 ├── utils.py            # Shared utility methods (API calls, caching)

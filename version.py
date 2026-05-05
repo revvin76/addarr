@@ -1,5 +1,5 @@
 """
-Version information for Addarr application.
+Version information for arrdash application.
 This module provides centralized version management.
 """
 

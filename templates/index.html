@@ -33,7 +33,7 @@
     <div id="mainSearchContainer" class="search-container main-search-container">
         <div class="text-center mb-3 search-hero" id="homeHero">
             <h3 class="text-light">Welcome to ADDARR</h3>
-            <p class="text-light mb-0" id="homeHeroCopy">Search for movies, TV shows{% if config.readarr.enabled %} and books{% endif %} to add to your media library.</p>
+            <p class="text-light mb-0" id="homeHeroCopy"></p>
         </div>
 
         <div class="search-form-wrapper" id="homeSearchForm">
@@ -44,9 +44,7 @@
                         name="query" id="mainSearchInput"
                         placeholder="Search movies, TV shows{% if config.readarr.enabled %} and books{% endif %}..." required
                         autocomplete="off">
-                    <button type="button" class="manage-library-searchbar__clear" id="clearSearch" disabled aria-label="Clear search">
-                    <i class="fas fa-xmark"></i>
-            </button>
+
                 </div>
                 <!-- <div class="mb-2">
                     <button type="submit" class="btn btn-primary btn-lg w-100">Search All Media</button>
@@ -249,13 +247,16 @@
 </div>
 
 <!-- Global Loading Spinner -->
-<div id="globalLoadingSpinner" class="loading-spinner">
-    <div class="spinner-container">
-        <button id="forceCloseSpinner" class="btn-close btn-close-white mt-3" style="display: none;"></button>
-        <div class="spinner-border spinner-radarr" role="status">
-            <span class="visually-hidden">Loading...</span>
+<div id="globalLoadingSpinner" class="loading-spinner show">
+    <div class="loading-spinner__panel">
+        <button id="forceCloseSpinner" class="btn-close btn-close-white force-close-spinner-hidden loading-spinner__close"></button>
+        <div class="loading-spinner__logo" aria-hidden="true">
+            <span class="loading-spinner__triangle loading-spinner__triangle--left"></span>
+            <span class="loading-spinner__triangle loading-spinner__triangle--top"></span>
+            <span class="loading-spinner__triangle loading-spinner__triangle--bottom"></span>
+            <span class="loading-spinner__plus loading-spinner__plus--h"></span>
+            <span class="loading-spinner__plus loading-spinner__plus--v"></span>
         </div>
-        <p class="mt-2 mb-0" id="loadingMessage">Loading...</p>
     </div>
 </div>
 
@@ -415,11 +416,12 @@ function withQueryParam(url, key, value) {
 async function loadRecentlyDownloadedSection(url, sectionId, carouselId, type) {
     const cachedUrl = withQueryParam(url, 'cached_only', '1');
     const refreshUrl = withQueryParam(url, 'refresh', '1');
+    const fetchOptions = window._bg?.signal ? { signal: window._bg.signal } : {};
 
     let showedCachedItems = false;
 
     try {
-        const cachedResp = await fetch(cachedUrl);
+        const cachedResp = await fetch(cachedUrl, fetchOptions);
         const cachedData = await cachedResp.json();
         if (cachedData.items && cachedData.items.length > 0) {
             populateCarousel(carouselId, cachedData.items, type, cachedData.source);
@@ -427,10 +429,11 @@ async function loadRecentlyDownloadedSection(url, sectionId, carouselId, type) {
             showedCachedItems = true;
         }
     } catch (err) {
+        if (err.name === 'AbortError') return;
         console.warn(`Cached ${type} load skipped:`, err);
     }
 
-    const refreshPromise = fetch(refreshUrl)
+    const refreshPromise = fetch(refreshUrl, fetchOptions)
         .then(resp => resp.json())
         .then(data => {
             if (data.items && data.items.length > 0) {
@@ -441,6 +444,7 @@ async function loadRecentlyDownloadedSection(url, sectionId, carouselId, type) {
             }
         })
         .catch(err => {
+            if (err.name === 'AbortError') return;
             console.error(`Error refreshing recently downloaded ${type}:`, err);
             if (!showedCachedItems) {
                 hideCarouselSection(sectionId, carouselId);
@@ -495,6 +499,9 @@ function populateCarousel(carouselId, items, type, source) {
         // Determine link based on type and source (source passed as parameter, not from item)
         if (type === 'trending-movie') {
             subtitle = item.year || 'Unknown';
+            if (item.tmdbId) {
+                link = `/manage?view=movie&open=${item.tmdbId}&source=home&plexId=tmdb-${encodeURIComponent(item.tmdbId)}&plexTitle=${encodeURIComponent(item.title || '')}&plexYear=${encodeURIComponent(item.year || '')}`;
+            }
         } else if (type === 'movie') {
             subtitle = item.year || 'Unknown';
             if (item.tmdbId && item.tmdbId !== null) {
@@ -516,24 +523,24 @@ function populateCarousel(carouselId, items, type, source) {
                 // No TVDB ID found: navigate to manage page where user can search
                 link = `/manage?view=tv`;
             }
-        } else if (type === 'book' && source === 'readarr') {
-            // Books: prefer foreignBookId because manage-books cards store that consistently.
-            const openId = item.foreignBookId || item.id;
+        } else if (type === 'book' && (source === 'readarr' || source === 'local')) {
+            // For local books: use local DB ID as primary identifier
+            // For Readarr books: use foreign book ID as primary identifier
+            const openId = source === 'local' ? (item.id || item.foreignBookId) : (item.foreignBookId || item.id);
+            const openForeignId = item.foreignBookId || '';
+            const openInternalId = item.id || '';
             if (openId) {
-                link = `/manage-books?open=${openId}&source=home`;
+                link = `/manage-books?open=${encodeURIComponent(openId)}&source=home&openForeign=${encodeURIComponent(openForeignId)}&openInternal=${encodeURIComponent(openInternalId)}`;
             }
             subtitle = item.author || 'Unknown Author';
         }
 
         // Build the element - use div for non-clickable, a for clickable
-        const isTrendingDetail = type === 'trending-movie' && item.tmdbId;
         const element = link
             ? `<a href="${link}" class="carousel-item" title="${title}">`
-            : isTrendingDetail
-                ? `<button type="button" class="carousel-item carousel-item--button" data-home-detail="movie" data-media-id="${item.tmdbId}" data-tmdb-only="1" title="${title}">`
             : `<div class="carousel-item" title="${title}" style="cursor: default;">`;
 
-        const closeTag = link ? '</a>' : isTrendingDetail ? '</button>' : '</div>';
+        const closeTag = link ? '</a>' : '</div>';
 
         return `
             ${element}
@@ -579,12 +586,16 @@ document.addEventListener('DOMContentLoaded', function() {
     hero.classList.toggle('setup-hero', setupMode);
     heroCopy.textContent = setupMode
         ? 'Addarr is ready to be configured. Open the menu, then tap the cog to connect your services and start searching.'
-        : 'Search for movies, TV shows{% if config.readarr.enabled %} and books{% endif %} to add to your media library.';
+        : '';
     searchForm.classList.toggle('d-none', setupMode);
 
     // Load recently downloaded content when page loads
     if (!setupMode) {
-        loadRecentlyDownloaded();
+        if (window.trackGlobalLoading) {
+            window.trackGlobalLoading(loadRecentlyDownloaded(), 'Loading library...');
+        } else {
+            loadRecentlyDownloaded();
+        }
         // Setup carousel navigation after carousels are populated
         setTimeout(setupCarouselNavigation, 100);
     }
@@ -595,17 +606,6 @@ document.addEventListener('DOMContentLoaded', function() {
         captureHomePageState();
     });
 
-    document.addEventListener('click', function(event) {
-        const trigger = event.target.closest('.carousel-item[data-home-detail]');
-        if (!trigger) return;
-        event.preventDefault();
-        const mediaType = trigger.dataset.homeDetail;
-        const mediaId = trigger.dataset.mediaId;
-        const tmdbOnly = trigger.dataset.tmdbOnly === '1';
-        if (typeof showDetails === 'function' && mediaType && mediaId) {
-            showDetails(mediaType, mediaId, tmdbOnly);
-        }
-    });
 });
 </script>
 

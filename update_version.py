@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Version update script for Addarr.
+Version update script for arrdash.
 Updates the VERSION file and propagates to all relevant files.
 Usage: python update_version.py <new_version>
 Example: python update_version.py 1.2.0
@@ -34,8 +34,8 @@ def update_version(new_version):
         },
         {
             'path': os.path.join(project_root, 'demo_env'),
-            'pattern': r'# Addarr v[\d.]+',
-            'replacement': f'# Addarr v{new_version}',
+            'pattern': r'# arrdash v[\d.]+',
+            'replacement': f'# arrdash v{new_version}',
             'type': 'regex'
         },
         {
@@ -52,7 +52,7 @@ def update_version(new_version):
         }
     ]
     
-    print(f"🔄 Updating Addarr version to {new_version}...\n")
+    print(f"🔄 Updating arrdash version to {new_version}...\n")
     
     for file_config in files_to_update:
         filepath = file_config['path']

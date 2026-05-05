@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Addarr service worker
+// arrdash service worker
 // Bump CACHE_NAME any time you change asset behaviour or want clients to
 // drop stale entries on their next visit.
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_NAME = 'addarr-cache-v3';
+const CACHE_NAME = 'arrdash-cache-v3';
 
 // Pre-cache only the genuine static shell. HTML pages and API responses are
 // never pre-cached — that's what was producing ERR_CONTENT_LENGTH_MISMATCH on

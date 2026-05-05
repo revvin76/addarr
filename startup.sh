@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Addarr Flask Server Startup Script with Watchdog-based Reload
+# arrdash Flask Server Startup Script with Watchdog-based Reload
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELOAD_FILE="$SCRIPT_DIR/.reload"
 PYTHON="${PYTHON:-python3}"
-LOG_FILE="$SCRIPT_DIR/addarr.log"
+LOG_FILE="$SCRIPT_DIR/arrdash.log"
 
 kill_flask_process() {
     if [ -n "$FLASK_PID" ] && kill -0 "$FLASK_PID" 2>/dev/null; then

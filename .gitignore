@@ -105,3 +105,7 @@ static/image_cache/*.*
 
 ruflo/
 ruflo/*.*
+
+.claudeignore
+_scratchpad/
+_scratchpad/*.*

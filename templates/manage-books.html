@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Books - Addarr</title>
+    <title>Manage Books - arrdash</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/styles.css" rel="stylesheet">
     <link href="/static/css/manage-page.css" rel="stylesheet">
@@ -23,12 +23,12 @@
     // Sequential batch image loader — 20 at a time. Mirrors manage.html.
     function startProgressiveLoading() {
         const items = [...document.querySelectorAll('.book-item')];
-        if (!items.length) return;
+        if (!items.length) return Promise.resolve();
         let batchStart = 0;
         const BATCH = 20;
         function loadBatch() {
             const slice = items.slice(batchStart, batchStart + BATCH);
-            if (!slice.length) return;
+            if (!slice.length) return Promise.resolve();
             batchStart += BATCH;
             const promises = slice.map(item => {
                 const img = item.querySelector('.search-result-thumbnail');
@@ -46,14 +46,26 @@
                     img.src = src;
                 });
             });
-            Promise.all(promises).then(loadBatch);
+            return Promise.all(promises).then(loadBatch);
         }
-        loadBatch();
+        return loadBatch();
     }
     </script>
 </head>
 {% set current_page = 'manage-books' %}
-<body class="manage-library-page manage-books-page{% if source_home and open_id %} manage-library-page--home-launch{% endif %}" data-manage-view="book" data-home-launch="{{ 'true' if source_home and open_id else 'false' }}">
+<body class="manage-library-page manage-books-page{% if source_home and open_id %} manage-library-page--home-launch app-header-hidden{% endif %}" data-manage-view="book" data-home-launch="{{ 'true' if source_home and open_id else 'false' }}">
+    <div id="globalLoadingSpinner" class="loading-spinner show">
+        <div class="loading-spinner__panel">
+            <button id="forceCloseSpinner" class="btn-close btn-close-white force-close-spinner-hidden loading-spinner__close"></button>
+            <div class="loading-spinner__logo" aria-hidden="true">
+                <span class="loading-spinner__triangle loading-spinner__triangle--left"></span>
+                <span class="loading-spinner__triangle loading-spinner__triangle--top"></span>
+                <span class="loading-spinner__triangle loading-spinner__triangle--bottom"></span>
+                <span class="loading-spinner__plus loading-spinner__plus--h"></span>
+                <span class="loading-spinner__plus loading-spinner__plus--v"></span>
+            </div>
+        </div>
+    </div>
     {% include 'partials/navbar.html' %}
 
     <div class="page-sticky-controls manage-library-controls" id="stickyControls">
@@ -61,8 +73,7 @@
             <input type="hidden" id="mediaFilter" value="book">
 
             <div class="manage-library-tabs" role="tablist" aria-label="Book filters">
-                <button class="manage-library-tab is-active" type="button" data-manage-filter="downloaded">Downloaded</button>
-                <button class="manage-library-tab" type="button" data-manage-filter="missing">Missing</button>
+                <button class="manage-library-tab is-active" type="button" data-manage-filter="all">All</button>
                 <button class="manage-library-tab" type="button" data-manage-filter="not_started">Not Started</button>
                 <button class="manage-library-tab" type="button" data-manage-filter="reading">Reading</button>
                 <button class="manage-library-tab" type="button" data-manage-filter="complete">Complete</button>
@@ -87,6 +98,10 @@
                     <i class="fas fa-arrow-down-a-z me-1"></i>A-Z
                 </button>
                 <div id="azLetters" class="flex-grow-1"></div>
+                <label class="form-check form-switch manage-library-toolbar__toggle mb-0">
+                    <input class="form-check-input" type="checkbox" id="includeMissingToggle" {% if include_missing %}checked{% endif %}>
+                    <span class="form-check-label">Include Missing Books</span>
+                </label>
                 <button class="btn btn-outline-secondary btn-sm flex-shrink-0 manage-library-toolbar__prefs"
                         type="button"
                         title="Reading preferences" onclick="openReadingPrefs()">
@@ -109,7 +124,7 @@
             {% set rs = book.reading_status or 'not_started' %}
             {% set book_pages = (book.pages ~ 'p') if book.pages else '' %}
             {% set book_meta_secondary = book.genre or 'Library' %}
-            <article class="media-item book-item"
+            <article class="media-item book-item result-item results-listing results-listing--book results-listing--book-library"
                      data-title="{{ (book.title or book.filename)|lower }}"
                      data-author="{{ (book.author or '')|lower }}"
                      data-genre="{{ (book.genre or '')|lower }}"
@@ -124,15 +139,14 @@
                      data-has-azw3="{{ 'true' if book.has_azw3 else 'false' }}"
                      onclick="openBookDetails(this)">
 
-                    <div class="manage-library-card book-card">
-                    <div class="manage-library-card__poster search-result-thumbnail-container">
+                    <div class="results-listing__poster-wrap search-result-thumbnail-container book-card">
                         {% if book.id %}
                         <img data-src="/api/book/cover/{{ book.id }}?w=180&h=270"
                         {% else %}
                         <img data-src="{{ book.cover_url or '/static/images/apple-touch-icon.png' }}"
                         {% endif %}
                              src="/static/images/placeholder.png"
-                             class="manage-result-thumbnail manage-library-card__poster-img search-result-thumbnail book-thumb"
+                             class="results-listing__poster manage-result-thumbnail search-result-thumbnail book-thumb"
                              alt="{{ book.title or book.filename }}"
                              onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
                         <div class="book-status-ribbon rs-{{ rs }} book-rs-badge"
@@ -145,69 +159,43 @@
                             <i class="fas fa-bookmark"></i>
                             {% endif %}
                         </div>
-                        <!-- Always-visible clickable heart -->
+                    </div>
+
+                    <div class="results-listing__body manage-book-row">
+                        <div class="results-listing__head">
+                            <h2 class="results-listing__title book-title">{{ book.title or book.filename }}</h2>
+                            <div class="dropdown book-card-menu">
+                                <button class="results-listing__menu"
+                                        type="button"
+                                        data-bs-toggle="dropdown"
+                                        aria-expanded="false"
+                                        aria-label="Book status actions"
+                                        onclick="event.stopPropagation()">
+                                    <i class="fas fa-ellipsis-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-dark book-card-menu__dropdown" onclick="event.stopPropagation()">
+                                    <li><button class="dropdown-item" type="button" onclick="setBookStatusQuick(this.closest('.book-item'), 'reading')">Reading</button></li>
+                                    <li><button class="dropdown-item" type="button" onclick="setBookStatusQuick(this.closest('.book-item'), 'complete')">Complete</button></li>
+                                    <li><button class="dropdown-item" type="button" onclick="setBookStatusQuick(this.closest('.book-item'), 'dnf')">DNF</button></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="results-listing__meta">
+                            <span class="results-listing__year">{{ book.year or 'N/A' }}</span>
+                            <span class="results-listing__status {{ 'is-missing' if (book.file_state or 'downloaded') == 'missing' else 'is-library' }}">
+                                {{ 'Missing' if (book.file_state or 'downloaded') == 'missing' else rs|replace('_', ' ')|title }}
+                            </span>
+                        </div>
+
+                        <p class="results-listing__overview book-pages-meta">{{ (book.genre or 'No genre available.') ~ (book_pages and (' · ' ~ book_pages) or '') }}</p>
+
                         <button class="book-heart-btn {{ 'wishlisted' if book.is_wishlist else '' }}"
                                 data-wishlisted="{{ '1' if book.is_wishlist else '0' }}"
                                 onclick="event.stopPropagation(); quickToggleWishlist(this)"
                                 title="{{ 'Remove from wishlist' if book.is_wishlist else 'Add to wishlist' }}">
                             <i class="{{ 'fas' if book.is_wishlist else 'far' }} fa-heart"></i>
                         </button>
-                    </div>
-
-                    <div class="manage-library-card__body">
-                        {% if book.id %}
-                        <img data-src="/api/book/cover/{{ book.id }}?w=800&h=450"
-                             src="/static/images/placeholder.png"
-                             class="manage-library-card__backdrop"
-                             alt=""
-                             aria-hidden="true"
-                             onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                        {% else %}
-                        <img data-src="{{ book.cover_url or '/static/images/apple-touch-icon.png' }}"
-                             src="/static/images/placeholder.png"
-                             class="manage-library-card__backdrop"
-                             alt=""
-                             aria-hidden="true"
-                             onerror="this.onerror=null; this.src='/static/images/apple-touch-icon.png'">
-                        {% endif %}
-                        <div class="manage-library-card__scrim"></div>
-
-                        <div class="manage-library-card__content">
-                            <div class="manage-library-card__head">
-                                <div class="manage-library-card__head-main">
-                                    <h2 class="manage-library-card__title book-title">{{ book.title or book.filename }}</h2>
-                                    <div class="manage-library-card__meta">
-                                        <span class="results-listing__year">{{ book.year or 'N/A' }}</span>
-                                        <span>&bull;</span>
-                                        <span class="book-genre">{{ book.genre or 'No genre available.' }}</span>
-                                    </div>
-                                </div>
-                                <button class="manage-library-card__menu" type="button" aria-label="Open {{ book.title or book.filename }} details"
-                                        onclick="event.stopPropagation(); openBookDetails(this.closest('.book-item'))">
-                                    <i class="fas fa-ellipsis-vertical"></i>
-                                </button>
-                            </div>
-
-                            <div class="manage-library-card__stats">
-                                <div class="manage-library-card__badges">
-                                    <span class="manage-library-stat manage-library-stat--readarr">
-                                        <i class="fas fa-bookmark"></i>
-                                        <span class="results-listing__status {{ 'is-missing' if (book.file_state or 'downloaded') == 'missing' else 'is-library' }}">
-                                            {{ 'Missing' if (book.file_state or 'downloaded') == 'missing' else rs|replace('_', ' ')|title }}
-                                        </span>
-                                    </span>
-                                    <span class="manage-library-stat">
-                                        <i class="fas fa-book-open"></i>
-                                        <span>{{ book_meta_secondary | truncate(26, true, '…') }}</span>
-                                    </span>
-                                </div>
-
-                                {% if book_pages %}
-                                <div class="manage-library-card__runtime">{{ book_pages }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
                     </div>
             </article>
             {% endfor %}
@@ -278,129 +266,170 @@
     </div>
 
     <!-- ── Manual Import / Edit Metadata Modal ── -->
-    <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-modal="true">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header" style="border-color:#333;">
-                    <h5 class="modal-title" id="importModalLabel">
-                        <i class="fas fa-edit me-2" style="color:#c0392b;"></i>Edit Metadata
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="importFilePath">
-                    <input type="hidden" id="importDbId">
-                    <input type="hidden" id="importSelectedSource">
-                    <input type="hidden" id="importSelectedForeignBookId">
+    <!-- Left click area to close the modal (70px from left edge) -->
+    <div id="importModalBackdrop" class="import-modal-backdrop"></div>
 
-                    <div class="row g-3">
-                        <!-- Cover column -->
-                        <div class="col-md-3 text-center">
-                            <img id="importCoverPreview" src="" alt="Cover"
-                                 style="max-height:140px;border-radius:6px;display:none;margin-bottom:8px;">
-                            <div class="d-flex flex-column gap-2">
-                                <div>
-                                    <label class="form-label d-block" style="font-size:0.78rem;">Cover URL</label>
-                                    <input type="text" class="form-control form-control-sm"
-                                           id="importCoverUrl" placeholder="https://…"
-                                           oninput="previewCover(this.value)">
-                                </div>
-                                <div>
-                                    <label class="form-label d-block" style="font-size:0.78rem;">Upload image</label>
-                                    <input type="file" class="form-control form-control-sm"
-                                           id="importCoverFile" accept="image/*"
-                                           onchange="previewLocalCover(this)">
-                                </div>
-                                <button type="button" class="btn btn-sm btn-outline-danger"
-                                        id="importDeleteCoverBtn" onclick="deleteCover()"
-                                        title="Remove the current cover image">
-                                    <i class="fas fa-trash me-1"></i>Delete cover
-                                </button>                                
-                                <button type="button" class="btn btn-sm btn-outline-secondary"
-                                        id="importRefreshBtn" onclick="refreshMetadata()"
-                                        title="Re-fetch metadata and cover from Goodreads/Readarr">
-                                    <i class="fas fa-sync-alt me-1"></i>Refresh online
-                                </button>
-                                <!-- Online search results picker moved here - directly after Refresh button -->
-                                <div class="col-12">
-                                    <div id="onlinePickerWrap" style="display:none; margin-top:12px; padding: 12px; background:#242424; border-radius:6px; border:1px solid #333;">
-                                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                                            <div style="font-size:0.78rem; font-weight:600; text-transform:uppercase;
-                                                        letter-spacing:0.06em; color:#aaa;">
-                                                Pick a result to fill the form
-                                            </div>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary"
-                                                    id="onlinePickerCancelBtn"
-                                                    onclick="closeOnlinePickerWrap()"
-                                                    title="Close search results">
-                                                <i class="fas fa-times me-1"></i>Cancel
-                                            </button>
-                                        </div>
-                                        <div id="onlinePickerGrid"
-                                             style="display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
-                                                    gap:10px; max-height:340px; overflow-y:auto; padding-right:4px;">
-                                        </div>
-                                    </div>
-                                </div>                                
-                            </div>
+    <!-- Main edit metadata panel (slides in from right) -->
+    <div id="importModal" class="import-modal-panel">
+        <div class="import-modal-header bg-dark text-light" style="border-bottom: 1px solid #333;">
+            <h5 class="import-modal-title">
+                <i class="fas fa-edit me-2" style="color:#c0392b;"></i>Edit Metadata
+            </h5>
+            <button type="button" class="import-modal-close" aria-label="Close" onclick="closeImportModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="import-modal-body bg-dark text-light">
+            <input type="hidden" id="importFilePath">
+            <input type="hidden" id="importDbId">
+            <input type="hidden" id="importSelectedSource">
+            <input type="hidden" id="importSelectedForeignBookId">
+
+            <div class="row g-3">
+                <!-- Cover column -->
+                <div class="col-md-3 text-center">
+                    <img id="importCoverPreview" src="" alt="Cover"
+                         style="max-height:140px;border-radius:6px;display:none;margin-bottom:8px;">
+                    <div class="d-flex flex-column gap-2">
+                        <div>
+                            <label class="form-label d-block" style="font-size:0.78rem;">Cover URL</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   id="importCoverUrl" placeholder="https://…"
+                                   oninput="previewCover(this.value)">
                         </div>
-                        <!-- Fields column -->
-                        <div class="col-md-9">
-                            <div class="row g-2">
-                                <div class="col-12">
-                                    <label class="form-label" for="importTitle">Title *</label>
-                                    <input type="text" class="form-control" id="importTitle" required>
+                        <div>
+                            <label class="form-label d-block" style="font-size:0.78rem;">Upload image</label>
+                            <input type="file" class="form-control form-control-sm"
+                                   id="importCoverFile" accept="image/*"
+                                   onchange="previewLocalCover(this)">
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                id="importDeleteCoverBtn" onclick="deleteCover()"
+                                title="Remove the current cover image">
+                            <i class="fas fa-trash me-1"></i>Delete cover
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                id="importRefreshBtn" onclick="refreshMetadata()"
+                                title="Re-fetch metadata and cover from Goodreads/Readarr">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh online
+                        </button>
+                        <!-- Online search results picker moved here - directly after Refresh button -->
+                        <div class="col-12">
+                            <div id="onlinePickerWrap" style="display:none; margin-top:12px; padding: 12px; background:#242424; border-radius:6px; border:1px solid #333;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                    <div style="font-size:0.78rem; font-weight:600; text-transform:uppercase;
+                                                letter-spacing:0.06em; color:#aaa;">
+                                        Pick a result to fill the form
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            id="onlinePickerCancelBtn"
+                                            onclick="closeOnlinePickerWrap()"
+                                            title="Close search results">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </button>
                                 </div>
-                                <div class="col-12">
-                                    <label class="form-label" for="importAuthor">Author</label>
-                                    <input type="text" class="form-control" id="importAuthor">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="importYear">Year</label>
-                                    <input type="number" class="form-control" id="importYear"
-                                           min="1000" max="2099">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="importPages">Pages</label>
-                                    <input type="number" class="form-control" id="importPages" min="1">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="importIsbn">ISBN</label>
-                                    <input type="text" class="form-control" id="importIsbn">
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label" for="importGenre">Genre</label>
-                                    <input type="text" class="form-control" id="importGenre"
-                                           placeholder="e.g. Fiction, Fantasy">
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label" for="importGoodreadsUrl">
-                                        Goodreads URL
-                                        <small class="text-muted ms-1" style="font-size:0.75rem;">(paste to help find the right book)</small>
-                                    </label>
-                                    <input type="url" class="form-control" id="importGoodreadsUrl"
-                                           placeholder="https://www.goodreads.com/book/show/…">
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label" for="importOverview">Synopsis / Overview</label>
-                                    <textarea class="form-control" id="importOverview" rows="4"></textarea>
+                                <div id="onlinePickerGrid"
+                                     style="display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+                                            gap:10px; max-height:340px; overflow-y:auto; padding-right:4px;">
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <div id="importError"   class="alert alert-danger mt-3"  style="display:none;"></div>
-                    <div id="importSuccess" class="alert alert-success mt-3" style="display:none;"></div>
                 </div>
-                <div class="modal-footer" style="border-color:#333;">
-                    <small class="text-muted me-auto" id="importFileLabel"></small>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" id="importSaveBtn"
-                            onclick="saveImport()">
-                        <i class="fas fa-save me-1"></i>Save
-                    </button>
+                <!-- Fields column -->
+                <div class="col-md-9">
+                    <div class="row g-2">
+                        <!-- ── CORE INFORMATION SECTION ── -->
+                        <div class="col-12">
+                            <div style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#888; margin-bottom:8px;">
+                                Essential Metadata
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importTitle" style="font-weight:600; color:#f5f7fb;">Title <span style="color:#c0392b;">*</span></label>
+                            <input type="text" class="form-control" id="importTitle" required
+                                   style="border-color:#c0392b; border-width:2px;">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importAuthor" style="font-weight:600;">Author</label>
+                            <input type="text" class="form-control" id="importAuthor">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importGenre" style="font-weight:600;">Genre</label>
+                            <input type="text" class="form-control" id="importGenre"
+                                   placeholder="e.g. Fiction, Fantasy">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importGoodreadsUrl">
+                                Goodreads URL
+                                <small class="text-muted ms-1" style="font-size:0.75rem;">(paste to help find the right book, then click Refresh online)</small>
+                            </label>
+                            <input type="url" class="form-control" id="importGoodreadsUrl"
+                                   placeholder="https://www.goodreads.com/book/show/…">
+                        </div>
+
+                        <!-- ── DESCRIPTION SECTION ── -->
+                        <div class="col-12" style="margin-top:12px;">
+                            <div style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#888; margin-bottom:8px;">
+                                Description
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="importOverview">Synopsis / Overview</label>
+                            <textarea class="form-control" id="importOverview" rows="4"></textarea>
+                        </div>
+
+                        <!-- ── ADVANCED DETAILS (COLLAPSIBLE) ── -->
+                        <div class="col-12" style="margin-top:12px;">
+                            <button type="button" class="btn btn-link p-0"
+                                    onclick="toggleAdvancedDetails()"
+                                    style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#888; text-decoration:none;">
+                                <i class="fas fa-chevron-down me-2" id="advancedToggleIcon" style="display:inline-block; width:12px; transition:transform 200ms ease;"></i>
+                                <span>Technical Details</span>
+                            </button>
+                        </div>
+
+                        <!-- Spacer for advanced section -->
+                        <div class="col-12 import-advanced-detail" style="margin-top:8px; display:none;"></div>
+
+                        <!-- Year field -->
+                        <div class="col-md-4 import-advanced-detail" style="display:none;">
+                            <label class="form-label" for="importYear">Year</label>
+                            <input type="number" class="form-control" id="importYear"
+                                   min="1000" max="2099">
+                        </div>
+
+                        <!-- Pages field -->
+                        <div class="col-md-4 import-advanced-detail" style="display:none;">
+                            <label class="form-label" for="importPages">Pages</label>
+                            <input type="number" class="form-control" id="importPages" min="1">
+                        </div>
+
+                        <!-- ISBN field -->
+                        <div class="col-md-4 import-advanced-detail" style="display:none;">
+                            <label class="form-label" for="importIsbn">ISBN</label>
+                            <input type="text" class="form-control" id="importIsbn">
+                        </div>
+
+                        <!-- File label -->
+                        <div class="col-12 import-advanced-detail" style="display:none;">
+                            <small class="text-muted me-auto" id="importFileLabel"></small>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <div id="importError"   class="alert alert-danger mt-3"  style="display:none;"></div>
+            <div id="importSuccess" class="alert alert-success mt-3" style="display:none;"></div>
+        </div>
+
+        <div class="settings-drawer__footer border-secondary" style="border-top: 1px solid #333;">
+            <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+            <button type="button" class="btn btn-danger" id="importSaveBtn"
+                    onclick="saveImport()">
+                <i class="fas fa-save me-1"></i>Save
+            </button>
         </div>
     </div>
 
@@ -427,13 +456,18 @@
     const searchInput  = document.getElementById('searchInput');
     const clearBtn     = document.getElementById('clearSearch');
     const emptyMsg     = document.getElementById('emptySearch');
-    let currentBookFilter = 'downloaded';
+    let currentBookFilter = 'all';
+
+    function updateBookSearchPlaceholder(visibleCount) {
+        searchInput.placeholder = `Search the ${visibleCount} books in your library`;
+    }
 
     function applyFilters() {
         const term   = searchInput.value.trim().toLowerCase();
         const status = currentBookFilter;
         clearBtn.disabled = !term;
         let anyVisible = false;
+        let visibleCount = 0;
         document.querySelectorAll('.book-item').forEach(item => {
             const titleMatch  = !term || (item.dataset.title  || '').includes(term);
             const authorMatch = !term || (item.dataset.author || '').includes(term);
@@ -443,17 +477,19 @@
             let statusOk = true;
             if (status === 'wishlist') {
                 statusOk = item.dataset.wishlist === '1';
-            } else if (status === 'downloaded' || status === 'missing') {
-                statusOk = (item.dataset.fileState || 'downloaded') === status;
             } else if (status !== 'all') {
                 statusOk = item.dataset.readingStatus === status;
             }
 
             const show = textOk && statusOk;
             item.style.display = show ? '' : 'none';
-            if (show) anyVisible = true;
+            if (show) {
+                anyVisible = true;
+                visibleCount += 1;
+            }
         });
         emptyMsg.style.display = anyVisible ? 'none' : 'block';
+        updateBookSearchPlaceholder(visibleCount);
     }
 
     function updateMediaDisplay() {
@@ -476,19 +512,37 @@
         applyFilters();
     });
 
+    const includeMissingToggle = document.getElementById('includeMissingToggle');
+    if (includeMissingToggle) {
+        includeMissingToggle.addEventListener('change', function() {
+            const url = new URL(window.location.href);
+            if (this.checked) url.searchParams.set('include_missing', '1');
+            else url.searchParams.delete('include_missing');
+            window.location.href = url.toString();
+        });
+    }
+
     // ── Auto-open book details if ?open=<id> parameter present ────────────────
     function handleAutoOpenBook() {
         const params = new URLSearchParams(window.location.search);
         const bookId = params.get('open');
+        const openForeignId = params.get('openForeign') || '';
+        const openInternalId = params.get('openInternal') || '';
         const launchSource = params.get('source');
         if (!bookId || launchSource !== 'home') return;
 
-        // First try to find by local db-id
-        let bookCard = document.querySelector(`[data-db-id="${bookId}"]`);
+        const cardSelectors = [
+            `[data-db-id="${bookId}"]`,
+            openForeignId ? `[data-foreign-id="${openForeignId}"]` : '',
+            `[data-foreign-id="${bookId}"]`,
+            openInternalId ? `[data-internal-id="${openInternalId}"]` : '',
+            `[data-internal-id="${bookId}"]`
+        ].filter(Boolean);
 
-        // If not found, try to find by foreign-id (Readarr ID)
-        if (!bookCard) {
-            bookCard = document.querySelector(`[data-foreign-id="${bookId}"]`);
+        let bookCard = null;
+        for (const selector of cardSelectors) {
+            bookCard = document.querySelector(selector);
+            if (bookCard) break;
         }
 
         const modalEl = document.getElementById('detailsModal');
@@ -497,6 +551,49 @@
                 modalEl.removeEventListener('hidden.bs.modal', onHomeLaunchClose);
                 window.location.href = '/';
             });
+        }
+
+        function fetchHomeLaunchBookDetails() {
+            const attempts = [];
+            const seen = new Set();
+            const enqueue = (url) => {
+                if (!url || seen.has(url)) return;
+                seen.add(url);
+                attempts.push(url);
+            };
+
+            if (openInternalId) {
+                enqueue(`/get_media_details?type=book&id=${encodeURIComponent(openInternalId)}&source=internal`);
+            }
+            if (openForeignId) {
+                enqueue(`/get_media_details?type=book&id=${encodeURIComponent(openForeignId)}`);
+            }
+            enqueue(`/get_media_details?type=book&id=${encodeURIComponent(bookId)}`);
+
+            const isUsableBookPayload = (book) => {
+                if (!book || book.error) return false;
+                const data = book.data || book;
+                if (!data || typeof data !== 'object') return false;
+                const title = (data.title || '').trim();
+                const author = (data.authorTitle || data.author?.authorName || data.author || '').trim();
+                const foreignId = String(data.foreignBookId || data.foreign_book_id || '').trim();
+                const internalId = String(data.id || data.internal_id || '').trim();
+                return Boolean(title || author || foreignId || internalId);
+            };
+
+            return attempts.reduce((chain, url) => {
+                return chain.catch(() => fetch(url)
+                    .then(r => {
+                        if (!r.ok) throw new Error(`API error: ${r.status}`);
+                        return r.json();
+                    })
+                    .then(book => {
+                        if (!isUsableBookPayload(book)) {
+                            throw new Error(`Empty book payload from ${url}`);
+                        }
+                        return book;
+                    }));
+            }, Promise.reject(new Error('No fetch attempts available')));
         }
 
         setTimeout(() => {
@@ -509,7 +606,7 @@
             const fallbackBook = {
                 id: null,
                 internal_id: null,
-                foreign_book_id: bookId,
+                foreign_book_id: openForeignId || bookId,
                 title: params.get('plexTitle') || 'Book',
                 author: '',
                 file_path: '',
@@ -521,11 +618,7 @@
             const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
             modal.show();
 
-            fetch(`/get_media_details?type=book&id=${encodeURIComponent(bookId)}`)
-                .then(r => {
-                    if (!r.ok) throw new Error(`API error: ${r.status}`);
-                    return r.json();
-                })
+            fetchHomeLaunchBookDetails()
                 .then(book => _renderBookDetailModal(book, null))
                 .catch(err => {
                     console.warn('[handleAutoOpenBook] Readarr fallback failed:', err);
@@ -586,6 +679,9 @@
             const readBtn = card.querySelector('a.btn-outline-success');
             if (readBtn) readBtn.href = `/read/local/${book.id}`;
         }
+        if (book.file_path) card.dataset.filePath = book.file_path;
+        if (book.foreign_book_id) card.dataset.foreignId = book.foreign_book_id;
+        if (book.internal_id) card.dataset.internalId = book.internal_id;
 
         // Replace "enriching…" pill with final source pill
         const pill = card.querySelector('.source-pill');
@@ -619,6 +715,13 @@
             statusEl.className = `results-listing__status ${fileState === 'missing' ? 'is-missing' : 'is-library'}`;
         }
 
+        const pagesEl = card.querySelector('.book-pages-meta');
+        if (pagesEl) {
+            const genre = book.genre || 'No genre available.';
+            const pages = book.pages ? `${book.pages}p` : '';
+            pagesEl.textContent = pages ? `${genre} · ${pages}` : genre;
+        }
+
         // Update reading ribbon
         if (book.reading_status) {
             card.dataset.readingStatus = book.reading_status;
@@ -636,23 +739,62 @@
         }
     }
 
+    function syncActiveBookUi(book, fallbackCard = null) {
+        if (!book) return;
+
+        const modalEl = document.getElementById('detailsModal');
+        const activeCard = fallbackCard || modalEl?._bookCard || null;
+
+        if (activeCard) {
+            patchBookCard(activeCard, book);
+        }
+
+        const activeBookId = modalEl?._bookId ? String(modalEl._bookId) : '';
+        const savedBookId = book.id ? String(book.id) : '';
+        if (modalEl && savedBookId && activeBookId && savedBookId === activeBookId && typeof _renderBookDetailModal === 'function') {
+            _renderBookDetailModal(book, activeCard);
+        }
+    }
+
     function normalizeManageBookForSharedModal(book, card) {
-        const coverUrl = book.id
-            ? `/api/book/cover/${book.id}?w=320&h=480&v=${PAGE_TS}`
-            : (book.cover_url || card?.querySelector('.book-thumb')?.src || '/static/images/apple-touch-icon.png');
+        const authorName = typeof book?.author === 'object'
+            ? (book.author?.authorName || book.author?.name || '')
+            : (book?.author || card?.dataset.author || '');
+        const coverId = book?.id || book?.internal_id || book?.internalId || null;
+        const coverVersion = encodeURIComponent(book?.updated_at || book?.added || PAGE_TS);
+        const posterImage = (book?.images || []).find(img => img?.coverType === 'poster' || img?.coverType === 'cover');
+        const remoteCoverUrl =
+            book?.cover_url ||
+            book?.remotePoster ||
+            posterImage?.remoteUrl ||
+            posterImage?.url ||
+            card?.querySelector('.book-thumb')?.src ||
+            '/static/images/apple-touch-icon.png';
+        const coverUrl = coverId
+            ? `/api/book/cover/${coverId}?w=320&h=480&v=${coverVersion}`
+            : remoteCoverUrl;
+        const backdropUrl = coverId
+            ? `/api/book/cover/${coverId}?w=1280&h=720&v=${coverVersion}`
+            : remoteCoverUrl;
 
         return {
             id: book.id,
+            internal_id: book.internal_id || book.internalId || null,
+            foreignBookId: book.foreignBookId || book.foreign_book_id || '',
             title: book.title || card?.querySelector('.book-title')?.textContent || 'Unknown Title',
             overview: book.overview || '',
-            path: book.file_path || card?.dataset.filePath || '',
-            releaseDate: book.year ? `${book.year}-01-01` : '',
-            pageCount: book.pages || null,
+            path: book.file_path || book.path || card?.dataset.filePath || '',
+            releaseDate: book.releaseDate || (book.year ? `${book.year}-01-01` : ''),
+            pageCount: book.pageCount || book.pages || null,
             added: book.added || '',
-            format: book.extension || '',
+            format: book.format || book.extension || '',
             source: book.source || card?.dataset.source || 'unknown',
-            author: { authorName: book.author || card?.dataset.author || '' },
-            images: [{ coverType: 'poster', remoteUrl: coverUrl, url: coverUrl }]
+            author: { authorName: authorName },
+            remotePoster: coverUrl,
+            images: [
+                { coverType: 'poster', remoteUrl: coverUrl, url: coverUrl },
+                { coverType: 'backdrop', remoteUrl: backdropUrl, url: backdropUrl }
+            ]
         };
     }
 
@@ -688,28 +830,40 @@
             })
             .then(book => _renderBookDetailModal(book, card))
             .catch(err => {
-                console.warn('[openBookDetails] API fetch failed, using card data:', err);
+                console.warn('[openBookDetails] API fetch failed, falling back to card data:', err);
+                // Fallback: set modal data from card when API fetch fails
+                const modalEl = document.getElementById('detailsModal');
+                if (modalEl && card) {
+                    modalEl._bookFilePath = card.dataset.filePath || '';
+                    modalEl._bookId = card.dataset.dbId || null;
+                }
             });
     }
 
     function _renderBookDetailModal(book, card) {
-        document.getElementById('detailsModalLabel').textContent = book.title || 'Book Details';
+        const detailBook = book && book.data ? book.data : book;
+        const normalizedBook = normalizeManageBookForSharedModal(detailBook, card);
+        const modalEl = document.getElementById('detailsModal');
+        document.getElementById('detailsModalLabel').textContent = detailBook?.title || 'Book Details';
         if (typeof setDetailsModalVariant === 'function') {
             setDetailsModalVariant('book');
         }
-        const fullData = normalizeManageBookEnvelope(book, card);
+        const fullData = (book && (book.data || book.status || book.on_disk !== undefined || book.monitored !== undefined))
+            ? book
+            : normalizeManageBookEnvelope(detailBook, card);
         if (card && (card.dataset.fileState || 'downloaded') === 'missing') {
             fullData.on_disk = false;
             fullData.status = 'missing';
         }
         renderBookDetails(
-            normalizeManageBookForSharedModal(book, card),
+            normalizedBook,
             fullData,
             'book',
-            book.id || null
+            normalizedBook?.id || normalizedBook?.internal_id || null
         );
-        document.getElementById('detailsModal')._bookCard = card || null;
-        document.getElementById('detailsModal')._bookId   = book.id || null;
+        modalEl._bookCard = card || null;
+        modalEl._bookId = normalizedBook?.id || normalizedBook?.internal_id || null;
+        modalEl._bookFilePath = normalizedBook?.path || detailBook?.file_path || '';
     }
 
     // Called by the "Edit Metadata" button inside the details modal.
@@ -718,8 +872,13 @@
     function openEditFromModal(btn) {
         const fp     = btn.dataset.editFp  || '';
         const bookId = btn.dataset.editId  || null;
-        const modal  = bootstrap.Modal.getInstance(document.getElementById('detailsModal'));
-        if (modal) modal.hide();
+        // Close the details modal first
+        const detailsModal = document.getElementById('detailsModal');
+        if (detailsModal) {
+            const bsModal = bootstrap.Modal.getInstance(detailsModal);
+            if (bsModal) bsModal.hide();
+            else detailsModal.classList.remove('show');
+        }
         setTimeout(() => triggerImport({ dataset: { filePath: fp } }, bookId || null), 300);
     }
 
@@ -1061,8 +1220,63 @@
             console.warn('[import] file-metadata fetch failed:', e);
         }
 
-        new bootstrap.Modal(document.getElementById('importModal')).show();
+        // Show custom modal with slide-in animation
+        const modalEl = document.getElementById('importModal');
+        const backdropEl = document.getElementById('importModalBackdrop');
+        const detailsModal = document.getElementById('detailsModal');
+        if (modalEl && backdropEl) {
+            modalEl.classList.add('show');
+            backdropEl.classList.add('show');
+            // Dim the background details modal
+            if (detailsModal) {
+                detailsModal.classList.add('import-modal-open');
+            }
+        }
     }
+
+    window.triggerImport = triggerImport;
+
+    function closeImportModal() {
+        const modalEl = document.getElementById('importModal');
+        const backdropEl = document.getElementById('importModalBackdrop');
+        const detailsModal = document.getElementById('detailsModal');
+        if (modalEl && backdropEl) {
+            modalEl.classList.remove('show');
+            backdropEl.classList.remove('show');
+            // Remove dimming from details modal
+            if (detailsModal) {
+                detailsModal.classList.remove('import-modal-open');
+            }
+        }
+    }
+
+    window.closeImportModal = closeImportModal;
+
+    // ── Toggle advanced details section ───────────────────────────────────────
+    function toggleAdvancedDetails() {
+        const section = document.getElementById('advancedDetailsSection');
+        const icon = document.getElementById('advancedToggleIcon');
+        if (section && icon) {
+            const isHidden = section.style.display === 'none';
+            section.style.display = isHidden ? 'contents' : 'none';
+            icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+    }
+
+    window.toggleAdvancedDetails = toggleAdvancedDetails;
+
+    // Initialize click-to-close on backdrop (left 70px area)
+    document.addEventListener('DOMContentLoaded', function() {
+        const backdropEl = document.getElementById('importModalBackdrop');
+        if (backdropEl) {
+            backdropEl.addEventListener('click', function(e) {
+                // Only close if click is in the clickable area (first 70px from left)
+                if (e.clientX < 70) {
+                    closeImportModal();
+                }
+            });
+        }
+    });
 
     function previewCover(url) {
         const img = document.getElementById('importCoverPreview');
@@ -1127,7 +1341,7 @@
                 card.dataset.idx = idx;
 
                 const srcClass = res.source === 'Google Books' ? 'google' : 'readarr';
-                const coverSrc = res.cover_url || '/static/images/apple-touch-icon.png';
+                const coverSrc = res.cover_preview_url || res.cover_url || '/static/images/apple-touch-icon.png';
                 const authorShort = (res.author || '').split(',')[0];
                 const year = res.year ? ' · ' + res.year : '';
 
@@ -1194,8 +1408,9 @@
             res.source_key === 'readarr' ? (res.foreign_book_id || '') : '';
 
         const prev = document.getElementById('importCoverPreview');
-        if (res.cover_url) {
-            prev.src = res.cover_url;
+        const previewUrl = res.cover_preview_url || res.cover_url || '';
+        if (previewUrl) {
+            prev.src = previewUrl;
             prev.style.display = 'block';
             prev.onerror = function() { prev.style.display = 'none'; };
         } else {
@@ -1224,10 +1439,7 @@
                 document.getElementById('importCoverPreview').style.display = 'none';
                 document.getElementById('importCoverUrl').value  = '';
                 document.getElementById('importCoverFile').value = '';
-                if (_importCard) {
-                    const img = _importCard.querySelector('.book-thumb');
-                    if (img) img.src = '/static/images/apple-touch-icon.png';
-                }
+                syncActiveBookUi(data.book, _importCard);
                 document.getElementById('importSuccess').textContent = '✓ Cover removed';
                 document.getElementById('importSuccess').style.display = 'block';
             }
@@ -1292,13 +1504,16 @@
                 if (upData.success && upData.book) savedBook = Object.assign(savedBook, upData.book);
             }
 
+            if (savedBook) {
+                syncActiveBookUi(savedBook, _importCard);
+            }
             if (_importCard) {
-                patchBookCard(_importCard, savedBook);
                 // Brief highlight so the user can see which card was updated
                 _importCard.style.outline = '2px solid #6ab759';
                 setTimeout(() => { if (_importCard) _importCard.style.outline = ''; }, 1800);
             }
-            bootstrap.Modal.getInstance(document.getElementById('importModal'))?.hide();
+            // Close the custom modal
+            closeImportModal();
         } catch (e) {
             document.getElementById('importError').textContent = e.message;
             document.getElementById('importError').style.display = 'block';
@@ -1350,6 +1565,24 @@
                 wBtn.className = `btn btn-sm ${now ? 'btn-danger' : 'btn-outline-danger'}`;
                 wBtn.textContent = `${now ? '♥' : '♡'} ${now ? 'In Wishlist' : 'Add to Wishlist'}`;
             }
+        })
+        .catch(console.error);
+    }
+
+    function setBookStatusQuick(card, status) {
+        if (!card) return;
+        const dbId = card.dataset.dbId;
+        if (!dbId) return;
+
+        fetch('/api/books/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ db_id: parseInt(dbId), reading_status: status })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            patchBookCard(card, data.book);
         })
         .catch(console.error);
     }
@@ -1444,7 +1677,11 @@
             initializeClearSearch();
             applyBookmarkBadges();
             buildAzNav();
-            startProgressiveLoading();
+            if (window.trackGlobalLoading) {
+                window.trackGlobalLoading(startProgressiveLoading(), 'Loading thumbnails...');
+            } else {
+                startProgressiveLoading();
+            }
             updateMediaDisplay();
             setTimeout(enrichPendingBooks, 200);
         } else {
@@ -1458,6 +1695,30 @@
             }
         });
     });
+
+    // ── Toggle Advanced Details in Import Modal ───────────────────────────────
+    function toggleAdvancedDetails() {
+        const icon = document.getElementById('advancedToggleIcon');
+        const fields = document.querySelectorAll('.import-advanced-detail');
+
+        if (!fields.length) return;
+
+        // Check current state
+        const isHidden = fields[0].style.display === 'none';
+
+        // Toggle display
+        fields.forEach(field => {
+            field.style.display = isHidden ? '' : 'none';
+        });
+
+        // Rotate icon
+        if (icon) {
+            const currentRotation = icon.style.transform ?
+                parseInt(icon.style.transform.match(/\d+/)?.[0] || 0) : 0;
+            const nextRotation = isHidden ? 180 : 0;
+            icon.style.transform = `rotate(${nextRotation}deg)`;
+        }
+    }
     </script>
 </body>
 </html>

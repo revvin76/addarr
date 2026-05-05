@@ -89,6 +89,26 @@ def get_book_by_id(db_id):
         return dict(row) if row else None
 
 
+def get_book_by_foreign_id(foreign_book_id):
+    """Return a book dict by Readarr/remote foreign book id."""
+    with _connect() as conn:
+        row = conn.execute(
+            'SELECT * FROM books WHERE foreign_book_id = ?',
+            (str(foreign_book_id),)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_book_by_internal_id(internal_id):
+    """Return a book dict by Readarr internal integer id."""
+    with _connect() as conn:
+        row = conn.execute(
+            'SELECT * FROM books WHERE internal_id = ?',
+            (internal_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
 def get_books_by_paths(file_paths):
     """Batch lookup by file path.  Returns {file_path: book_dict}."""
     if not file_paths:

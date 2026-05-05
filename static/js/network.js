@@ -1,4 +1,4 @@
-const PREFERRED_BASE_KEY = 'addarr_base_url';
+const PREFERRED_BASE_KEY = 'arrdash_base_url';
 
 async function fetchJsonWithFallback(path, options = {}, timeoutMs = 5000) {
   const base = await resolveBaseUrl();

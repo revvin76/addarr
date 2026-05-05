@@ -47,7 +47,7 @@ def setup_basic_logging():
     logger.setLevel(logging.INFO)
     
     handler = RotatingFileHandler(
-        'addarr.log', 
+        'arrdash.log', 
         maxBytes=5*1024*1024,
         backupCount=3,
         encoding='utf-8'
@@ -287,7 +287,7 @@ def print_welcome():
     global tunnel_url  # Add this line to access the global variable
 
     app_info = f"""
-    {Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}
+    {Fore.GREEN}🚀 arrdash MEDIA MANAGER{Style.RESET_ALL}
     {Fore.WHITE}• Version: {CONFIG.app.version}
     {Fore.WHITE}• Local: {Fore.CYAN}http://127.0.0.1:{CONFIG.app.port}{Style.RESET_ALL}
     {Fore.WHITE}• Network: {Fore.CYAN}http://{get_ip_address()}:{CONFIG.app.port}{Style.RESET_ALL}
@@ -311,7 +311,7 @@ def print_welcome():
         my_art.to_terminal()
     except Exception as e:
         # Fallback if logo isn't available
-        print(f"{Fore.GREEN}🚀 ADDARR MEDIA MANAGER{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}🚀 arrdash MEDIA MANAGER{Style.RESET_ALL}")
     
     print(app_info)
     with tunnel_url_lock:

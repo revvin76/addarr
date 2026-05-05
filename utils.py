@@ -203,29 +203,55 @@ def save_book_metadata(book_data, overwrite=True):
     """
     try:
         fid = str(book_data.get('foreignBookId', '')).strip()
-        if not fid:
+        internal_id = str(
+            book_data.get('internalId')
+            or book_data.get('internal_id')
+            or book_data.get('id')
+            or ''
+        ).strip()
+        if not fid and not internal_id:
             return
         _ensure_metadata_dir()
-        path = os.path.join(METADATA_DIR, f'book_{fid}.json')
-        if not overwrite and os.path.isfile(path):
-            logging.debug(f"[cache] skipped overwrite for book {fid} (permanent cache)")
+        payload = dict(book_data)
+        if fid:
+            payload['foreignBookId'] = fid
+        if internal_id:
+            payload['internalId'] = internal_id
+            payload['internal_id'] = internal_id
+
+        cache_paths = []
+        if fid:
+            cache_paths.append(os.path.join(METADATA_DIR, f'book_{fid}.json'))
+        if internal_id:
+            cache_paths.append(os.path.join(METADATA_DIR, f'book_internal_{internal_id}.json'))
+
+        existing_paths = [path for path in cache_paths if os.path.isfile(path)]
+        if not overwrite and existing_paths:
+            logging.debug(f"[cache] skipped overwrite for book {fid or internal_id} (permanent cache)")
             return
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(book_data, f, ensure_ascii=False, indent=2)
-        logging.debug(f"[cache] saved metadata for book {fid}")
+
+        for path in cache_paths:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+        logging.debug(f"[cache] saved metadata for book {fid or internal_id}")
     except Exception as e:
         logging.warning(f"[cache] save_book_metadata error: {e}")
 
 def load_book_metadata(foreign_book_id):
     """Load a cached book dict for foreign_book_id, or return None."""
     try:
-        path = os.path.join(METADATA_DIR, f'book_{foreign_book_id}.json')
-        if not os.path.isfile(path):
-            return None
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        logging.debug(f"[cache] loaded metadata for book {foreign_book_id}")
-        return data
+        candidates = [
+            os.path.join(METADATA_DIR, f'book_{foreign_book_id}.json'),
+            os.path.join(METADATA_DIR, f'book_internal_{foreign_book_id}.json'),
+        ]
+        for path in candidates:
+            if not os.path.isfile(path):
+                continue
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            logging.debug(f"[cache] loaded metadata for book {foreign_book_id}")
+            return data
+        return None
     except Exception as e:
         logging.warning(f"[cache] load_book_metadata error: {e}")
         return None
@@ -719,7 +745,7 @@ class SharedUtils:
     # ============ GOOGLE BOOKS METHODS ============
 
     def search_google_books(self, query, max_items=10):
-        """Search Google Books API and normalise results to Addarr book format.
+        """Search Google Books API and normalise results to arrdash book format.
 
         No API key required for up to ~1,000 requests/day.
         Set GOOGLE_BOOKS_API_KEY for a higher quota.
@@ -1003,9 +1029,9 @@ class SharedUtils:
 
     def _normalise_book_images(self, book):
         """Fix up Readarr image fields in-place.
-        - coverType 'cover' → 'poster' (Addarr convention)
+        - coverType 'cover' → 'poster' (arrdash convention)
         - remoteUrl missing and url is a relative Readarr path →
-          route through Addarr's /api/readarr/cover proxy so the
+          route through arrdash's /api/readarr/cover proxy so the
           browser doesn't need direct access to the Readarr host.
         """
         for img in book.get('images', []):

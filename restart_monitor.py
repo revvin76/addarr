@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).parent
 RELOAD_FILE = SCRIPT_DIR / '.reload'
 PORT = 5000
-LOG_FILE = SCRIPT_DIR / 'addarr.log'
+LOG_FILE = SCRIPT_DIR / 'arrdash.log'
 
 def get_flask_pid():
     """Get Flask process PID listening on the specified port."""

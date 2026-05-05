@@ -1,6 +1,6 @@
 {
-    "name": "Addarr",
-    "short_name": "Addarr",
+    "name": "arrdash",
+    "short_name": "arrdash",
     "version": "1.2.0",
     "start_url": "/",
     "display": "standalone",

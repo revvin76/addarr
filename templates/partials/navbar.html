@@ -10,7 +10,7 @@
 <div class="container-fluid bg-dark py-2 app-topbar" id="appTopbar">
     <div class="container d-flex align-items-center">
         <a href="/" class="d-flex align-items-center text-decoration-none me-auto">
-            <img src="/static/images/logo.png" alt="Addarr Logo" height="40" class="me-2">
+            <img src="/static/images/logo.png" alt="arrdash Logo" height="40" class="me-2">
         </a>
 
         <div class="d-flex align-items-center gap-2">
@@ -24,21 +24,9 @@
 <div class="nav-drawer" id="appNavDrawer" data-open="false" aria-hidden="true">
     <div class="nav-drawer__backdrop" data-nav-close></div>
     <aside class="nav-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="appNavDrawerTitle" tabindex="-1">
-        <div class="nav-drawer__header">
-            <div class="nav-drawer__brand">
-                <img src="/static/images/logo.png" alt="Addarr Logo" class="nav-drawer__logo">
-                <span class="visually-hidden" id="appNavDrawerTitle">Navigation</span>
-            </div>
-            <button class="nav-drawer__close btn btn-link text-light p-0" type="button" data-nav-close aria-label="Close navigation">
-                <i class="fas fa-x"></i>
-            </button>
-        </div>
-
-        <div class="nav-drawer__divider"></div>
-
         <nav class="nav-drawer__body" aria-label="Primary">
             <a class="nav-drawer__item {% if current_page == 'index' %}is-active{% endif %}" href="/">
-                <span class="nav-drawer__item-icon nav-drawer__item-icon--addarr"><i class="fas fa-house"></i></span>
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--arrdash"><i class="fas fa-house"></i></span>
                 <span>Home</span>
             </a>
 
@@ -72,7 +60,7 @@
 
             {% if (config.radarr.enabled and config.radarr.url) or (config.sonarr.enabled and config.sonarr.url) or (config.readarr.enabled and config.readarr.url) or (config.prowlarr.enabled and config.prowlarr.url) or (config.qbit.enabled and config.qbit.url) %}
             <a class="nav-drawer__item {% if current_page == 'links' %}is-active{% endif %}" href="/links">
-                <span class="nav-drawer__item-icon nav-drawer__item-icon--addarr"><i class="fas fa-link"></i></span>
+                <span class="nav-drawer__item-icon nav-drawer__item-icon--arrdash"><i class="fas fa-link"></i></span>
                 <span>Service Links</span>
             </a>
             {% endif %}
@@ -561,7 +549,7 @@
                                                 name="DUCKDNS_ENABLED" {% if config.duckdns.enabled %}checked{% endif %}>
                                             <label class="form-check-label" for="duckdnsEnabled">Enable DuckDNS</label>
                                         </div>
-                                            <small class="settings-module-note">Dynamic DNS for a stable hostname to reach Addarr remotely. <a href="https://www.duckdns.org" target="_blank" rel="noopener noreferrer">duckdns.org</a></small>
+                                            <small class="settings-module-note">Dynamic DNS for a stable hostname to reach arrdash remotely. <a href="https://www.duckdns.org" target="_blank" rel="noopener noreferrer">duckdns.org</a></small>
                                     </div>
                                     <div class="col-12 collapsible-content" id="duckdnsContent" {% if not config.duckdns.enabled %}style="display: none;"{% endif %}>
                                         <div class="row g-3">
@@ -605,7 +593,7 @@
                                                 name="ENABLE_AUTO_UPDATE" {% if config['update']['enabled'] %}checked{% endif %}>
                                             <label class="form-check-label" for="enableAutoUpdate">Enable Auto Update</label>
                                         </div>
-                                            <small class="settings-module-note">Automatically check your configured Addarr repository for releases. <a href="https://github.com/{{ config['update']['github_repo'] }}" target="_blank" rel="noopener noreferrer">Repository</a></small>
+                                            <small class="settings-module-note">Automatically check your configured arrdash repository for releases. <a href="https://github.com/{{ config['update']['github_repo'] }}" target="_blank" rel="noopener noreferrer">Repository</a></small>
                                     </div>
                                     <div class="col-12 collapsible-content" id="autoUpdateContent" {% if not config['update']['enabled'] %}style="display: none;"{% endif %}>
                                         <div class="row g-3">
@@ -648,7 +636,7 @@
                                                 name="TUNNEL_ENABLED" {% if config.tunnel.enabled %}checked{% endif %}>
                                             <label class="form-check-label" for="tunnelEnabled">Enable Pinggy Tunnel</label>
                                         </div>
-                                            <small class="settings-module-note">Secure tunnel access for reaching Addarr remotely. <a href="https://pinggy.io" target="_blank" rel="noopener noreferrer">pinggy.io</a></small>
+                                            <small class="settings-module-note">Secure tunnel access for reaching arrdash remotely. <a href="https://pinggy.io" target="_blank" rel="noopener noreferrer">pinggy.io</a></small>
                                     </div>
                                     <div class="col-12 collapsible-content" id="tunnelContent" {% if not config.tunnel.enabled %}style="display: none;"{% endif %}>
                                         <div class="row g-3">
@@ -684,7 +672,7 @@
                                                 name="AUTH_ENABLED" {% if config.auth.enabled %}checked{% endif %}>
                                             <label class="form-check-label" for="authEnabled">Enable Basic Authentication</label>
                                         </div>
-                                            <small class="settings-module-note">Protect Addarr with username and password access. <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication" target="_blank" rel="noopener noreferrer">MDN guide</a></small>
+                                            <small class="settings-module-note">Protect arrdash with username and password access. <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication" target="_blank" rel="noopener noreferrer">MDN guide</a></small>
                                     </div>
                                     <div class="col-12 collapsible-content" id="authContent" {% if not config.auth.enabled %}style="display: none;"{% endif %}>
                                         <div class="row g-3">
@@ -803,7 +791,7 @@
                                                 name="FLASK_DEBUG" {% if config.app.debug %}checked{% endif %}>
                                             <label class="form-check-label" for="debugEnabled">Enable Debug Mode</label>
                                         </div>
-                                            <small class="settings-module-note">Control local logging and developer diagnostics. <a href="https://github.com/{{ config['update']['github_repo'] }}" target="_blank" rel="noopener noreferrer">Addarr repository</a></small>
+                                            <small class="settings-module-note">Control local logging and developer diagnostics. <a href="https://github.com/{{ config['update']['github_repo'] }}" target="_blank" rel="noopener noreferrer">arrdash repository</a></small>
                                     </div>
                                     <div class="col-12 collapsible-content" id="debugContent" {% if not config.app.debug %}style="display: none;"{% endif %}>
                                         <div class="row g-3">
@@ -834,7 +822,7 @@
                         </div>
                         <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
-                                <p class="settings-module-note mb-3">Review release status and downloaded updates for your Addarr install. <a href="https://github.com/{{ config['update']['github_repo'] }}/blob/{{ config['update']['channel'] }}/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a></p>
+                                <p class="settings-module-note mb-3">Review release status and downloaded updates for your arrdash install. <a href="https://github.com/{{ config['update']['github_repo'] }}/blob/{{ config['update']['channel'] }}/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a></p>
                                 <div class="version-info">
                                     v{{ config.app.version }}
                                     <span class="badge {% if config.update.channel == 'dev' %}badge-warning{% else %}badge-success{% endif %}">
@@ -870,7 +858,7 @@
                         </div>
                         <div class="card bg-dark border-secondary settings-block-body" style="display:none;margin-top:10px;">
                             <div class="card-body">
-                                <p class="settings-module-note mb-3">Restart the running Addarr process after major configuration changes. <a href="https://github.com/{{ config['update']['github_repo'] }}" target="_blank" rel="noopener noreferrer">Project home</a></p>
+                                <p class="settings-module-note mb-3">Restart the running arrdash process after major configuration changes. <a href="https://github.com/{{ config['update']['github_repo'] }}" target="_blank" rel="noopener noreferrer">Project home</a></p>
                                 <div class="row g-3">
                                     <div class="col-12">
                                         <p class="text-muted mb-3">
@@ -920,7 +908,7 @@
 
         <div class="about-drawer__body">
             <div class="about-drawer__hero">
-                <img src="/static/images/logo.png" alt="Addarr Logo" class="about-drawer__logo">
+                <img src="/static/images/logo.png" alt="arrdash Logo" class="about-drawer__logo">
                 <p class="about-drawer__subtitle">Media Management System</p>
                 <div class="about-drawer__badges">
                     <span class="badge bg-radarr">Version: <span id="infoVersion">{{ config.app.version }}</span></span>
@@ -1020,7 +1008,7 @@
      Shared JS: config modal, notifications, test connections
 ════════════════════════════════════════════════════════ -->
 <script>
-window.addarrDefaultDisplayConfig = {
+window.arrdashDefaultDisplayConfig = {
     mode: 'dark',
     accent: '#6ab759',
     bg: '#1c1d24',
@@ -1035,7 +1023,7 @@ window.addarrDefaultDisplayConfig = {
     shadowOpacity: '0.38'
 };
 
-window.addarrDisplayConfig = {
+window.arrdashDisplayConfig = {
     mode: {{ config.display.mode | tojson }},
     accent: {{ config.display.accent | tojson }},
     bg: {{ config.display.bg | tojson }},
@@ -1077,32 +1065,32 @@ function applyDisplayConfigToInputs(cfg) {
 function syncDisplayConfigFromInputs() {
     const next = {
         mode: document.getElementById('displayMode')?.value || 'dark',
-        accent: document.getElementById('displayAccent')?.value || window.addarrDefaultDisplayConfig.accent,
-        bg: document.getElementById('displayBg')?.value || window.addarrDefaultDisplayConfig.bg,
-        panel: document.getElementById('displayPanel')?.value || window.addarrDefaultDisplayConfig.panel,
-        surface: document.getElementById('displaySurface')?.value || window.addarrDefaultDisplayConfig.surface,
-        surfaceAlt: document.getElementById('displaySurfaceAlt')?.value || window.addarrDefaultDisplayConfig.surfaceAlt,
-        text: document.getElementById('displayText')?.value || window.addarrDefaultDisplayConfig.text,
-        muted: document.getElementById('displayMuted')?.value || window.addarrDefaultDisplayConfig.muted,
-        radius: document.getElementById('displayRadius')?.value || window.addarrDefaultDisplayConfig.radius,
-        borderWidth: document.getElementById('displayBorderWidth')?.value || window.addarrDefaultDisplayConfig.borderWidth,
-        shadowOpacity: document.getElementById('displayShadowOpacity')?.value || window.addarrDefaultDisplayConfig.shadowOpacity,
-        border: document.getElementById('displayBorder')?.value || window.addarrDefaultDisplayConfig.border
+        accent: document.getElementById('displayAccent')?.value || window.arrdashDefaultDisplayConfig.accent,
+        bg: document.getElementById('displayBg')?.value || window.arrdashDefaultDisplayConfig.bg,
+        panel: document.getElementById('displayPanel')?.value || window.arrdashDefaultDisplayConfig.panel,
+        surface: document.getElementById('displaySurface')?.value || window.arrdashDefaultDisplayConfig.surface,
+        surfaceAlt: document.getElementById('displaySurfaceAlt')?.value || window.arrdashDefaultDisplayConfig.surfaceAlt,
+        text: document.getElementById('displayText')?.value || window.arrdashDefaultDisplayConfig.text,
+        muted: document.getElementById('displayMuted')?.value || window.arrdashDefaultDisplayConfig.muted,
+        radius: document.getElementById('displayRadius')?.value || window.arrdashDefaultDisplayConfig.radius,
+        borderWidth: document.getElementById('displayBorderWidth')?.value || window.arrdashDefaultDisplayConfig.borderWidth,
+        shadowOpacity: document.getElementById('displayShadowOpacity')?.value || window.arrdashDefaultDisplayConfig.shadowOpacity,
+        border: document.getElementById('displayBorder')?.value || window.arrdashDefaultDisplayConfig.border
     };
 
-    window.addarrDisplayConfig = next;
+    window.arrdashDisplayConfig = next;
     applyDisplayTheme();
 }
 
 function resetDisplayThemeDefaults() {
-    const defaults = { ...window.addarrDefaultDisplayConfig };
+    const defaults = { ...window.arrdashDefaultDisplayConfig };
     applyDisplayConfigToInputs(defaults);
-    window.addarrDisplayConfig = defaults;
+    window.arrdashDisplayConfig = defaults;
     applyDisplayTheme();
 }
 
 function applyDisplayTheme() {
-    const cfg = window.addarrDisplayConfig || {};
+    const cfg = window.arrdashDisplayConfig || {};
     const root = document.documentElement;
     if (!root) return;
 

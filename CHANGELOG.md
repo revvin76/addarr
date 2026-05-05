@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-05-05
+Rebrand and initial upload
+
 ## [1.1.36] - 2026-05-02
 
 ### Updated

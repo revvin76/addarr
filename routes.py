@@ -12,6 +12,7 @@ import difflib
 from datetime import datetime
 from update_manager import UpdateManager
 import books_db
+import utils as utils_module
 from PIL import Image
 import io, requests as req
 from urllib.parse import quote
@@ -76,7 +77,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     STATUS_CACHE_TTL = 300   # 5 minutes — only status can go stale
     RECENT_CACHE_TTL = 300   # 5 minutes for homepage recent payloads
 
-    def get_cached_library(media_type):
+    def get_cached_library(media_type, prefer_cached=False):
         """Three-tier library cache:
         1. In-memory dict (60 s TTL) — zero I/O
         2. Disk JSON file (1 hr TTL) — no API call
@@ -98,6 +99,15 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             cache_entry['data']      = disk_data
             cache_entry['timestamp'] = now
             return disk_data
+
+        if prefer_cached:
+            if disk_data is not None:
+                cache_entry['data'] = disk_data
+                cache_entry['timestamp'] = now
+                return disk_data
+            if cache_entry['data'] is not None:
+                return cache_entry['data']
+            return []
 
         # ── Tier 3: live API fetch with differential update ──────────────────
         try:
@@ -291,6 +301,487 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     def _refresh_requested():
         return request.args.get('refresh') == '1'
 
+    def _extract_author_name(value):
+        if isinstance(value, dict):
+            return (
+                value.get('authorName')
+                or value.get('name')
+                or ''
+            )
+        return str(value or '').strip()
+
+    def _extract_poster_url(item):
+        if not item:
+            return ''
+        if item.get('remotePoster'):
+            return item.get('remotePoster') or ''
+        for img in item.get('images', []) or []:
+            if img.get('coverType') in ('poster', 'cover'):
+                return img.get('remoteUrl') or img.get('url') or ''
+        return ''
+
+    def _img_proxy_url(remote_url, width, height, title=''):
+        if not remote_url:
+            return '/static/images/apple-touch-icon.png'
+        return f"/api/img?url={quote(remote_url)}&w={width}&h={height}&t={quote(title or '')}"
+
+    def _book_cover_preview_url(cover_url, title=''):
+        if not cover_url:
+            return '/static/images/apple-touch-icon.png'
+        if cover_url.startswith('/'):
+            return f"/api/readarr/cover?path={quote(cover_url)}"
+        if cover_url.startswith('http'):
+            return _img_proxy_url(cover_url, 174, 261, title)
+        return '/static/images/apple-touch-icon.png'
+
+    def _book_release_date(local_book=None, cached_meta=None, remote_data=None):
+        for candidate in (local_book or {}, cached_meta or {}, remote_data or {}):
+            release_date = candidate.get('releaseDate')
+            if release_date:
+                return release_date
+            year = candidate.get('year')
+            if year:
+                return f"{year}-01-01"
+        return ''
+
+    def _book_page_count(local_book=None, cached_meta=None, remote_data=None):
+        for candidate in (local_book or {}, cached_meta or {}, remote_data or {}):
+            pages = candidate.get('pageCount') or candidate.get('pages')
+            if pages:
+                return pages
+        return None
+
+    def _find_local_book_record(book_id=None, foreign_id=None, internal_id=None, file_path=None, title=None, author=None):
+        record = None
+        if file_path:
+            record = books_db.get_book_by_path(file_path)
+        if not record and book_id:
+            try:
+                record = books_db.get_book_by_id(int(book_id))
+            except Exception:
+                record = None
+        if not record and foreign_id:
+            record = books_db.get_book_by_foreign_id(str(foreign_id).strip())
+        if not record and internal_id:
+            try:
+                record = books_db.get_book_by_internal_id(int(internal_id))
+            except Exception:
+                record = books_db.get_book_by_internal_id(str(internal_id).strip()) if str(internal_id).strip().isdigit() else None
+        if not record and title:
+            title_key = str(title).strip().lower()
+            author_key = str(author or '').strip().lower()
+            for book in books_db.get_all_books():
+                if str(book.get('title') or '').strip().lower() != title_key:
+                    continue
+                if author_key and str(book.get('author') or '').strip().lower() != author_key:
+                    continue
+                record = book
+                break
+        return record
+
+    def _book_cache_metadata(*candidate_ids):
+        for candidate in candidate_ids:
+            candidate = str(candidate or '').strip()
+            if not candidate:
+                continue
+            cached = utils_module.load_book_metadata(candidate)
+            if cached:
+                return cached
+        return None
+
+    def _find_cached_readarr_book_record(foreign_id=None, internal_id=None, title_hint='', author_hint=''):
+        target_foreign = str(foreign_id or '').strip()
+        target_internal = str(internal_id or '').strip()
+        title_key = str(title_hint or '').strip().lower()
+        author_key = str(author_hint or '').strip().lower()
+
+        for book in get_cached_library('book', prefer_cached=True) or []:
+            if target_internal and str(book.get('id') or '').strip() == target_internal:
+                return book
+            if target_foreign and str(book.get('foreignBookId') or '').strip() == target_foreign:
+                return book
+            if title_key and str(book.get('title') or '').strip().lower() == title_key:
+                book_author = str(book.get('authorTitle') or '').strip().lower()
+                if not author_key or book_author == author_key:
+                    return book
+        return None
+
+    def _persist_book_enrichment(book_payload, local_book=None, preferred_foreign_id='', preferred_internal_id=''):
+        if not book_payload or book_payload.get('error'):
+            return local_book
+
+        raw = dict(book_payload.get('data') or book_payload)
+        if preferred_foreign_id and not raw.get('foreignBookId'):
+            raw['foreignBookId'] = str(preferred_foreign_id)
+        if preferred_internal_id and not raw.get('internalId') and not raw.get('internal_id'):
+            raw['internalId'] = str(preferred_internal_id)
+            raw['internal_id'] = str(preferred_internal_id)
+        utils_module.save_book_metadata(raw)
+
+        if not local_book or not local_book.get('file_path'):
+            return local_book
+
+        author_name = _extract_author_name(raw.get('author') or raw.get('authorTitle'))
+        cover_url = _extract_poster_url(raw)
+        genres = raw.get('genres') or []
+        if isinstance(genres, list):
+            genre_value = ', '.join(genres[:3]) if genres else None
+        else:
+            genre_value = genres or None
+
+        update = {
+            'file_path': local_book['file_path'],
+            'title': raw.get('title') or local_book.get('title'),
+            'author': author_name or local_book.get('author'),
+            'cover_url': cover_url or local_book.get('cover_url'),
+            'overview': raw.get('overview') or local_book.get('overview'),
+            'year': raw.get('year') or (raw.get('releaseDate') or '')[:4] or local_book.get('year'),
+            'pages': raw.get('pageCount') or raw.get('pages') or local_book.get('pages'),
+            'isbn': raw.get('isbn') or local_book.get('isbn'),
+            'genre': genre_value or local_book.get('genre'),
+            'foreign_book_id': str(raw.get('foreignBookId') or preferred_foreign_id or local_book.get('foreign_book_id') or ''),
+            'internal_id': raw.get('id') or raw.get('internalId') or raw.get('internal_id') or preferred_internal_id or local_book.get('internal_id'),
+            'source': 'readarr' if (raw.get('id') or raw.get('foreignBookId')) else 'google_books',
+        }
+        return books_db.save_book(update) or local_book
+
+    def _build_book_envelope(local_book=None, cached_meta=None, remote_payload=None, preferred_foreign_id='', preferred_internal_id=''):
+        remote_data = (remote_payload or {}).get('data') or (remote_payload or {})
+        local_book = local_book or {}
+        cached_meta = cached_meta or {}
+
+        title = (
+            local_book.get('title')
+            or cached_meta.get('title')
+            or remote_data.get('title')
+            or 'Unknown Title'
+        )
+        author_name = (
+            local_book.get('author')
+            or _extract_author_name(cached_meta.get('author'))
+            or _extract_author_name(remote_data.get('author') or remote_data.get('authorTitle'))
+            or 'Unknown Author'
+        )
+        poster_url = (
+            local_book.get('cover_url')
+            or cached_meta.get('remotePoster')
+            or _extract_poster_url(remote_data)
+            or '/static/images/apple-touch-icon.png'
+        )
+        overview = (
+            local_book.get('overview')
+            or cached_meta.get('overview')
+            or remote_data.get('overview')
+            or ''
+        )
+        release_date = _book_release_date(local_book, cached_meta, remote_data)
+        page_count = _book_page_count(local_book, cached_meta, remote_data)
+        foreign_book_id = str(
+            local_book.get('foreign_book_id')
+            or cached_meta.get('foreignBookId')
+            or remote_data.get('foreignBookId')
+            or preferred_foreign_id
+            or ''
+        ).strip()
+        internal_resolved = (
+            local_book.get('internal_id')
+            or remote_data.get('id')
+            or remote_data.get('internalId')
+            or remote_data.get('internal_id')
+            or preferred_internal_id
+            or None
+        )
+        on_disk = bool(local_book.get('file_path'))
+        status = 'existing' if on_disk else ((remote_payload or {}).get('status') or 'not_added')
+        monitored = (remote_payload or {}).get('monitored')
+        if monitored is None:
+            monitored = True
+
+        data = {
+            'id': local_book.get('id'),
+            'internal_id': internal_resolved,
+            'internalId': internal_resolved,
+            'foreignBookId': foreign_book_id,
+            'foreign_book_id': foreign_book_id,
+            'title': title,
+            'overview': overview,
+            'path': local_book.get('file_path') or remote_data.get('path') or '',
+            'releaseDate': release_date,
+            'pageCount': page_count,
+            'added': local_book.get('updated_at') or '',
+            'format': os.path.splitext(local_book.get('file_path') or '')[1].lstrip('.').upper() if local_book.get('file_path') else '',
+            'source': local_book.get('source') or remote_data.get('_source') or remote_data.get('source') or 'unknown',
+            'author': {'authorName': author_name},
+            'images': [{'coverType': 'poster', 'remoteUrl': poster_url, 'url': poster_url}] if poster_url else [],
+            'remotePoster': poster_url,
+            'year': (release_date[:4] if release_date else '') or local_book.get('year') or '',
+            'pages': page_count,
+            'isbn': local_book.get('isbn') or cached_meta.get('isbn') or remote_data.get('isbn') or '',
+            'genre': local_book.get('genre') or ', '.join((cached_meta.get('genres') or remote_data.get('genres') or [])[:3]) if isinstance((cached_meta.get('genres') or remote_data.get('genres') or []), list) else (local_book.get('genre') or cached_meta.get('genres') or remote_data.get('genres') or ''),
+        }
+        return {
+            'status': status,
+            'data': data,
+            'on_disk': on_disk,
+            'monitored': monitored,
+        }
+
+    def _resolve_book_reference(book_id=None, foreign_id=None, internal_id=None, file_path=None, title_hint='', author_hint=''):
+        local_book = _find_local_book_record(
+            book_id=book_id,
+            foreign_id=foreign_id,
+            internal_id=internal_id,
+            file_path=file_path,
+            title=title_hint,
+            author=author_hint,
+        )
+
+        preferred_foreign_id = str(
+            foreign_id
+            or (local_book or {}).get('foreign_book_id')
+            or ''
+        ).strip()
+        preferred_internal_id = str(
+            internal_id
+            or (local_book or {}).get('internal_id')
+            or ''
+        ).strip()
+
+        cached_meta = _book_cache_metadata(
+            preferred_foreign_id,
+            preferred_internal_id,
+            book_id,
+        )
+        cached_readarr_book = _find_cached_readarr_book_record(
+            foreign_id=preferred_foreign_id,
+            internal_id=preferred_internal_id,
+            title_hint=title_hint or (local_book or {}).get('title') or (cached_meta or {}).get('title') or '',
+            author_hint=author_hint or (local_book or {}).get('author') or _extract_author_name((cached_meta or {}).get('author')) or '',
+        )
+
+        if local_book or cached_meta or cached_readarr_book:
+            remote_payload = None
+            if cached_readarr_book:
+                remote_payload = {
+                    'status': 'existing' if (cached_readarr_book.get('statistics', {}) or {}).get('bookFileCount', 0) > 0 else 'not_added',
+                    'data': {
+                        'id': cached_readarr_book.get('id'),
+                        'internalId': cached_readarr_book.get('id'),
+                        'internal_id': cached_readarr_book.get('id'),
+                        'foreignBookId': cached_readarr_book.get('foreignBookId'),
+                        'title': cached_readarr_book.get('title'),
+                        'authorTitle': cached_readarr_book.get('authorTitle'),
+                        'author': {'authorName': cached_readarr_book.get('authorTitle')} if cached_readarr_book.get('authorTitle') else None,
+                        'overview': cached_readarr_book.get('overview'),
+                        'releaseDate': cached_readarr_book.get('releaseDate'),
+                        'pageCount': cached_readarr_book.get('pageCount'),
+                        'genres': cached_readarr_book.get('genres') or [],
+                        'remotePoster': cached_readarr_book.get('remotePoster') or '',
+                        'images': cached_readarr_book.get('images') or ([] if not cached_readarr_book.get('remotePoster') else [{
+                            'coverType': 'poster',
+                            'remoteUrl': cached_readarr_book.get('remotePoster'),
+                            'url': cached_readarr_book.get('remotePoster'),
+                        }]),
+                        'path': cached_readarr_book.get('path') or '',
+                    },
+                    'on_disk': bool((cached_readarr_book.get('statistics', {}) or {}).get('bookFileCount', 0) > 0),
+                    'monitored': bool(cached_readarr_book.get('monitored', True)),
+                }
+            return _build_book_envelope(
+                local_book=local_book,
+                cached_meta=cached_meta,
+                remote_payload=remote_payload,
+                preferred_foreign_id=preferred_foreign_id,
+                preferred_internal_id=preferred_internal_id,
+            )
+
+        remote_payload = None
+        query_title = title_hint or (local_book or {}).get('title') or (cached_meta or {}).get('title') or ''
+        query_author = author_hint or (local_book or {}).get('author') or _extract_author_name((cached_meta or {}).get('author')) or ''
+        query = f"{query_title} {query_author}".strip()
+
+        if CONFIG.google_books.enabled and query:
+            try:
+                results = utils.search_google_books(query, max_items=5)
+                if results:
+                    match = _best_enrichment_match(results, query_title, query_author) or results[0]
+                    if match:
+                        remote_payload = {
+                            'status': 'not_added',
+                            'data': match,
+                            'on_disk': False,
+                            'monitored': True,
+                        }
+                        local_book = _persist_book_enrichment(remote_payload, local_book, preferred_foreign_id, preferred_internal_id) or local_book
+                        cached_meta = _book_cache_metadata(preferred_foreign_id, preferred_internal_id, book_id) or cached_meta
+            except Exception as e:
+                logging.warning("[book_resolver] Google Books error: %s", e)
+
+        if not remote_payload and CONFIG.readarr.enabled:
+            lookup_id = preferred_foreign_id or str(book_id or '').strip()
+            if lookup_id:
+                remote_payload = utils.get_readarr_details(lookup_id)
+                if not remote_payload.get('error'):
+                    local_book = _persist_book_enrichment(remote_payload, local_book, preferred_foreign_id, preferred_internal_id) or local_book
+                    cached_meta = _book_cache_metadata(preferred_foreign_id, preferred_internal_id, book_id) or cached_meta
+
+        if local_book or cached_meta or (remote_payload and not remote_payload.get('error')):
+            return _build_book_envelope(
+                local_book=local_book,
+                cached_meta=cached_meta,
+                remote_payload=remote_payload,
+                preferred_foreign_id=preferred_foreign_id,
+                preferred_internal_id=preferred_internal_id,
+            )
+
+        return {'error': 'Book not found'}
+
+    def _find_cached_media_record(media_type, media_id=None, internal_id=None, source='', title_hint='', year_hint=''):
+        target_media_id = str(media_id or '').strip()
+        target_internal_id = str(internal_id or '').strip()
+        items = get_cached_library(media_type) or []
+
+        for item in items:
+            item_id = str(item.get('id') or '').strip()
+            if target_internal_id and item_id == target_internal_id:
+                return item
+
+            if media_type == 'movie':
+                if target_media_id and (
+                    str(item.get('tmdbId') or '').strip() == target_media_id
+                    or item_id == target_media_id
+                ):
+                    return item
+            else:
+                if target_media_id and (
+                    str(item.get('tvdbId') or '').strip() == target_media_id
+                    or (source == 'tmdb' and str(item.get('tmdbId') or '').strip() == target_media_id)
+                    or item_id == target_media_id
+                ):
+                    return item
+
+        if title_hint and year_hint:
+            return _best_cached_library_match(media_type, title_hint, year_hint)
+        return None
+
+    def _build_local_media_envelope(media_type, item):
+        if not item:
+            return None
+
+        if media_type == 'movie':
+            on_disk = bool(item.get('hasFile'))
+        else:
+            stats = item.get('statistics', {}) or {}
+            on_disk = bool(stats.get('episodeFileCount') or stats.get('percentOfEpisodes'))
+
+        return {
+            'status': 'existing' if on_disk else (item.get('status') or 'not_added'),
+            'data': item,
+            'on_disk': on_disk,
+            'monitored': item.get('monitored', False),
+        }
+
+    def _build_tmdb_media_envelope(media_type, tmdb_data, tmdb_id='', local_item=None):
+        if not tmdb_data:
+            return None
+
+        local_item = dict(local_item or {})
+        poster_path = tmdb_data.get('poster_path') or ''
+        backdrop_path = tmdb_data.get('backdrop_path') or ''
+        poster_url = f"https://image.tmdb.org/t/p/original{poster_path}" if poster_path else (local_item.get('remotePoster') or '')
+        backdrop_url = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
+
+        images = list(local_item.get('images') or [])
+        if poster_url and not any(img.get('coverType') == 'poster' for img in images):
+            images.append({'coverType': 'poster', 'url': poster_url, 'remoteUrl': poster_url})
+        if backdrop_url and not any(img.get('coverType') in {'fanart', 'backdrop'} for img in images):
+            images.append({'coverType': 'backdrop', 'url': backdrop_url, 'remoteUrl': backdrop_url})
+
+        data = {
+            **local_item,
+            'title': local_item.get('title') or tmdb_data.get('title') or 'Unknown Title',
+            'overview': local_item.get('overview') or tmdb_data.get('overview') or '',
+            'images': images,
+            'remotePoster': local_item.get('remotePoster') or poster_url,
+            'genres': local_item.get('genres') or tmdb_data.get('genres') or [],
+            'status': local_item.get('status') or tmdb_data.get('status') or 'unknown',
+        }
+
+        if media_type == 'movie':
+            tmdb_resolved = local_item.get('tmdbId') or tmdb_id
+            data.update({
+                'id': local_item.get('id') or tmdb_resolved,
+                'tmdbId': tmdb_resolved,
+                'year': local_item.get('year') or '',
+                'ratings': local_item.get('ratings') or ({'value': tmdb_data.get('vote_average')} if tmdb_data.get('vote_average') else {}),
+            })
+        else:
+            tmdb_resolved = local_item.get('tmdbId') or tmdb_id
+            first_air_date = tmdb_data.get('first_air_date') or ''
+            data.update({
+                'id': local_item.get('id') or tmdb_resolved,
+                'tmdbId': tmdb_resolved,
+                'tvdbId': local_item.get('tvdbId'),
+                'year': local_item.get('year') or (first_air_date[:4] if first_air_date else ''),
+                'ratings': local_item.get('ratings') or ({'value': tmdb_data.get('vote_average')} if tmdb_data.get('vote_average') else {}),
+            })
+
+        return {
+            'status': 'existing' if local_item else 'not_added',
+            'data': data,
+            'on_disk': bool(local_item.get('hasFile') if media_type == 'movie' else (local_item.get('statistics', {}) or {}).get('episodeFileCount')),
+            'monitored': local_item.get('monitored', False) if local_item else False,
+        }
+
+    def _resolve_movie_reference(media_id=None, internal_id=None, title_hint='', year_hint=''):
+        local_item = _find_cached_media_record(
+            'movie',
+            media_id=media_id,
+            internal_id=internal_id,
+            title_hint=title_hint,
+            year_hint=year_hint,
+        )
+        tmdb_id = str((local_item or {}).get('tmdbId') or media_id or '').strip()
+
+        if local_item:
+            return _build_local_media_envelope('movie', local_item)
+
+        if CONFIG.tmdb.enabled and tmdb_id:
+            try:
+                return _build_tmdb_media_envelope('movie', utils.get_tmdb_media_details('movie', tmdb_id), tmdb_id=tmdb_id)
+            except Exception as e:
+                logging.warning("[movie_resolver] TMDB lookup failed for %s: %s", tmdb_id, e)
+
+        if CONFIG.radarr.enabled and media_id:
+            return utils.get_radarr_details(media_id)
+
+        return {'error': 'Movie not found'}
+
+    def _resolve_tv_reference(media_id=None, internal_id=None, source='tvdb', title_hint='', year_hint=''):
+        local_item = _find_cached_media_record(
+            'tv',
+            media_id=media_id,
+            internal_id=internal_id,
+            source=source,
+            title_hint=title_hint,
+            year_hint=year_hint,
+        )
+        tmdb_id = str((local_item or {}).get('tmdbId') or (media_id if source == 'tmdb' else '') or '').strip()
+
+        if local_item:
+            return _build_local_media_envelope('tv', local_item)
+
+        if CONFIG.tmdb.enabled and tmdb_id:
+            try:
+                return _build_tmdb_media_envelope('tv', utils.get_tmdb_media_details('tv', tmdb_id), tmdb_id=tmdb_id)
+            except Exception as e:
+                logging.warning("[tv_resolver] TMDB lookup failed for %s: %s", tmdb_id, e)
+
+        if CONFIG.sonarr.enabled and media_id:
+            return utils.get_sonarr_details(media_id, source=source)
+
+        return {'error': 'Series not found'}
+
     # ============ ROUTE DEFINITIONS ============
     @app.route('/')
     @conditional_debug_log
@@ -320,6 +811,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         try:
             open_id = (request.args.get('open') or '').strip()
             source_home = (request.args.get('source') or '').strip().lower() == 'home' and bool(open_id)
+            include_missing = (request.args.get('include_missing') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
             from utils import scan_books_folder, extract_file_metadata, _title_from_filename
             books_db.init_db()
             root_folder = CONFIG.readarr.root_folder if CONFIG.readarr.enabled else None
@@ -383,15 +875,94 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     'file_state': 'downloaded',
                 })
 
+            if CONFIG.readarr.enabled and merged:
+                try:
+                    readarr_books = get_cached_library('book', prefer_cached=True) or []
+                    by_foreign = {
+                        str(b.get('foreignBookId') or '').strip(): b
+                        for b in readarr_books
+                        if b.get('foreignBookId')
+                    }
+                    by_internal = {
+                        str(b.get('id') or '').strip(): b
+                        for b in readarr_books
+                        if b.get('id') is not None
+                    }
+                    by_isbn = {}
+                    by_title_author = {}
+                    for rb in readarr_books:
+                        isbn = str(rb.get('isbn13') or rb.get('isbn10') or '').strip()
+                        if isbn:
+                            by_isbn[isbn] = rb
+                        key = (
+                            str(rb.get('title') or '').strip().lower(),
+                            str(rb.get('authorTitle') or '').strip().lower()
+                        )
+                        if key[0]:
+                            by_title_author[key] = rb
+
+                    for idx, rec in enumerate(merged):
+                        if (rec.get('foreign_book_id') and rec.get('internal_id')) or not rec.get('file_path'):
+                            continue
+
+                        matched = None
+                        if rec.get('foreign_book_id'):
+                            matched = by_foreign.get(str(rec.get('foreign_book_id')).strip())
+                        if not matched and rec.get('internal_id'):
+                            matched = by_internal.get(str(rec.get('internal_id')).strip())
+                        if not matched and rec.get('isbn'):
+                            matched = by_isbn.get(str(rec.get('isbn')).strip())
+                        if not matched:
+                            key = (
+                                str(rec.get('title') or '').strip().lower(),
+                                str(rec.get('author') or '').strip().lower()
+                            )
+                            matched = by_title_author.get(key)
+
+                        if not matched:
+                            continue
+
+                        updates = {
+                            'file_path': rec['file_path'],
+                            'foreign_book_id': str(matched.get('foreignBookId') or rec.get('foreign_book_id') or ''),
+                            'internal_id': matched.get('id') or rec.get('internal_id'),
+                            'author': rec.get('author') or matched.get('authorTitle'),
+                            'overview': rec.get('overview') or matched.get('overview'),
+                            'year': rec.get('year') or ((matched.get('releaseDate') or '')[:4] or None),
+                            'pages': rec.get('pages') or matched.get('pageCount'),
+                            'isbn': rec.get('isbn') or matched.get('isbn13') or matched.get('isbn10'),
+                            'genre': rec.get('genre') or ', '.join((matched.get('genres') or [])[:3]) or None,
+                        }
+                        cover_url = next(
+                            (
+                                (img.get('remoteUrl') or img.get('url'))
+                                for img in (matched.get('images') or [])
+                                if img.get('coverType') in ('poster', 'cover')
+                            ),
+                            None
+                        )
+                        if cover_url and not rec.get('cover_url'):
+                            updates['cover_url'] = cover_url
+
+                        saved = books_db.save_book(updates) or rec
+                        merged[idx] = {
+                            **rec,
+                            **saved,
+                            'has_azw3': rec.get('has_azw3', False),
+                            'file_state': rec.get('file_state', 'downloaded'),
+                        }
+                except Exception as e:
+                    logging.warning("[manage_books] Failed to sync local book IDs from Readarr cache: %s", e)
+
             local_foreign_ids = {
                 str(book.get('foreign_book_id') or '').strip()
                 for book in merged
                 if book.get('foreign_book_id')
             }
 
-            if CONFIG.readarr.enabled:
+            if include_missing and CONFIG.readarr.enabled:
                 try:
-                    readarr_books = get_cached_library('book') or []
+                    readarr_books = get_cached_library('book', prefer_cached=True) or []
                     for book in readarr_books:
                         foreign_id = str(book.get('foreignBookId') or '').strip()
                         if not foreign_id or foreign_id in local_foreign_ids:
@@ -430,15 +1001,18 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                     logging.warning("[manage_books] Failed to merge missing Readarr books: %s", e)
 
             merged.sort(key=lambda b: (b.get('title') or b['filename']).lower())
+            downloaded_count = sum(1 for b in merged if (b.get('file_state') or 'downloaded') == 'downloaded')
 
             return render_template(
                 'manage-books.html',
                 books=merged,
                 config=CONFIG._config,
-                total_downloaded=len(merged),
+                total_downloaded=downloaded_count,
+                total_loaded=len(merged),
                 root_folder=root_folder or '',
                 open_id=open_id,
                 source_home=source_home,
+                include_missing=include_missing,
             )
         except Exception as e:
             logging.error(f"Error loading manage-books: {e}", exc_info=True)
@@ -664,7 +1238,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
 
             if _cached_only_requested():
                 cached_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
-                return jsonify(cached_payload or {'items': [], 'type': 'movie', 'source': 'addarr'})
+                return jsonify(cached_payload or {'items': [], 'type': 'movie', 'source': 'arrdash'})
 
             if not _refresh_requested():
                 cached_payload = _load_recent_payload(recent_cache_name, allow_stale=False)
@@ -675,7 +1249,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 fallback_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
                 if fallback_payload is not None:
                     return jsonify(fallback_payload)
-                return jsonify({'items': [], 'type': 'movie', 'source': 'addarr'})
+                return jsonify({'items': [], 'type': 'movie', 'source': 'arrdash'})
 
             data = utils.fetch_trending_optimized(
                 media_type='all',
@@ -699,7 +1273,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 }
                 for movie in movies
             ]
-            payload = {'items': items, 'type': 'movie', 'source': 'addarr'}
+            payload = {'items': items, 'type': 'movie', 'source': 'arrdash'}
             _save_recent_payload(recent_cache_name, payload)
             return jsonify(payload)
         except Exception as e:
@@ -707,14 +1281,14 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             fallback_payload = _load_recent_payload('recent_home_trending', allow_stale=True)
             if fallback_payload is not None:
                 return jsonify(fallback_payload)
-            return jsonify({'items': [], 'type': 'movie', 'source': 'addarr'})
+            return jsonify({'items': [], 'type': 'movie', 'source': 'arrdash'})
 
     @app.route('/logs')
     @conditional_debug_log
     @requires_auth  
     def get_logs():
         try:
-            log_path = 'addarr.log'
+            log_path = 'arrdash.log'
             lines_to_return = min(int(request.args.get('lines', 500)), 2000)
             
             if not os.path.exists(log_path):
@@ -1046,11 +1620,15 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             return jsonify(cached_data)
 
         if media_type == 'movie':
-            data = utils.get_radarr_details(media_id)
+            data = _resolve_movie_reference(media_id=media_id)
         elif media_type == 'book':
-            data = utils.get_readarr_details(media_id)
+            data = _resolve_book_reference(
+                book_id=media_id if detail_source != 'internal' else None,
+                foreign_id=media_id if detail_source != 'internal' else None,
+                internal_id=media_id if detail_source == 'internal' else None,
+            )
         else:
-            data = utils.get_sonarr_details(media_id, source=detail_source)
+            data = _resolve_tv_reference(media_id=media_id, source=detail_source)
 
         save_media_cache(cache_key, data)
         return jsonify(data)
@@ -1880,6 +2458,11 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         if CONFIG.google_books.enabled and query:
             try:
                 gb_results = utils.search_google_books(query, max_items=8)
+                if (not gb_results) and search_title and author:
+                    logging.info("[search_online_all] Google Books returned 0 results for strict query %r; retrying title-only %r", query, search_title)
+                    gb_results = utils.search_google_books(search_title, max_items=8)
+                if not gb_results:
+                    logging.warning("[search_online_all] Google Books returned no results for query=%r title=%r author=%r", query, search_title, author)
                 for r in gb_results:
                     _genres = r.get('genres') or []
                     all_results.append({
@@ -1890,6 +2473,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                         'year':            r.get('year') or '',
                         'pages':           r.get('pageCount') or 0,
                         'cover_url':       r.get('cover_url') or r.get('remotePoster') or '',
+                        'cover_preview_url': _book_cover_preview_url(r.get('cover_url') or r.get('remotePoster') or '', r.get('title') or ''),
                         'overview':        r.get('overview') or '',
                         'genres':          _genres,
                         'genre_str':       ', '.join(_genres[:3]) if _genres else '',
@@ -1897,12 +2481,17 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                         'foreign_book_id': r.get('foreignBookId') or '',
                     })
             except Exception as e:
-                logging.warning("[search_online_all] Google Books error: %s", e)
+                logging.warning("[search_online_all] Google Books error for query=%r title=%r author=%r: %s", query, search_title, author, e, exc_info=True)
 
         # ── Readarr ────────────────────────────────────────────────────────────
         if CONFIG.readarr.enabled and query:
             try:
                 ra_results = utils.search_readarr(query)
+                if (not ra_results) and search_title and author:
+                    logging.info("[search_online_all] Readarr returned 0 results for strict query %r; retrying title-only %r", query, search_title)
+                    ra_results = utils.search_readarr(search_title)
+                if not ra_results:
+                    logging.warning("[search_online_all] Readarr returned no results for query=%r title=%r author=%r", query, search_title, author)
                 for r in (ra_results or [])[:8]:
                     author_obj  = r.get('author') or {}
                     author_name = (author_obj.get('authorName') if isinstance(author_obj, dict)
@@ -1923,14 +2512,16 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                         'year':            (r.get('releaseDate') or '')[:4] or '',
                         'pages':           r.get('pageCount') or 0,
                         'cover_url':       cover_url,
+                        'cover_preview_url': _book_cover_preview_url(cover_url, r.get('title') or ''),
                         'overview':        r.get('overview') or '',
                         'genres':          _genres,
                         'genre_str':       ', '.join(_genres[:3]) if _genres else '',
                         'isbn':            r.get('isbn') or '',
                         'foreign_book_id': str(r.get('foreignBookId') or ''),
+                        'internal_id':     r.get('id'),
                     })
             except Exception as e:
-                logging.warning("[search_online_all] Readarr error: %s", e)
+                logging.warning("[search_online_all] Readarr error for query=%r title=%r author=%r: %s", query, search_title, author, e, exc_info=True)
 
         for result in all_results:
             result['_score'] = _enrichment_match_score(
@@ -1946,6 +2537,66 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             result.pop('_score', None)
 
         return jsonify({'results': all_results})
+
+    @app.route('/api/books/relink/<int:db_id>', methods=['POST'])
+    @requires_auth
+    def books_relink(db_id):
+        data = request.get_json(force=True, silent=True) or {}
+        selected = data.get('match') or {}
+        if not isinstance(selected, dict):
+            return jsonify({'error': 'match payload required'}), 400
+
+        book = books_db.get_book_by_id(db_id)
+        if not book:
+            return jsonify({'error': 'not found'}), 404
+
+        source_key = (selected.get('source_key') or selected.get('source') or '').strip().lower()
+        author_name = (selected.get('author') or '').strip()
+        genres = selected.get('genres') or []
+        if isinstance(genres, list):
+            genre_value = ', '.join(genres[:3]) if genres else ''
+        else:
+            genre_value = str(genres or '').strip()
+
+        updated = books_db.save_book({
+            'file_path': book['file_path'],
+            'title': selected.get('title') or book.get('title'),
+            'author': author_name or book.get('author'),
+            'cover_url': selected.get('cover_url') or book.get('cover_url'),
+            'overview': selected.get('overview') or book.get('overview'),
+            'year': selected.get('year') or book.get('year'),
+            'pages': selected.get('pages') or book.get('pages'),
+            'isbn': selected.get('isbn') or book.get('isbn'),
+            'genre': genre_value or book.get('genre'),
+            'foreign_book_id': str(selected.get('foreign_book_id') or book.get('foreign_book_id') or ''),
+            'internal_id': selected.get('internal_id') or book.get('internal_id'),
+            'source': source_key or 'manual',
+        })
+        if not updated:
+            return jsonify({'error': 'failed to update local book'}), 500
+
+        cache_payload = {
+            'title': updated.get('title') or '',
+            'author': {'authorName': updated.get('author') or ''},
+            'overview': updated.get('overview') or '',
+            'releaseDate': f"{updated.get('year')}-01-01" if updated.get('year') else '',
+            'pageCount': updated.get('pages') or 0,
+            'isbn': updated.get('isbn') or '',
+            'genres': [g.strip() for g in str(updated.get('genre') or '').split(',') if g.strip()],
+            'foreignBookId': str(updated.get('foreign_book_id') or ''),
+            'internalId': updated.get('internal_id'),
+            'internal_id': updated.get('internal_id'),
+            'remotePoster': selected.get('cover_url') or updated.get('cover_url') or '',
+            'images': ([{
+                'coverType': 'poster',
+                'remoteUrl': selected.get('cover_url') or updated.get('cover_url') or '',
+                'url': selected.get('cover_url') or updated.get('cover_url') or '',
+            }] if (selected.get('cover_url') or updated.get('cover_url')) else []),
+        }
+        utils_module.save_book_metadata(cache_payload)
+        _bust_thumb_cache(updated['id'])
+
+        return jsonify({'success': True, 'book': updated})
 
     # ── Reader route for local (non-Readarr) books ─────────────────────────────
 
@@ -2008,16 +2659,15 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @app.route('/api/img')
     @requires_auth
     def img_proxy():
-        """Caching image proxy — redirect-on-miss with background fetch.
+        """Caching image proxy — local-cache-first, fetch-on-miss.
 
         Cache HIT  → served from disk instantly, no outbound request.
-        Cache MISS → browser redirected to the optimised source URL immediately;
-                     a daemon thread fetches, resizes and writes to disk so the
-                     next request is always a hit.
+        Cache MISS → fetch remote image now, resize, persist to local cache,
+                     then serve the cached file in the same response.
 
-        All events logged at INFO with the item title so addarr.log is readable.
+        All events logged at INFO with the item title so arrdash.log is readable.
         """
-        import hashlib, threading
+        import hashlib
 
         title = request.args.get('t', '')       # human-readable label for logs
         url   = request.args.get('url', '').strip()
@@ -2046,54 +2696,38 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 resp.headers['Cache-Control'] = 'public, max-age=604800'
                 return resp
 
-            # ── Cache miss: redirect browser; fetch+save in background ─────────
-            logging.info(f'[img_proxy] MISS {label} — redirecting to source, caching in background')
+            # ── Cache miss: fetch, cache, then serve locally ───────────────────
+            logging.info(f'[img_proxy] MISS {label} — fetching and caching locally')
 
-            def _fetch_and_cache(fetch_url, dest, tw, th, name):
-                """Fetch image from source URL with Plex authentication support.
+            headers = {'User-Agent': 'arrdash/1.0'}
 
-                Detects Plex URLs and includes X-Plex-Token header for authenticated requests.
-                Other sources (TMDB, etc.) use only User-Agent header.
-                """
-                try:
-                    # Build headers with User-Agent
-                    headers = {'User-Agent': 'addarr/1.0'}
+            plex_base_url = CONFIG.plex.url.rstrip('/') if CONFIG.plex.url else ''
+            is_plex_url = (
+                'plex.tv' in norm_url or
+                '127.0.0.1:32400' in norm_url or
+                (plex_base_url and plex_base_url in norm_url)
+            )
 
-                    # Detect if URL is from Plex and add authentication token
-                    plex_base_url = CONFIG.plex.url.rstrip('/') if CONFIG.plex.url else ''
-                    is_plex_url = (
-                        'plex.tv' in fetch_url or
-                        '127.0.0.1:32400' in fetch_url or
-                        (plex_base_url and plex_base_url in fetch_url)
-                    )
+            if is_plex_url and CONFIG.plex.token:
+                headers['X-Plex-Token'] = CONFIG.plex.token
+                logging.debug(f'[img_proxy] Plex URL detected, adding X-Plex-Token header')
 
-                    if is_plex_url and CONFIG.plex.token:
-                        headers['X-Plex-Token'] = CONFIG.plex.token
-                        logging.debug(f'[img_proxy] Plex URL detected, adding X-Plex-Token header')
+            r = requests.get(norm_url, timeout=15, headers=headers)
+            if r.status_code != 200:
+                logging.warning(f'[img_proxy] Fetch failed {label}: HTTP {r.status_code}')
+                return '', 404
 
-                    r = requests.get(fetch_url, timeout=15, headers=headers)
+            img = Image.open(io.BytesIO(r.content)).convert('RGB')
+            img.thumbnail((w, h), Image.LANCZOS)
+            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+            tmp = cache_file + '.tmp'
+            img.save(tmp, format='JPEG', quality=75, optimize=True)
+            os.replace(tmp, cache_file)
+            logging.info(f'[img_proxy] SAVE {label} → cache updated ({w}×{h}px)')
 
-                    if r.status_code != 200:
-                        logging.warning(f'[img_proxy] Fetch failed {name!r}: HTTP {r.status_code}')
-                        return
-                    img = Image.open(io.BytesIO(r.content)).convert('RGB')
-                    img.thumbnail((tw, th), Image.LANCZOS)
-                    os.makedirs(os.path.dirname(dest), exist_ok=True)
-                    tmp = dest + '.tmp'
-                    img.save(tmp, format='JPEG', quality=75, optimize=True)
-                    os.replace(tmp, dest)
-                    logging.info(f'[img_proxy] SAVE {name!r} → cache updated ({tw}×{th}px)')
-                except Exception as exc:
-                    logging.warning(f'[img_proxy] Cache error {name!r}: {exc}')
-
-            threading.Thread(
-                target=_fetch_and_cache,
-                args=(norm_url, cache_file, w, h, title or url[:60]),
-                daemon=True,
-                name=f'img-{cache_key}'
-            ).start()
-
-            return redirect(norm_url, 302)
+            resp = send_file(cache_file, mimetype='image/jpeg')
+            resp.headers['Cache-Control'] = 'public, max-age=604800'
+            return resp
 
         except Exception as exc:
             logging.error(f'[img_proxy] CRASH for {label}: {exc}', exc_info=True)
@@ -2107,7 +2741,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         Usage: /api/readarr/cover?path=/api/v1/mediacover/39/cover.jpg?lastWrite=...
         """
         path = request.args.get('path', '')
-        if not path or '/mediacover' not in path:
+        if not path or 'mediacover' not in path.lower():
             return '', 404
         try:
             # Strip the leading /api/v1 prefix — requests wants the full URL
@@ -2170,7 +2804,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
 
             def make_urls(svc_url):
                 """Return the configured service URL as 'local'.
-                   Pinggy only tunnels Addarr's own port — individual service ports
+                   Pinggy only tunnels arrdash's own port — individual service ports
                    are NOT forwarded, so no Pinggy URL is provided for services.
                    If the URL uses 'localhost' or '127.0.0.1', substitute the LAN IP
                    so the link is reachable from the same device that opened the page.
@@ -2437,6 +3071,9 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         year = data.get('year')
         tvdb_id = data.get('tvdb_id')
         sonarr_id = data.get('sonarr_id')
+        poster = (data.get('poster') or '').strip()
+        matched_title = (data.get('matched_title') or '').strip()
+        matched_year = data.get('matched_year')
 
         if not plex_id or not title or not tvdb_id:
             return jsonify({'error': 'plex_id, title and tvdb_id are required'}), 400
@@ -2447,10 +3084,11 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         current = mapping.get(plex_id, {})
         mapping[plex_id] = {
             **current,
-            'title': title,
-            'year': year,
+            'title': matched_title or title,
+            'year': matched_year or year,
             'tvdbId': tvdb_id,
             'sonarrId': sonarr_id or current.get('sonarrId'),
+            'poster': poster or current.get('poster'),
             'updatedAt': time.time(),
             'reason': 'manual-rebind'
         }
@@ -2481,6 +3119,9 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         title = (data.get('title') or '').strip()
         year = data.get('year')
         tmdb_id = data.get('tmdb_id')
+        poster = (data.get('poster') or '').strip()
+        matched_title = (data.get('matched_title') or '').strip()
+        matched_year = data.get('matched_year')
 
         if not plex_id or not title or not tmdb_id:
             return jsonify({'error': 'plex_id, title and tmdb_id are required'}), 400
@@ -2491,9 +3132,10 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         current = mapping.get(plex_id, {})
         mapping[plex_id] = {
             **current,
-            'title': title,
-            'year': year,
+            'title': matched_title or title,
+            'year': matched_year or year,
             'tmdbId': tmdb_id,
+            'poster': poster or current.get('poster'),
             'updatedAt': time.time(),
             'reason': 'manual-relink'
         }
@@ -2669,6 +3311,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 'title': item.get('title'),
                 'year': item.get('year'),
                 'tmdbId': tmdb_id or current.get('tmdbId'),
+                'poster': item.get('poster') or current.get('poster'),
                 'updatedAt': time.time(),
                 'reason': reason,
             }
@@ -2687,6 +3330,12 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             current_year = str(item.get('year') or '').strip()
             if cached_title and cached_title == current_title and (not cached_year or not current_year or cached_year == current_year):
                 item['tmdbId'] = cached.get('tmdbId')
+                if cached.get('poster'):
+                    item['poster'] = cached.get('poster')
+                if cached.get('title'):
+                    item['title'] = cached.get('title')
+                if cached.get('year'):
+                    item['year'] = cached.get('year')
                 return bool(item.get('tmdbId'))
             return False
 
@@ -2823,43 +3472,31 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         else:
             logging.info("[recently_downloaded_movies] Plex is DISABLED. Skipping to Radarr fallback.")
 
-        # Fallback to Radarr (SECONDARY SOURCE)
-        logging.info("[recently_downloaded_movies] ========== RADARR/SONARR FALLBACK ==========")
+        # Fallback to local cached Radarr library
+        logging.info("[recently_downloaded_movies] ========== LOCAL LIBRARY FALLBACK ==========")
         if CONFIG.radarr.enabled:
-            logging.info("[recently_downloaded_movies] Radarr is ENABLED. Attempting Radarr call...")
             try:
-                logging.info("[recently_downloaded_movies] Radarr URL: %s", CONFIG.radarr.url)
-                resp = requests.get(
-                    f"{CONFIG.radarr.url}/api/v3/movie",
-                    params={'apikey': CONFIG.radarr.api_key, 'sortKey': 'added', 'sortDirection': 'descending'},
-                    timeout=15
-                )
-                logging.info("[recently_downloaded_movies] Radarr response code: %s", resp.status_code)
+                movies = get_cached_library('movie') or []
+                logging.info("[recently_downloaded_movies] Library cache returned %d total movies", len(movies))
 
-                if resp.status_code == 200:
-                    movies = resp.json()
-                    logging.info("[recently_downloaded_movies] Radarr returned %d total movies", len(movies))
-
-                    items = [
-                        {
-                            'id': m.get('id'),
-                            'tmdbId': m.get('tmdbId'),
-                            'title': m.get('title'),
-                            'poster': f"/api/img?url={quote(m.get('remotePoster', ''))}&w=150&h=225&t={quote(m.get('title', ''))}" if m.get('remotePoster') else '/static/images/apple-touch-icon.png',
-                            'hasFile': m.get('hasFile', False),
-                            'year': m.get('year'),
-                            'rating': m.get('ratings', {}).get('value', 'N/A')
-                        }
-                        for m in movies if m.get('hasFile')
-                    ][:20]
-                    logging.info("[recently_downloaded_movies] Radarr: filtered to %d movies with files. Returning from Radarr.", len(items))
-                    payload = {'items': items, 'type': 'movie', 'source': 'radarr'}
-                    _save_recent_payload(recent_cache_name, payload)
-                    return jsonify(payload)
-                else:
-                    logging.warning("[recently_downloaded_movies] Radarr returned non-200 status: %s", resp.status_code)
+                items = [
+                    {
+                        'id': m.get('id'),
+                        'tmdbId': m.get('tmdbId'),
+                        'title': m.get('title'),
+                        'poster': f"/api/img?url={quote(m.get('remotePoster', ''))}&w=150&h=225&t={quote(m.get('title', ''))}" if m.get('remotePoster') else '/static/images/apple-touch-icon.png',
+                        'hasFile': m.get('hasFile', False),
+                        'year': m.get('year'),
+                        'rating': m.get('ratings', {}).get('value', 'N/A')
+                    }
+                    for m in movies if m.get('hasFile')
+                ][:20]
+                logging.info("[recently_downloaded_movies] Library fallback: filtered to %d movies with files.", len(items))
+                payload = {'items': items, 'type': 'movie', 'source': 'radarr'}
+                _save_recent_payload(recent_cache_name, payload)
+                return jsonify(payload)
             except Exception as e:
-                logging.warning("[recently_downloaded_movies] Radarr error: %s", e, exc_info=True)
+                logging.warning("[recently_downloaded_movies] Local movie library fallback error: %s", e, exc_info=True)
         else:
             logging.info("[recently_downloaded_movies] Radarr is DISABLED. Skipping Radarr.")
 
@@ -2907,6 +3544,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
                 'year': item.get('year'),
                 'tvdbId': tvdb_id or current.get('tvdbId'),
                 'sonarrId': sonarr_id or current.get('sonarrId'),
+                'poster': item.get('poster') or current.get('poster'),
                 'updatedAt': time.time(),
                 'reason': reason,
             }
@@ -2930,6 +3568,12 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             if title_matches and year_matches:
                 item['tvdbId'] = cached.get('tvdbId')
                 item['sonarrId'] = cached.get('sonarrId')
+                if cached.get('poster'):
+                    item['poster'] = cached.get('poster')
+                if cached.get('title'):
+                    item['title'] = cached.get('title')
+                if cached.get('year'):
+                    item['year'] = cached.get('year')
                 if item.get('tvdbId') or item.get('sonarrId'):
                     logging.info("[recently_downloaded_tv] Plex '%s' restored from local cache -> TVDB %s / Sonarr %s",
                                  item.get('title'), item.get('tvdbId'), item.get('sonarrId'))
@@ -3107,45 +3751,33 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
         else:
             logging.info("[recently_downloaded_tv] Plex is DISABLED. Skipping to Sonarr fallback.")
 
-        # Fallback to Sonarr (SECONDARY SOURCE)
-        logging.info("[recently_downloaded_tv] ========== RADARR/SONARR FALLBACK ==========")
+        # Fallback to local cached Sonarr library
+        logging.info("[recently_downloaded_tv] ========== LOCAL LIBRARY FALLBACK ==========")
         if CONFIG.sonarr.enabled:
-            logging.info("[recently_downloaded_tv] Sonarr is ENABLED. Attempting Sonarr call...")
             try:
-                logging.info("[recently_downloaded_tv] Sonarr URL: %s", CONFIG.sonarr.url)
-                resp = requests.get(
-                    f"{CONFIG.sonarr.url}/api/v3/series",
-                    params={'apikey': CONFIG.sonarr.api_key, 'sortKey': 'added', 'sortDirection': 'descending'},
-                    timeout=15
-                )
-                logging.info("[recently_downloaded_tv] Sonarr response code: %s", resp.status_code)
+                series = get_cached_library('tv') or []
+                logging.info("[recently_downloaded_tv] Library cache returned %d total series", len(series))
 
-                if resp.status_code == 200:
-                    series = resp.json()
-                    logging.info("[recently_downloaded_tv] Sonarr returned %d total series", len(series))
-
-                    items = [
-                        {
-                            'id': s.get('id'),
-                            'sonarrId': s.get('id'),
-                            'tvdbId': s.get('tvdbId'),
-                            'title': s.get('title'),
-                            'poster': f"/api/img?url={quote(s.get('remotePoster', ''))}&w=150&h=225&t={quote(s.get('title', ''))}" if s.get('remotePoster') else '/static/images/apple-touch-icon.png',
-                            'year': s.get('year'),
-                            'seasons': s.get('statistics', {}).get('seasonCount', 0),
-                            'episodes': s.get('statistics', {}).get('episodeFileCount', 0),
-                            'rating': s.get('ratings', {}).get('value', 'N/A')
-                        }
-                        for s in series if s.get('statistics', {}).get('episodeFileCount', 0) > 0
-                    ][:20]
-                    logging.info("[recently_downloaded_tv] Sonarr: filtered to %d series with episodes. Returning from Sonarr.", len(items))
-                    payload = {'items': items, 'type': 'tv', 'source': 'sonarr'}
-                    _save_recent_payload(recent_cache_name, payload)
-                    return jsonify(payload)
-                else:
-                    logging.warning("[recently_downloaded_tv] Sonarr returned non-200 status: %s", resp.status_code)
+                items = [
+                    {
+                        'id': s.get('id'),
+                        'sonarrId': s.get('id'),
+                        'tvdbId': s.get('tvdbId'),
+                        'title': s.get('title'),
+                        'poster': f"/api/img?url={quote(s.get('remotePoster', ''))}&w=150&h=225&t={quote(s.get('title', ''))}" if s.get('remotePoster') else '/static/images/apple-touch-icon.png',
+                        'year': s.get('year'),
+                        'seasons': s.get('statistics', {}).get('seasonCount', 0),
+                        'episodes': s.get('statistics', {}).get('episodeFileCount', 0),
+                        'rating': s.get('ratings', {}).get('value', 'N/A')
+                    }
+                    for s in series if s.get('statistics', {}).get('episodeFileCount', 0) > 0
+                ][:20]
+                logging.info("[recently_downloaded_tv] Library fallback: filtered to %d series with episodes.", len(items))
+                payload = {'items': items, 'type': 'tv', 'source': 'sonarr'}
+                _save_recent_payload(recent_cache_name, payload)
+                return jsonify(payload)
             except Exception as e:
-                logging.warning("[recently_downloaded_tv] Sonarr error: %s", e, exc_info=True)
+                logging.warning("[recently_downloaded_tv] Local TV library fallback error: %s", e, exc_info=True)
         else:
             logging.info("[recently_downloaded_tv] Sonarr is DISABLED. Skipping Sonarr.")
 
@@ -3158,7 +3790,7 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
     @app.route('/api/recently-downloaded/books')
     @requires_auth
     def get_recently_downloaded_books():
-        """Fetch recently downloaded books from Readarr (Plex not supported for books)"""
+        """Fetch recently downloaded books from local database only (source of truth for downloaded books)"""
         recent_cache_name = 'recent_books'
 
         if _cached_only_requested():
@@ -3170,29 +3802,36 @@ def init_routes(app, config_manager, update_manager, auth_decorator, debug_decor
             if cached_payload is not None:
                 return jsonify(cached_payload)
 
-        if not CONFIG.readarr.enabled:
-            fallback_payload = _load_recent_payload(recent_cache_name, allow_stale=True)
-            if fallback_payload is not None:
-                return jsonify(fallback_payload)
-            return jsonify({'items': []})
-
         try:
-            books = get_cached_library('book') or []
-            # Return only books with files, limit to 20
-            items = [
-                {
-                    'id': b.get('id'),
-                    'foreignBookId': b.get('foreignBookId'),
-                    'title': b.get('title'),
-                    'author': b.get('authorTitle'),
-                    'poster': f"/api/book/cover/{b.get('id')}?w=150&h=225" if b.get('id') else '/static/images/apple-touch-icon.png',
-                    'year': b.get('releaseDate', '')[:4] if b.get('releaseDate') else 'N/A',
-                    'pages': b.get('pageCount', 0)
-                }
-                for b in books if b.get('statistics', {}).get('bookFileCount', 0) > 0
-            ][:20]
+            # ── Use LOCAL DATABASE as source of truth (only books actually on disk) ──
+            books_db.init_db()
+            with books_db._connect() as conn:
+                # Get recently updated books from local DB, sorted by updated_at descending
+                rows = conn.execute('''
+                    SELECT * FROM books
+                    ORDER BY updated_at DESC
+                    LIMIT 20
+                ''').fetchall()
+                local_books = [dict(row) for row in rows]
 
-            payload = {'items': items, 'type': 'book', 'source': 'readarr'}
+            items = []
+            for local_book in local_books:
+                local_book_id = local_book.get('id')
+                poster_version = quote(str(local_book.get('updated_at') or ''))
+                poster = f"/api/book/cover/{local_book_id}?w=150&h=225{('&v=' + poster_version) if poster_version else ''}"
+
+                items.append({
+                    'id': local_book_id,
+                    'foreignBookId': local_book.get('foreign_book_id') or '',
+                    'title': local_book.get('title') or 'Unknown',
+                    'author': local_book.get('author') or 'Unknown Author',
+                    'poster': poster,
+                    'year': str(local_book.get('year')) if local_book.get('year') else 'N/A',
+                    'pages': local_book.get('pages') or 0,
+                    'source': 'local',
+                })
+
+            payload = {'items': items, 'type': 'book', 'source': 'local'}
             _save_recent_payload(recent_cache_name, payload)
             return jsonify(payload)
         except Exception as e:

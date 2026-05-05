@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM ADDARR Flask Application Launcher
+REM arrdash Flask Application Launcher
 REM Restart Monitor as Background Daemon Thread
 REM ============================================================
 REM
@@ -26,7 +26,7 @@ cd /d "%~dp0"
 
 echo.
 echo ===============================================
-echo    ADDARR - Flask Application Launcher
+echo    arrdash - Flask Application Launcher
 echo    Built-in Restart Monitor
 echo ===============================================
 echo.
